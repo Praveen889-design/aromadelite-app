@@ -1,0 +1,21 @@
+{
+  "name": "aromadelite-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Aromadelite Quote & Lead Manager — single-command runner for the React client and Express API.",
+  "scripts": {
+    "install:all":  "npm --prefix server install && npm --prefix client install",
+    "seed":         "npm --prefix server run seed",
+
+    "dev:api":      "npm --prefix server run dev",
+    "dev:web":      "npm --prefix client start",
+    "dev":          "concurrently -k -n api,web -c cyan,magenta \"npm:dev:api\" \"npm:dev:web\"",
+
+    "build":        "npm --prefix client run build",
+    "start":        "npm --prefix server run start:prod",
+    "prod":         "npm run build && npm start"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

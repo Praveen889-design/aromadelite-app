@@ -1,0 +1,48 @@
+{
+  "name": "aromadelite-client",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "axios": "^1.7.7",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^2.5.2",
+    "jspdf-autotable": "^3.8.3",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-hot-toast": "^2.6.0",
+    "react-router-dom": "^6.26.2",
+    "react-scripts": "5.0.1",
+    "recharts": "^3.8.1"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^3.4.13"
+  },
+  "scripts": {
+    "start": "BROWSER=none PORT=3000 react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "android:init":  "npm install -D @capacitor/cli @capacitor/core @capacitor/android && npx cap add android",
+    "android:sync":  "npm run build && npx cap sync android",
+    "android:open":  "npx cap open android",
+    "android:build": "npm run android:sync && cd android && ./gradlew assembleDebug && echo \"APK at $(pwd)/app/build/outputs/apk/debug/app-debug.apk\""
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app"
+    ]
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  }
+}
