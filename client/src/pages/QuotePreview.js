@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import api from '../utils/api';
@@ -70,7 +70,6 @@ const groupByCategory = (items) => {
 
 export default function QuotePreview() {
   const { id } = useParams();
-  const navigate = useNavigate();
   const { toast } = useToast();
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
@@ -87,7 +86,7 @@ export default function QuotePreview() {
     }
   };
 
-  useEffect(() => { fetchQuote(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [id]);
+  useEffect(() => { fetchQuote(); }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const gstBuckets = useMemo(() => {
     const buckets = { 12: { base: 0, gst: 0 }, 18: { base: 0, gst: 0 } };

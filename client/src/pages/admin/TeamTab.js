@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import api from '../../utils/api';
 import { useToast } from '../../components/Toast';
 import EmployeeModal from '../../components/admin/EmployeeModal';
@@ -9,7 +8,6 @@ const formatINR = (n) =>
 
 export default function TeamTab({ onSwitchTab }) {
   const { toast } = useToast();
-  const navigate = useNavigate();
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);

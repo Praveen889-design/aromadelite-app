@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../utils/api';
 import { useToast } from '../Toast';
-import { CLIENT_TYPE_LABEL, STATUS_LABEL, ClientTypeBadge, StatusBadge } from './badges';
+import { STATUS_LABEL, ClientTypeBadge, StatusBadge } from './badges';
 
 const formatINR = (n) =>
   new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n || 0);
