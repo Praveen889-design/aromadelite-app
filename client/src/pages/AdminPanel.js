@@ -487,6 +487,289 @@ const PipelineFunnel = ({ pipeline }) => {
   );
 };
 
+// ─── Aging Quotes Alert ──────────────────────────────────────
+const AGE_BUCKETS = [
+  { key: 'critical', label: 'Critical',  days: '30+ days', bg: '#FEF2F2', fg: '#991B1B', bar: '#EF4444', border: '#FECACA', pill: '#FEE2E2' },
+  { key: 'warning',  label: 'Warning',   days: '14–29 days', bg: '#FFF7ED', fg: '#9A3412', bar: '#F97316', border: '#FED7AA', pill: '#FFEDD5' },
+  { key: 'notice',   label: 'Notice',    days: '7–13 days', bg: '#FEFCE8', fg: '#92400E', bar: '#EAB308', border: '#FEF08A', pill: '#FEF9C3' },
+];
+
+function AgingQuotesAlert() {
+  const [data,      setData]      = useState(null);
+  const [loading,   setLoading]   = useState(true);
+  const [expanded,  setExpanded]  = useState(false);
+  const [filter,    setFilter]    = useState('all'); // 'all' | 'critical' | 'warning' | 'notice'
+  const { toast }                 = useToast();
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data: res } = await api.get('/api/quotes/aging');
+      setData(res);
+    } catch (e) {
+      console.warn('[aging]', e);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const updateStatus = async (q, status) => {
+    try {
+      await api.patch(`/api/quotes/${q.id}/status`, { status });
+      toast(`${q.quote_number} marked ${status}.`, { kind: 'success' });
+      load();
+    } catch (e) {
+      toast(e?.response?.data?.error || 'Update failed', { kind: 'error' });
+    }
+  };
+
+  if (loading || !data || data.summary.total === 0) return null;
+
+  const { summary, quotes } = data;
+  const visible = filter === 'all' ? quotes : quotes.filter((q) => q.bucket === filter);
+  const bucketCfg = (key) => AGE_BUCKETS.find((b) => b.key === key) || AGE_BUCKETS[2];
+
+  return (
+    <div style={{
+      border: '1px solid #FECACA',
+      borderRadius: 14, overflow: 'hidden',
+      boxShadow: '0 2px 12px rgba(239,68,68,.08)',
+      background: '#FFFBFB',
+    }}>
+      {/* ── Header ── */}
+      <div style={{
+        padding: '13px 18px',
+        background: 'linear-gradient(90deg, #FEF2F2, #FFF7ED)',
+        borderBottom: expanded ? '1px solid #FECACA' : 'none',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        flexWrap: 'wrap', gap: 10, cursor: 'pointer',
+      }} onClick={() => setExpanded((x) => !x)}>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {/* Pulse dot */}
+          <span style={{
+            display: 'inline-block', width: 10, height: 10, borderRadius: '50%',
+            background: '#EF4444',
+            boxShadow: summary.critical > 0 ? '0 0 0 3px #FECACA' : 'none',
+          }} />
+          <div>
+            <span style={{
+              fontFamily: "'Nunito', sans-serif", fontWeight: 800, fontSize: 14,
+              color: '#991B1B',
+            }}>⚠ Aging Quotes Alert</span>
+            <span style={{
+              marginLeft: 8,
+              fontFamily: "'Source Sans 3', sans-serif", fontSize: 11.5, color: '#B91C1C',
+            }}>{summary.total} quote{summary.total !== 1 ? 's' : ''} waiting for action</span>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {AGE_BUCKETS.map((b) => summary[b.key] > 0 && (
+            <span key={b.key} style={{
+              background: b.pill, color: b.fg,
+              fontFamily: "'Nunito', sans-serif", fontWeight: 800, fontSize: 11,
+              padding: '3px 10px', borderRadius: 999,
+              border: `1px solid ${b.border}`,
+            }}>
+              {summary[b.key]} {b.label}
+            </span>
+          ))}
+          <span style={{
+            marginLeft: 4, fontSize: 13, color: '#9CA3AF', fontWeight: 600,
+            fontFamily: "'Source Sans 3', sans-serif",
+          }}>{expanded ? '▲' : '▼'}</span>
+        </div>
+      </div>
+
+      {/* ── Expanded body ── */}
+      {expanded && (
+        <div>
+          {/* Filter tabs */}
+          <div style={{
+            padding: '10px 18px 0',
+            display: 'flex', gap: 6, flexWrap: 'wrap',
+          }}>
+            {[{ key: 'all', label: `All (${summary.total})` },
+              ...AGE_BUCKETS.filter((b) => summary[b.key] > 0).map((b) => ({
+                key: b.key, label: `${b.label} (${summary[b.key]})`,
+              }))
+            ].map((tab) => (
+              <button key={tab.key} onClick={() => setFilter(tab.key)} style={{
+                border: '1px solid',
+                borderColor: filter === tab.key ? '#EF4444' : '#E5E7EB',
+                borderRadius: 8, background: filter === tab.key ? '#FEF2F2' : '#fff',
+                color: filter === tab.key ? '#991B1B' : '#6B7280',
+                fontFamily: "'Source Sans 3', sans-serif", fontWeight: 700,
+                fontSize: 11.5, padding: '4px 12px', cursor: 'pointer',
+              }}>{tab.label}</button>
+            ))}
+          </div>
+
+          {/* Table */}
+          <div style={{ overflowX: 'auto', padding: '10px 0 0' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ background: '#F8FAFC' }}>
+                  {['Age', 'Quote', 'Client', 'Associate', 'Status', 'Amount', 'Follow-up', 'Actions'].map((h, i) => (
+                    <th key={i} style={{
+                      fontFamily: "'Source Sans 3', sans-serif", fontWeight: 700,
+                      fontSize: 10, color: '#0E7490', letterSpacing: '.07em',
+                      textTransform: 'uppercase', padding: '8px 12px',
+                      textAlign: i >= 5 ? 'right' : 'left',
+                      borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap',
+                    }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {visible.map((q) => {
+                  const cfg = bucketCfg(q.bucket);
+                  const overdue = q.next_follow_up_date &&
+                    q.next_follow_up_date < new Date().toISOString().slice(0, 10);
+                  return (
+                    <tr key={q.id} style={{
+                      borderBottom: '1px solid #F1F5F9',
+                      borderLeft: `3px solid ${cfg.bar}`,
+                      background: filter === 'all' ? '#fff' : cfg.bg,
+                    }}>
+                      {/* Age */}
+                      <td style={{ padding: '10px 12px' }}>
+                        <span style={{
+                          display: 'inline-block',
+                          background: cfg.pill, color: cfg.fg,
+                          fontFamily: "'DM Mono', monospace", fontWeight: 700, fontSize: 11,
+                          padding: '3px 8px', borderRadius: 999,
+                          border: `1px solid ${cfg.border}`,
+                          whiteSpace: 'nowrap',
+                        }}>{q.age_days}d old</span>
+                      </td>
+                      {/* Quote # */}
+                      <td style={{ padding: '10px 12px' }}>
+                        <a href={`/quotes/${q.id}`} style={{
+                          fontFamily: "'DM Mono', monospace", fontWeight: 700,
+                          fontSize: 12, color: '#0E7490', textDecoration: 'none',
+                        }}>{q.quote_number}</a>
+                        <div style={{
+                          fontFamily: "'Source Sans 3', sans-serif",
+                          fontSize: 10, color: '#9CA3AF', marginTop: 1,
+                        }}>{q.created_at?.slice(0, 10)}</div>
+                      </td>
+                      {/* Client */}
+                      <td style={{ padding: '10px 12px', maxWidth: 160 }}>
+                        <div style={{
+                          fontFamily: "'Nunito', sans-serif", fontWeight: 700,
+                          fontSize: 12.5, color: '#164E63',
+                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                        }}>{q.client_business_name || q.client_name}</div>
+                        <div style={{
+                          fontFamily: "'Source Sans 3', sans-serif",
+                          fontSize: 10.5, color: '#6B7280',
+                        }}>{q.client_name} · {q.client_city || '—'}</div>
+                      </td>
+                      {/* Associate */}
+                      <td style={{ padding: '10px 12px' }}>
+                        <div style={{
+                          fontFamily: "'Source Sans 3', sans-serif",
+                          fontSize: 12, color: '#374151', fontWeight: 600,
+                        }}>{q.employee_name}</div>
+                        <div style={{
+                          fontFamily: "'DM Mono', monospace",
+                          fontSize: 10, color: '#9CA3AF',
+                        }}>{q.employee_code}</div>
+                      </td>
+                      {/* Status */}
+                      <td style={{ padding: '10px 12px' }}>
+                        <span style={{
+                          display: 'inline-block',
+                          background: q.status === 'sent' ? '#ECFEFF' : '#F1F5F9',
+                          color:      q.status === 'sent' ? '#0E7490'  : '#374151',
+                          fontFamily: "'Source Sans 3', sans-serif", fontWeight: 700,
+                          fontSize: 9.5, padding: '2px 8px', borderRadius: 999,
+                          textTransform: 'uppercase', letterSpacing: '.06em',
+                        }}>{q.status}</span>
+                      </td>
+                      {/* Amount */}
+                      <td style={{
+                        padding: '10px 12px', textAlign: 'right',
+                        fontFamily: "'DM Mono', monospace", fontWeight: 600,
+                        fontSize: 12, color: '#164E63', whiteSpace: 'nowrap',
+                      }}>
+                        {new Intl.NumberFormat('en-IN', {
+                          style: 'currency', currency: 'INR', maximumFractionDigits: 0,
+                        }).format(q.total_amount)}
+                      </td>
+                      {/* Follow-up */}
+                      <td style={{ padding: '10px 12px', textAlign: 'right' }}>
+                        {q.next_follow_up_date ? (
+                          <span style={{
+                            display: 'inline-block',
+                            background: overdue ? '#FEE2E2' : '#ECFEFF',
+                            color: overdue ? '#991B1B' : '#0E7490',
+                            fontFamily: "'DM Mono', monospace", fontSize: 10,
+                            fontWeight: 700, padding: '2px 7px', borderRadius: 6,
+                          }}>
+                            {overdue ? '⚠ ' : ''}{q.next_follow_up_date}
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: 11, color: '#D1D5DB' }}>—</span>
+                        )}
+                      </td>
+                      {/* Actions */}
+                      <td style={{ padding: '10px 12px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                        <button
+                          onClick={() => updateStatus(q, 'accepted')}
+                          style={{
+                            background: '#D1FAE5', color: '#065F46', border: 0,
+                            borderRadius: 6, padding: '4px 9px', fontSize: 11,
+                            fontFamily: "'Source Sans 3', sans-serif", fontWeight: 700,
+                            cursor: 'pointer', marginRight: 4,
+                          }}>✓ Accept</button>
+                        <button
+                          onClick={() => updateStatus(q, 'rejected')}
+                          style={{
+                            background: '#FEE2E2', color: '#991B1B', border: 0,
+                            borderRadius: 6, padding: '4px 9px', fontSize: 11,
+                            fontFamily: "'Source Sans 3', sans-serif", fontWeight: 700,
+                            cursor: 'pointer',
+                          }}>✕ Reject</button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Footer total value */}
+          <div style={{
+            padding: '10px 18px',
+            borderTop: '1px solid #FEE2E2',
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          }}>
+            <span style={{
+              fontFamily: "'Source Sans 3', sans-serif", fontSize: 11.5, color: '#9CA3AF',
+            }}>
+              {visible.length} quote{visible.length !== 1 ? 's' : ''} shown
+            </span>
+            <span style={{
+              fontFamily: "'DM Mono', monospace", fontWeight: 700, fontSize: 13,
+              color: '#991B1B',
+            }}>
+              Total at risk:{' '}
+              {new Intl.NumberFormat('en-IN', {
+                style: 'currency', currency: 'INR', maximumFractionDigits: 0,
+              }).format(visible.reduce((s, q) => s + q.total_amount, 0))}
+            </span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── P&L table ───────────────────────────────────────────────
 const fmtINR = (v) =>
   new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(v || 0);
@@ -1042,6 +1325,9 @@ function OverviewTab() {
           value={`${stats.leads.conversion_rate}%`}
           sub="lead → converted" />
       </div>
+
+      {/* Aging Quotes Alert */}
+      <AgingQuotesAlert />
 
       {/* Team performance + Leads by biz */}
       <div style={{

@@ -130,6 +130,51 @@ router.get('/', async (req, res) => {
   }
 });
 
+// GET /api/quotes/aging  — admin-only, quotes ≥7 days old still in draft/sent
+router.get('/aging', async (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
+  try {
+    const threshold = Math.max(1, Number(req.query.threshold) || 7);
+    const { rows } = await pool.query(`
+      SELECT
+        q.id, q.quote_number, q.status, q.total_amount,
+        q.client_name, q.client_business_name, q.client_city, q.client_type,
+        q.next_follow_up_date, q.expected_order_date,
+        q.created_at,
+        (CURRENT_DATE - q.created_at::date) AS age_days,
+        e.name  AS employee_name,
+        e.employee_id AS employee_code,
+        e.region
+      FROM quotes q
+      JOIN employees e ON e.id = q.employee_id
+      WHERE q.status IN ('draft', 'sent')
+        AND q.created_at::date <= CURRENT_DATE - ($1 * INTERVAL '1 day')
+      ORDER BY age_days DESC
+    `, [threshold]);
+
+    const bucket = (d) =>
+      d >= 30 ? 'critical' : d >= 14 ? 'warning' : 'notice';
+
+    const quotes = rows.map((r) => ({
+      ...r,
+      age_days: Number(r.age_days),
+      total_amount: +Number(r.total_amount).toFixed(2),
+      bucket: bucket(Number(r.age_days)),
+    }));
+
+    const summary = {
+      critical: quotes.filter((q) => q.bucket === 'critical').length,
+      warning:  quotes.filter((q) => q.bucket === 'warning').length,
+      notice:   quotes.filter((q) => q.bucket === 'notice').length,
+      total:    quotes.length,
+    };
+
+    res.json({ threshold, summary, quotes });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.get('/:id', async (req, res) => {
   try {
     const { rows } = await pool.query(`
