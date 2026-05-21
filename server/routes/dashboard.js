@@ -115,6 +115,32 @@ router.get('/stats', async (req, res) => {
       return acc;
     }, {});
 
+    // Pipeline funnel — count + estimated value per status
+    const pipelineRes = isAdmin
+      ? await pool.query(`
+          SELECT status,
+                 COUNT(*) AS count,
+                 COALESCE(SUM(estimated_monthly_value), 0) AS value
+          FROM leads GROUP BY status
+        `)
+      : await pool.query(`
+          SELECT status,
+                 COUNT(*) AS count,
+                 COALESCE(SUM(estimated_monthly_value), 0) AS value
+          FROM leads WHERE employee_id = $1 GROUP BY status
+        `, [req.user.id]);
+    const PIPELINE_STAGES = ['new', 'contacted', 'qualified', 'converted', 'lost'];
+    const pipeline_stages = PIPELINE_STAGES.reduce((acc, s) => {
+      acc[s] = { count: 0, value: 0 };
+      return acc;
+    }, {});
+    for (const r of pipelineRes.rows) {
+      const key = r.status || 'new';
+      if (pipeline_stages[key]) {
+        pipeline_stages[key] = { count: Number(r.count), value: +Number(r.value).toFixed(2) };
+      }
+    }
+
     // Recent activity
     const activityRes = isAdmin
       ? await pool.query(`
@@ -151,6 +177,7 @@ router.get('/stats', async (req, res) => {
         top_products,
         associate_performance: perfRes.rows,
         leads_by_client_type,
+        pipeline_stages,
         recent_activity: activityRes.rows,
       },
     });

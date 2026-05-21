@@ -289,6 +289,202 @@ const TeamRow = ({ emp, rank, best }) => {
   );
 };
 
+// ─── Pipeline funnel ─────────────────────────────────────────
+const PIPE_STAGES = [
+  { key: 'new',       label: 'New Leads',  color: '#475569', fill: '#64748B', light: '#F1F5F9' },
+  { key: 'contacted', label: 'Contacted',  color: '#0E7490', fill: '#0891B2', light: '#ECFEFF' },
+  { key: 'qualified', label: 'Qualified',  color: '#6D28D9', fill: '#7C3AED', light: '#EDE9FE' },
+  { key: 'converted', label: 'Converted',  color: '#065F46', fill: '#059669', light: '#D1FAE5' },
+];
+
+const ArrowRight = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+       strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+    <path d="M5 12h14M13 6l6 6-6 6" />
+  </svg>
+);
+
+const PipelineFunnel = ({ pipeline }) => {
+  const topCount   = pipeline.new?.count       || 0;
+  const lostCount  = pipeline.lost?.count      || 0;
+  const convCount  = pipeline.converted?.count || 0;
+  const grandTotal = PIPE_STAGES.reduce((s, st) => s + (pipeline[st.key]?.count || 0), 0) + lostCount;
+  const overallConv = grandTotal > 0 ? Math.round((convCount / grandTotal) * 100) : 0;
+
+  return (
+    <div style={{
+      background: '#FFFFFF', border: '1px solid #ECFEFF',
+      borderRadius: 14, overflow: 'hidden',
+      boxShadow: '0 2px 10px rgba(8,42,56,.04)',
+    }}>
+      {/* Card header */}
+      <div style={{
+        padding: '14px 18px 10px',
+        borderBottom: '1px solid #F1F5F9',
+        display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
+      }}>
+        <div>
+          <h3 style={{
+            margin: 0, fontFamily: "'Nunito', sans-serif",
+            fontWeight: 800, fontSize: 14, color: '#164E63',
+          }}>Lead Pipeline Funnel</h3>
+          <div style={{
+            fontFamily: "'Source Sans 3', sans-serif", fontSize: 11,
+            color: '#6B7280', marginTop: 2,
+          }}>{grandTotal} total leads · stages New → Contacted → Qualified → Converted</div>
+        </div>
+        <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 16 }}>
+          <div style={{
+            fontFamily: "'Source Sans 3', sans-serif", fontSize: 10,
+            color: '#6B7280', textTransform: 'uppercase', letterSpacing: '.06em',
+          }}>Overall conversion</div>
+          <div style={{
+            fontFamily: "'Nunito', sans-serif", fontWeight: 900,
+            fontSize: 26, color: '#059669', lineHeight: 1.1,
+          }}>{overallConv}%</div>
+        </div>
+      </div>
+
+      <div style={{ padding: '16px 18px' }}>
+        {/* ── Visual funnel bars ── */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
+          {PIPE_STAGES.map((stage, i) => {
+            const count    = pipeline[stage.key]?.count || 0;
+            const value    = pipeline[stage.key]?.value || 0;
+            const barPct   = topCount > 0 ? Math.max((count / topCount) * 100, count > 0 ? 10 : 0) : (count > 0 ? 50 : 0);
+            const prevCnt  = i > 0 ? (pipeline[PIPE_STAGES[i - 1].key]?.count || 0) : 0;
+            const passPct  = i > 0 && prevCnt > 0 ? Math.round((count / prevCnt) * 100) : null;
+
+            return (
+              <div key={stage.key}>
+                {/* Drop indicator */}
+                {passPct !== null && (
+                  <div style={{
+                    textAlign: 'center', marginBottom: 4,
+                    fontFamily: "'DM Mono', monospace", fontSize: 10, color: '#94A3B8',
+                  }}>
+                    ▼ {passPct}% progressed from previous stage
+                  </div>
+                )}
+
+                {/* Centered tapering bar */}
+                <div style={{ display: 'flex', justifyContent: 'center' }}>
+                  <div style={{
+                    width: `${barPct}%`, minWidth: count > 0 ? 120 : 0,
+                    maxWidth: '100%',
+                    background: `linear-gradient(135deg, ${stage.fill}EE, ${stage.fill})`,
+                    borderRadius: 8,
+                    height: 52,
+                    display: 'flex', alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '0 14px',
+                    transition: 'width .4s ease',
+                    boxShadow: `0 2px 8px ${stage.fill}44`,
+                  }}>
+                    <span style={{
+                      fontFamily: "'Nunito', sans-serif", fontWeight: 800,
+                      fontSize: 12, color: '#fff',
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }}>{stage.label}</span>
+                    <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 8 }}>
+                      <div style={{
+                        fontFamily: "'Nunito', sans-serif", fontWeight: 900,
+                        fontSize: 20, color: '#fff', lineHeight: 1,
+                      }}>{count}</div>
+                      {value > 0 && (
+                        <div style={{
+                          fontFamily: "'DM Mono', monospace", fontSize: 9,
+                          color: 'rgba(255,255,255,.75)', marginTop: 1,
+                        }}>{fmtL(value)}</div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* ── Stage stat cards row ── */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))',
+          gap: 8, marginBottom: lostCount > 0 ? 12 : 0,
+        }}>
+          {PIPE_STAGES.map((stage, i) => {
+            const count   = pipeline[stage.key]?.count || 0;
+            const value   = pipeline[stage.key]?.value || 0;
+            const prevCnt = i > 0 ? (pipeline[PIPE_STAGES[i - 1].key]?.count || 0) : 0;
+            const passPct = i > 0 && prevCnt > 0 ? Math.round((count / prevCnt) * 100) : null;
+
+            return (
+              <div key={stage.key} style={{
+                background: stage.light, borderRadius: 10,
+                padding: '10px 12px', border: `1px solid ${stage.fill}33`,
+              }}>
+                <div style={{
+                  fontFamily: "'Source Sans 3', sans-serif", fontWeight: 700,
+                  fontSize: 10, color: stage.color, textTransform: 'uppercase',
+                  letterSpacing: '.06em', marginBottom: 4,
+                }}>{stage.label}</div>
+                <div style={{
+                  fontFamily: "'Nunito', sans-serif", fontWeight: 900,
+                  fontSize: 22, color: stage.color, lineHeight: 1,
+                }}>{count}</div>
+                {value > 0 && (
+                  <div style={{
+                    fontFamily: "'DM Mono', monospace", fontSize: 10,
+                    color: stage.color, opacity: .75, marginTop: 2,
+                  }}>{fmtL(value)}</div>
+                )}
+                {passPct !== null && (
+                  <div style={{
+                    marginTop: 5, display: 'flex', alignItems: 'center', gap: 3,
+                  }}>
+                    <ArrowRight style={{ color: stage.color, width: 10, height: 10 }} />
+                    <span style={{
+                      fontFamily: "'Source Sans 3', sans-serif", fontSize: 10,
+                      color: stage.color, fontWeight: 700,
+                    }}>{passPct}% in</span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* ── Lost leads row ── */}
+        {lostCount > 0 && (
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            background: '#FEF2F2', border: '1px solid #FECACA',
+            borderRadius: 8, padding: '8px 14px',
+          }}>
+            <div style={{
+              fontFamily: "'Source Sans 3', sans-serif", fontWeight: 700,
+              fontSize: 12, color: '#B91C1C',
+            }}>
+              ✖ Lost Leads
+            </div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+              <span style={{
+                fontFamily: "'Nunito', sans-serif", fontWeight: 900,
+                fontSize: 20, color: '#DC2626',
+              }}>{lostCount}</span>
+              <span style={{
+                fontFamily: "'Source Sans 3', sans-serif", fontSize: 10,
+                color: '#EF4444', fontWeight: 600,
+              }}>
+                {grandTotal > 0 ? Math.round((lostCount / grandTotal) * 100) : 0}% of all leads
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 // ─── P&L table ───────────────────────────────────────────────
 const fmtINR = (v) =>
   new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(v || 0);
@@ -514,6 +710,11 @@ function OverviewTab() {
           <LeadsByBiz data={stats.leads_by_client_type || {}} />
         </div>
       </div>
+
+      {/* Lead Pipeline Funnel */}
+      {stats.pipeline_stages && (
+        <PipelineFunnel pipeline={stats.pipeline_stages} />
+      )}
 
       {/* P&L Dashboard */}
       {pnl && (
