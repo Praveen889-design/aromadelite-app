@@ -951,24 +951,36 @@ function OverviewTab() {
   const [stats, setStats] = useState(null);
   const [pnl, setPnl] = useState(null);
   const [loading, setLoading] = useState(true);
-  const token = localStorage.getItem('token');
+  const [error, setError] = useState(null);
 
   const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    const token = localStorage.getItem('aromadelite_token');
+    const hdrs  = { Authorization: `Bearer ${token}` };
     try {
-      const [statsRes, pnlRes] = await Promise.all([
-        fetch('/api/dashboard/stats', { headers: { Authorization: `Bearer ${token}` } }),
-        fetch('/api/reports/pnl',     { headers: { Authorization: `Bearer ${token}` } }),
-      ]);
+      const statsRes = await fetch('/api/dashboard/stats', { headers: hdrs });
+      if (!statsRes.ok) throw new Error(`Dashboard API error: ${statsRes.status}`);
       const statsData = await statsRes.json();
-      const pnlData   = await pnlRes.json();
       setStats(statsData.stats);
-      setPnl(pnlData);
     } catch (e) {
-      console.error(e);
+      console.error('[dashboard/stats]', e);
+      setError(e.message || 'Failed to load dashboard');
     } finally {
       setLoading(false);
     }
-  }, [token]);
+    // PnL loads independently — failure won't blank the whole page
+    try {
+      const token2 = localStorage.getItem('aromadelite_token');
+      const pnlRes = await fetch('/api/reports/pnl', { headers: { Authorization: `Bearer ${token2}` } });
+      if (pnlRes.ok) {
+        const pnlData = await pnlRes.json();
+        setPnl(pnlData);
+      }
+    } catch (e) {
+      console.warn('[reports/pnl]', e);
+    }
+  }, []);
 
   useEffect(() => { load(); }, [load]);
 
@@ -978,6 +990,25 @@ function OverviewTab() {
       padding: 60, color: '#6B7280',
       fontFamily: "'Source Sans 3', sans-serif",
     }}>Loading dashboard…</div>
+  );
+
+  if (error) return (
+    <div style={{
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      padding: 60, gap: 12,
+    }}>
+      <div style={{
+        fontFamily: "'Nunito', sans-serif", fontWeight: 800, fontSize: 15, color: '#991B1B',
+      }}>Dashboard failed to load</div>
+      <div style={{
+        fontFamily: "'Source Sans 3', sans-serif", fontSize: 12, color: '#6B7280',
+      }}>{error}</div>
+      <button onClick={load} style={{
+        background: '#0891B2', color: '#fff', border: 0, borderRadius: 8,
+        padding: '8px 18px', cursor: 'pointer',
+        fontFamily: "'Nunito', sans-serif", fontWeight: 700, fontSize: 13,
+      }}>Retry</button>
+    </div>
   );
 
   if (!stats) return null;
