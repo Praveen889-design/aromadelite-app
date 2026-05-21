@@ -10,12 +10,16 @@ const parseJSON = (s, fallback = null) => {
   try { return JSON.parse(s); } catch { return fallback; }
 };
 
-const hydrate = (p) => ({
-  ...p,
-  variants: parseJSON(p.variants, []),
-  pack_sizes: parseJSON(p.pack_sizes, []),
-  is_active: !!p.is_active,
-});
+const hydrate = (p, includeAdminFields = false) => {
+  const out = {
+    ...p,
+    variants: parseJSON(p.variants, []),
+    pack_sizes: parseJSON(p.pack_sizes, []),
+    is_active: !!p.is_active,
+  };
+  if (!includeAdminFields) delete out.manufacturing_cost;
+  return out;
+};
 
 router.get('/categories', async (req, res) => {
   try {
@@ -71,7 +75,60 @@ router.get('/admin/all', requireRole('admin'), async (req, res) => {
       FROM products p JOIN product_categories c ON c.id = p.category_id
       ORDER BY c.sort_order, p.name
     `);
-    res.json({ products: rows.map(hydrate) });
+    res.json({ products: rows.map((r) => hydrate(r, true)) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Admin — bulk upload products via CSV data
+router.post('/bulk-upload', requireRole('admin'), async (req, res) => {
+  try {
+    const { rows: csvRows } = req.body || {};
+    if (!Array.isArray(csvRows) || !csvRows.length)
+      return res.status(400).json({ error: 'No rows provided' });
+
+    const catRes = await pool.query('SELECT id, name FROM product_categories');
+    const catMap = Object.fromEntries(catRes.rows.map((c) => [c.name.toLowerCase(), c.id]));
+
+    const results = { created: 0, skipped: 0, errors: [] };
+
+    for (let i = 0; i < csvRows.length; i++) {
+      const row = csvRows[i];
+      const catId = catMap[(row.category_name || '').toLowerCase()];
+      if (!catId) { results.errors.push(`Row ${i + 2}: unknown category "${row.category_name}"`); results.skipped++; continue; }
+      if (!row.name) { results.errors.push(`Row ${i + 2}: name is required`); results.skipped++; continue; }
+      const gst = Number(row.gst_percent);
+      if (![12, 18].includes(gst)) { results.errors.push(`Row ${i + 2}: gst_percent must be 12 or 18`); results.skipped++; continue; }
+
+      const variants = row.variants ? row.variants.split('|').map((s) => s.trim()).filter(Boolean) : [];
+      const packSizes = row.pack_sizes ? row.pack_sizes.split('|').map((s) => {
+        const [size, price] = s.split('=').map((x) => x.trim());
+        return { size, price: Number(price) || 0 };
+      }) : [];
+      const find5L   = packSizes.find((p) => /^\s*5L\b/i.test(p.size))?.price ?? null;
+      const find20L  = packSizes.find((p) => /^\s*20L\b/i.test(p.size))?.price ?? null;
+      const find200L = packSizes.find((p) => /^\s*200L\b/i.test(p.size))?.price ?? null;
+
+      await pool.query(`
+        INSERT INTO products
+          (category_id, name, description, variants, pack_sizes, unit,
+           base_price, bulk_price_5L, bulk_price_20L, bulk_price_200L,
+           gst_percent, hsn_code, manufacturing_cost, is_active)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+        ON CONFLICT DO NOTHING
+      `, [
+        catId, row.name.trim(), row.description || null,
+        JSON.stringify(variants), JSON.stringify(packSizes), row.unit || null,
+        Number(row.base_price) || 0, find5L, find20L, find200L,
+        gst, row.hsn_code || null,
+        Number(row.manufacturing_cost) || 0,
+        row.is_active === 'false' || row.is_active === '0' ? 0 : 1,
+      ]);
+      results.created++;
+    }
+
+    res.json(results);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -106,14 +163,16 @@ router.post('/', requireRole('admin'), async (req, res) => {
       INSERT INTO products
         (category_id, name, description, variants, pack_sizes, unit,
          base_price, bulk_price_5L, bulk_price_20L, bulk_price_200L,
-         gst_percent, hsn_code, is_active)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+         gst_percent, hsn_code, manufacturing_cost, is_active)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
       RETURNING id
     `, [
       b.category_id, b.name, b.description || null,
       JSON.stringify(variants), JSON.stringify(pack_sizes), b.unit || null,
       Number(b.base_price) || 0, find(/^\s*5L\b/i), find(/^\s*20L\b/i), find(/^\s*200L\b/i),
-      Number(b.gst_percent), b.hsn_code || null, b.is_active === false ? 0 : 1,
+      Number(b.gst_percent), b.hsn_code || null,
+      Number(b.manufacturing_cost) || 0,
+      b.is_active === false ? 0 : 1,
     ]);
 
     const created = await pool.query('SELECT * FROM products WHERE id = $1', [rows[0].id]);
@@ -144,7 +203,8 @@ router.patch('/:id', requireRole('admin'), async (req, res) => {
       if (![12, 18].includes(Number(b.gst_percent))) return res.status(400).json({ error: 'gst_percent must be 12 or 18' });
       setClauses.push(`gst_percent = ${$v(Number(b.gst_percent))}`);
     }
-    if (b.hsn_code !== undefined)  setClauses.push(`hsn_code = ${$v(b.hsn_code)}`);
+    if (b.hsn_code !== undefined)           setClauses.push(`hsn_code = ${$v(b.hsn_code)}`);
+    if (b.manufacturing_cost !== undefined) setClauses.push(`manufacturing_cost = ${$v(Number(b.manufacturing_cost) || 0)}`);
     if (b.is_active !== undefined) setClauses.push(`is_active = ${$v(b.is_active ? 1 : 0)}`);
     if (b.variants !== undefined)  setClauses.push(`variants = ${$v(JSON.stringify(Array.isArray(b.variants) ? b.variants : []))}`);
     if (b.pack_sizes !== undefined) {

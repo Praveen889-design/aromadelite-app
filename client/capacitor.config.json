@@ -1,0 +1,8 @@
+{
+  "appId": "com.aromadelite.app",
+  "appName": "Aromadelite",
+  "webDir": "build",
+  "server": {
+    "androidScheme": "https"
+  }
+}

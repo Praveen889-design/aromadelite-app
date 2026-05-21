@@ -9,3 +9,5 @@ client/build/
 *.db-shm
 *.db-wal
 database/*.db
+.vercel
+.env*.local

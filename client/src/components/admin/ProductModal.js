@@ -15,7 +15,7 @@ export default function ProductModal({ open, mode = 'create', product, categorie
   const { toast } = useToast();
   const [v, setV] = useState({
     category_id: '', name: '', description: '', unit: '',
-    base_price: 0, gst_percent: 18, hsn_code: '',
+    base_price: 0, manufacturing_cost: 0, gst_percent: 18, hsn_code: '',
     variantsText: '', packSizesText: '', is_active: true,
   });
   const [busy, setBusy] = useState(false);
@@ -29,6 +29,7 @@ export default function ProductModal({ open, mode = 'create', product, categorie
         description: product.description || '',
         unit: product.unit || '',
         base_price: product.base_price || 0,
+        manufacturing_cost: product.manufacturing_cost || 0,
         gst_percent: product.gst_percent || 18,
         hsn_code: product.hsn_code || '',
         variantsText: (product.variants || []).join(', '),
@@ -57,6 +58,7 @@ export default function ProductModal({ open, mode = 'create', product, categorie
       description: v.description.trim() || null,
       unit: v.unit.trim() || null,
       base_price: Number(v.base_price) || 0,
+      manufacturing_cost: Number(v.manufacturing_cost) || 0,
       gst_percent: Number(v.gst_percent),
       hsn_code: v.hsn_code.trim() || null,
       variants: v.variantsText.split(',').map((s) => s.trim()).filter(Boolean),
@@ -117,6 +119,11 @@ export default function ProductModal({ open, mode = 'create', product, categorie
           <Field label="Base price (₹)">
             <input className={inputCls} type="number" min={0} value={v.base_price}
                    onChange={(e) => upd({ base_price: e.target.value })} />
+          </Field>
+          <Field label="Manufacturing Cost (₹) — Admin only">
+            <input className={inputCls} type="number" min={0} value={v.manufacturing_cost}
+                   onChange={(e) => upd({ manufacturing_cost: e.target.value })}
+                   placeholder="0" />
           </Field>
           <Field label="Active">
             <select className={inputCls} value={v.is_active ? '1' : '0'} onChange={(e) => upd({ is_active: e.target.value === '1' })}>

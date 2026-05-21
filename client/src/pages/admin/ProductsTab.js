@@ -1,10 +1,26 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import api from '../../utils/api';
 import { useToast } from '../../components/Toast';
 import ProductModal from '../../components/admin/ProductModal';
 
 const formatINR = (n) =>
   new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n || 0);
+
+const CSV_TEMPLATE = [
+  'name,category_name,description,unit,base_price,gst_percent,hsn_code,variants,pack_sizes,manufacturing_cost,is_active',
+  'Floor Cleaner,Chemical Cleaners,Multi-surface cleaner,L,35,18,3402,Standard|Concentrated,1L=35|5L=160|20L=580,18,true',
+  'Dish Wash Bar,Chemical Cleaners,Heavy-duty bar,pc,8,18,3402,Standard,,4,true',
+].join('\n');
+
+function parseCSV(text) {
+  const lines = text.trim().split('\n');
+  if (lines.length < 2) return [];
+  const headers = lines[0].split(',').map((h) => h.trim());
+  return lines.slice(1).map((line) => {
+    const vals = line.split(',').map((v) => v.trim());
+    return Object.fromEntries(headers.map((h, i) => [h, vals[i] ?? '']));
+  }).filter((r) => r.name);
+}
 
 export default function ProductsTab() {
   const { toast } = useToast();
@@ -14,7 +30,9 @@ export default function ProductsTab() {
   const [search, setSearch] = useState('');
   const [filterCat, setFilterCat] = useState('');
   const [modal, setModal] = useState({ open: false, mode: 'create', product: null });
-  const [editing, setEditing] = useState({}); // id → { base_price }
+  const [editing, setEditing] = useState({});
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -52,6 +70,36 @@ export default function ProductsTab() {
     }
   };
 
+  const downloadTemplate = () => {
+    const blob = new Blob([CSV_TEMPLATE], { type: 'text/csv' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'aromadelite_products_template.csv';
+    a.click();
+  };
+
+  const handleFileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    const text = await file.text();
+    const csvRows = parseCSV(text);
+    if (!csvRows.length) { toast('No valid rows found in CSV', { kind: 'error' }); return; }
+    setUploading(true);
+    try {
+      const { data } = await api.post('/api/products/bulk-upload', { rows: csvRows });
+      toast(`Bulk upload done: ${data.created} created, ${data.skipped} skipped.`, { kind: 'success' });
+      if (data.errors?.length) {
+        data.errors.slice(0, 3).forEach((err) => toast(err, { kind: 'error' }));
+      }
+      load();
+    } catch (err) {
+      toast(err?.response?.data?.error || 'Upload failed', { kind: 'error' });
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const visible = products.filter((p) => {
     if (filterCat && p.category_id !== Number(filterCat)) return false;
     if (search && !p.name.toLowerCase().includes(search.toLowerCase())) return false;
@@ -68,6 +116,15 @@ export default function ProductsTab() {
           <option value="">All categories</option>
           {categories.map((c) => <option key={c.id} value={c.id}>{c.icon_emoji} {c.name}</option>)}
         </select>
+        <button onClick={downloadTemplate}
+                className="border border-slate-300 text-slate-700 text-sm font-medium rounded-lg px-3 py-2 hover:bg-slate-50 whitespace-nowrap">
+          ↓ CSV Template
+        </button>
+        <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={handleFileUpload} />
+        <button onClick={() => fileRef.current?.click()} disabled={uploading}
+                className="border border-cyan-600 text-cyan-700 text-sm font-semibold rounded-lg px-3 py-2 hover:bg-cyan-50 whitespace-nowrap disabled:opacity-50">
+          {uploading ? 'Uploading…' : '↑ Bulk Upload'}
+        </button>
         <button onClick={() => setModal({ open: true, mode: 'create', product: null })}
                 className="bg-cyan-600 hover:bg-cyan-700 text-white text-sm font-semibold rounded-lg px-3 py-2 whitespace-nowrap">
           + Add product
@@ -82,6 +139,7 @@ export default function ProductsTab() {
                 <th className="text-left px-3 py-2">Product</th>
                 <th className="text-left px-3 py-2">Category</th>
                 <th className="text-right px-3 py-2">Base ₹</th>
+                <th className="text-right px-3 py-2">Mfg Cost ₹</th>
                 <th className="text-right px-3 py-2">5L</th>
                 <th className="text-right px-3 py-2">20L</th>
                 <th className="text-right px-3 py-2">200L</th>
@@ -107,6 +165,9 @@ export default function ProductsTab() {
                                onChange={(e) => setEditing((s) => ({ ...s, [p.id]: { base_price: e.target.value } }))}
                                className="w-20 border border-slate-300 rounded px-1 py-0.5 text-right text-sm" />
                       ) : <span className="font-medium">{formatINR(p.base_price)}</span>}
+                    </td>
+                    <td className="px-3 py-2 text-right text-xs text-amber-700 font-medium">
+                      {p.manufacturing_cost != null && p.manufacturing_cost > 0 ? formatINR(p.manufacturing_cost) : '—'}
                     </td>
                     <td className="px-3 py-2 text-right text-xs">{p.bulk_price_5L != null ? formatINR(p.bulk_price_5L) : '—'}</td>
                     <td className="px-3 py-2 text-right text-xs">{p.bulk_price_20L != null ? formatINR(p.bulk_price_20L) : '—'}</td>
