@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../utils/api';
-import { useToast } from '../../components/Toast';
+
 
 /* ─── Formatters ─────────────────────────────────────────────── */
 const fmtINR = (v) =>
@@ -23,8 +23,6 @@ const discountColor = (pct) => {
   return               { bg: '#FEE2E2', fg: '#991B1B', bar: '#EF4444' }; // extreme – red
 };
 
-const winRateColor = (pct) =>
-  pct <= 0 ? '#EF4444' : pct < 5 ? '#0891B2' : pct < 15 ? '#F59E0B' : pct < 30 ? '#F97316' : '#EF4444';
 
 /* ─── Sub-components ─────────────────────────────────────────── */
 const KPICard = ({ label, value, sub, accent = '#0891B2', icon }) => (
@@ -169,7 +167,6 @@ const PERIODS = [
 ];
 
 export default function PriceDeviationTab() {
-  const { toast } = useToast();
   const [period,   setPeriod]   = useState('all');
   const [from,     setFrom]     = useState('');
   const [to,       setTo]       = useState('');
