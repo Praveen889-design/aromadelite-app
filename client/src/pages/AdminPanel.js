@@ -5,6 +5,8 @@ import QuotesTab from './admin/QuotesTab';
 import LeadsTab from './admin/LeadsTab';
 import ReportsTab from './admin/ReportsTab';
 import { useAuth } from '../context/AuthContext';
+import api from '../utils/api';
+import { useToast } from '../components/Toast';
 
 // ─── Icons ───────────────────────────────────────────────────
 const Ic = {
@@ -563,6 +565,387 @@ const PnlTable = ({ title, rows, emptyMsg = 'No data' }) => (
   </div>
 );
 
+// ─── Target vs Actual ────────────────────────────────────────
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const monthLabel = (y, m) => `${MONTHS[m - 1]} ${y}`;
+
+const pctColor = (p) =>
+  p >= 100 ? '#059669' : p >= 80 ? '#0891B2' : p >= 50 ? '#F59E0B' : '#EF4444';
+
+const ProgBar = ({ actual, target, fmt }) => {
+  if (!target) return (
+    <span style={{ fontSize: 11, color: '#9CA3AF', fontFamily: "'Source Sans 3', sans-serif" }}>
+      No target
+    </span>
+  );
+  const pct  = Math.round((actual / target) * 100);
+  const fill = Math.min(100, (actual / target) * 100);
+  const col  = pctColor(pct);
+  return (
+    <div style={{ minWidth: 120 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+        <span style={{
+          fontFamily: "'DM Mono', monospace", fontSize: 11,
+          color: '#164E63', fontWeight: 700,
+        }}>{fmt(actual)}</span>
+        <span style={{
+          fontFamily: "'DM Mono', monospace", fontSize: 10, color: '#9CA3AF',
+        }}>/ {fmt(target)}</span>
+      </div>
+      <div style={{ height: 6, background: '#F1F5F9', borderRadius: 999, overflow: 'hidden' }}>
+        <div style={{
+          height: '100%', width: `${fill}%`,
+          background: `linear-gradient(90deg, ${col}, ${col}CC)`,
+          borderRadius: 999, transition: 'width .4s ease',
+        }} />
+      </div>
+      <div style={{
+        marginTop: 2, textAlign: 'right',
+        fontFamily: "'DM Mono', monospace", fontSize: 10,
+        color: col, fontWeight: 700,
+      }}>{pct}%</div>
+    </div>
+  );
+};
+
+const statusBadge = (row) => {
+  const hasAny = row.revenue_target > 0 || row.leads_target > 0 || row.conversions_target > 0;
+  if (!hasAny) return { label: 'No Target', bg: '#F1F5F9', fg: '#6B7280' };
+  const rp = row.revenue_target > 0 ? (row.actual_revenue / row.revenue_target) * 100 : 100;
+  if (rp >= 100) return { label: '🏆 Exceeded',       bg: '#D1FAE5', fg: '#065F46' };
+  if (rp >= 80)  return { label: '🔵 On Track',        bg: '#ECFEFF', fg: '#0E7490' };
+  if (rp >= 50)  return { label: '🟡 Getting There',   bg: '#FEF3C7', fg: '#92400E' };
+  return             { label: '🔴 Behind',             bg: '#FEE2E2', fg: '#991B1B' };
+};
+
+function SetTargetsModal({ open, year, month, rows, onClose, onSaved }) {
+  const { toast } = useToast();
+  const [vals, setVals] = useState({});
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!open || !rows) return;
+    const init = {};
+    for (const r of rows) {
+      init[r.employee_id] = {
+        revenue_target:     r.revenue_target     || '',
+        leads_target:       r.leads_target       || '',
+        conversions_target: r.conversions_target || '',
+      };
+    }
+    setVals(init);
+  }, [open, rows]);
+
+  if (!open) return null;
+
+  const upd = (empId, field, val) =>
+    setVals((v) => ({ ...v, [empId]: { ...v[empId], [field]: val } }));
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      const targets = (rows || []).map((r) => ({
+        employee_id:        r.employee_id,
+        revenue_target:     Number(vals[r.employee_id]?.revenue_target)     || 0,
+        leads_target:       Number(vals[r.employee_id]?.leads_target)       || 0,
+        conversions_target: Number(vals[r.employee_id]?.conversions_target) || 0,
+      }));
+      await api.post('/api/targets/bulk', { year, month, targets });
+      toast(`Targets saved for ${monthLabel(year, month)}.`, { kind: 'success' });
+      onSaved();
+      onClose();
+    } catch (e) {
+      toast(e?.response?.data?.error || 'Failed to save targets', { kind: 'error' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const inputCls = 'w-full text-right border border-slate-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-600';
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/50 px-3 py-6"
+      onMouseDown={(e) => e.target === e.currentTarget && onClose()}
+      role="dialog" aria-modal="true"
+    >
+      <div className="bg-white w-full max-w-2xl rounded-2xl shadow-xl overflow-hidden">
+        <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
+          <div>
+            <h2 className="font-semibold text-slate-900">Set Targets</h2>
+            <div className="text-xs text-slate-500 mt-0.5">{monthLabel(year, month)}</div>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-700 text-xl">×</button>
+        </div>
+
+        <div className="overflow-y-auto max-h-[60vh]">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50 sticky top-0">
+              <tr>
+                {['Associate', 'Revenue Target (₹)', 'Leads', 'Conversions'].map((h, i) => (
+                  <th key={i} className={`px-3 py-2 text-[10px] uppercase tracking-wide text-slate-500 font-semibold border-b border-slate-200 ${i === 0 ? 'text-left' : 'text-right'}`}>
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {(rows || []).map((r) => (
+                <tr key={r.employee_id} className="border-t border-slate-100">
+                  <td className="px-3 py-2">
+                    <div className="font-medium text-slate-800 text-sm">{r.name}</div>
+                    <div className="text-[11px] text-slate-500">{r.employee_code}{r.region ? ` · ${r.region}` : ''}</div>
+                  </td>
+                  <td className="px-3 py-2">
+                    <input type="number" min={0} className={inputCls}
+                      value={vals[r.employee_id]?.revenue_target ?? ''}
+                      onChange={(e) => upd(r.employee_id, 'revenue_target', e.target.value)}
+                      placeholder="0" />
+                  </td>
+                  <td className="px-3 py-2 w-24">
+                    <input type="number" min={0} className={inputCls}
+                      value={vals[r.employee_id]?.leads_target ?? ''}
+                      onChange={(e) => upd(r.employee_id, 'leads_target', e.target.value)}
+                      placeholder="0" />
+                  </td>
+                  <td className="px-3 py-2 w-24">
+                    <input type="number" min={0} className={inputCls}
+                      value={vals[r.employee_id]?.conversions_target ?? ''}
+                      onChange={(e) => upd(r.employee_id, 'conversions_target', e.target.value)}
+                      placeholder="0" />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="px-5 py-3 border-t border-slate-200 flex justify-end gap-2">
+          <button onClick={onClose} disabled={saving}
+            className="px-4 py-2 text-sm rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-50">
+            Cancel
+          </button>
+          <button onClick={save} disabled={saving}
+            className="px-4 py-2 text-sm rounded-lg bg-cyan-600 hover:bg-cyan-700 text-white font-semibold disabled:opacity-60">
+            {saving ? 'Saving…' : 'Save Targets'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TargetVsActual() {
+  const now = new Date();
+  const [year,  setYear]  = useState(now.getFullYear());
+  const [month, setMonth] = useState(now.getMonth() + 1);
+  const [data,  setData]  = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [modalOpen, setModalOpen] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data: res } = await api.get(`/api/targets?year=${year}&month=${month}`);
+      setData(res);
+    } catch (e) {
+      console.error('targets fetch failed', e);
+    } finally {
+      setLoading(false);
+    }
+  }, [year, month]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const goBack = () => {
+    if (month === 1) { setYear((y) => y - 1); setMonth(12); }
+    else setMonth((m) => m - 1);
+  };
+  const goFwd = () => {
+    if (month === 12) { setYear((y) => y + 1); setMonth(1); }
+    else setMonth((m) => m + 1);
+  };
+
+  const rows   = data?.rows || [];
+  const totRev = rows.reduce((s, r) => s + r.actual_revenue,  0);
+  const totTgt = rows.reduce((s, r) => s + r.revenue_target,  0);
+  const totLd  = rows.reduce((s, r) => s + r.actual_leads,    0);
+  const totCv  = rows.reduce((s, r) => s + r.actual_conversions, 0);
+
+  return (
+    <>
+      <div style={{
+        background: '#FFFFFF', border: '1px solid #ECFEFF',
+        borderRadius: 14, overflow: 'hidden',
+        boxShadow: '0 2px 10px rgba(8,42,56,.04)',
+      }}>
+        {/* Header */}
+        <div style={{
+          padding: '14px 18px 10px',
+          borderBottom: '1px solid #F1F5F9',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          flexWrap: 'wrap', gap: 8,
+        }}>
+          <div>
+            <h3 style={{
+              margin: 0, fontFamily: "'Nunito', sans-serif",
+              fontWeight: 800, fontSize: 14, color: '#164E63',
+            }}>Target vs Actual</h3>
+            <div style={{
+              fontFamily: "'Source Sans 3', sans-serif", fontSize: 11,
+              color: '#6B7280', marginTop: 2,
+            }}>{rows.length} associate{rows.length !== 1 ? 's' : ''} · {monthLabel(year, month)}</div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {/* Month navigation */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <button onClick={goBack} style={{
+                border: '1px solid #E5E7EB', borderRadius: 6, background: '#fff',
+                padding: '4px 8px', cursor: 'pointer', fontSize: 13, color: '#374151',
+                fontWeight: 600, lineHeight: 1,
+              }}>‹</button>
+              <span style={{
+                fontFamily: "'DM Mono', monospace", fontSize: 11,
+                color: '#374151', padding: '0 6px', whiteSpace: 'nowrap',
+              }}>{monthLabel(year, month)}</span>
+              <button onClick={goFwd} style={{
+                border: '1px solid #E5E7EB', borderRadius: 6, background: '#fff',
+                padding: '4px 8px', cursor: 'pointer', fontSize: 13, color: '#374151',
+                fontWeight: 600, lineHeight: 1,
+              }}>›</button>
+            </div>
+            {/* Set targets button */}
+            <button
+              onClick={() => setModalOpen(true)}
+              style={{
+                background: '#0891B2', color: '#fff',
+                border: 0, borderRadius: 8, cursor: 'pointer',
+                fontFamily: "'Nunito', sans-serif", fontWeight: 700, fontSize: 12,
+                padding: '6px 14px', whiteSpace: 'nowrap',
+              }}
+            >Set Targets</button>
+          </div>
+        </div>
+
+        {/* Table */}
+        {loading ? (
+          <div style={{
+            padding: 32, textAlign: 'center',
+            fontFamily: "'Source Sans 3', sans-serif", fontSize: 13, color: '#6B7280',
+          }}>Loading…</div>
+        ) : rows.length === 0 ? (
+          <div style={{
+            padding: 32, textAlign: 'center',
+            fontFamily: "'Source Sans 3', sans-serif", fontSize: 13, color: '#6B7280',
+          }}>No active associates found.</div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ background: '#F8FAFC' }}>
+                  {['Associate', 'Revenue vs Target', 'Leads vs Target', 'Conversions', 'Status'].map((h, i) => (
+                    <th key={i} style={{
+                      fontFamily: "'Source Sans 3', sans-serif", fontWeight: 700,
+                      fontSize: 10, color: '#0E7490', letterSpacing: '.07em',
+                      textTransform: 'uppercase', padding: '9px 14px',
+                      textAlign: i === 0 ? 'left' : i === 4 ? 'center' : 'left',
+                      borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap',
+                    }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r) => {
+                  const badge = statusBadge(r);
+                  const col   = avatarColor(r.name);
+                  return (
+                    <tr key={r.employee_id} style={{ borderBottom: '1px solid #F1F5F9' }}>
+                      {/* Associate */}
+                      <td style={{ padding: '12px 14px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <div style={{
+                            width: 30, height: 30, borderRadius: '50%', flexShrink: 0,
+                            background: col.bg, color: col.fg,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontFamily: "'Nunito', sans-serif", fontWeight: 800, fontSize: 11,
+                          }}>{initials(r.name)}</div>
+                          <div>
+                            <div style={{
+                              fontFamily: "'Nunito', sans-serif", fontWeight: 800,
+                              fontSize: 13, color: '#164E63',
+                            }}>{r.name}</div>
+                            <div style={{
+                              fontFamily: "'DM Mono', monospace", fontSize: 10, color: '#6B7280',
+                            }}>{r.employee_code}{r.region ? ` · ${r.region}` : ''}</div>
+                          </div>
+                        </div>
+                      </td>
+                      {/* Revenue */}
+                      <td style={{ padding: '12px 14px', minWidth: 160 }}>
+                        <ProgBar actual={r.actual_revenue} target={r.revenue_target} fmt={fmtL} />
+                      </td>
+                      {/* Leads */}
+                      <td style={{ padding: '12px 14px', minWidth: 130 }}>
+                        <ProgBar actual={r.actual_leads} target={r.leads_target} fmt={String} />
+                      </td>
+                      {/* Conversions */}
+                      <td style={{ padding: '12px 14px', minWidth: 130 }}>
+                        <ProgBar actual={r.actual_conversions} target={r.conversions_target} fmt={String} />
+                      </td>
+                      {/* Status */}
+                      <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                        <span style={{
+                          display: 'inline-block',
+                          background: badge.bg, color: badge.fg,
+                          fontFamily: "'Source Sans 3', sans-serif", fontWeight: 700,
+                          fontSize: 10.5, padding: '3px 10px', borderRadius: 999,
+                          whiteSpace: 'nowrap',
+                        }}>{badge.label}</span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              {/* Totals footer */}
+              {rows.length > 1 && (
+                <tfoot>
+                  <tr style={{ background: '#F8FAFC', borderTop: '2px solid #E5E7EB' }}>
+                    <td style={{
+                      padding: '10px 14px',
+                      fontFamily: "'Nunito', sans-serif", fontWeight: 800,
+                      fontSize: 12, color: '#164E63',
+                    }}>Team Total</td>
+                    <td style={{ padding: '10px 14px', minWidth: 160 }}>
+                      <ProgBar actual={totRev} target={totTgt} fmt={fmtL} />
+                    </td>
+                    <td style={{
+                      padding: '10px 14px',
+                      fontFamily: "'DM Mono', monospace", fontSize: 12, color: '#164E63',
+                    }}>{totLd} leads</td>
+                    <td style={{
+                      padding: '10px 14px',
+                      fontFamily: "'DM Mono', monospace", fontSize: 12, color: '#164E63',
+                    }}>{totCv} converted</td>
+                    <td />
+                  </tr>
+                </tfoot>
+              )}
+            </table>
+          </div>
+        )}
+      </div>
+
+      <SetTargetsModal
+        open={modalOpen}
+        year={year} month={month}
+        rows={rows}
+        onClose={() => setModalOpen(false)}
+        onSaved={load}
+      />
+    </>
+  );
+}
+
 // ─── Overview dashboard tab ──────────────────────────────────
 function OverviewTab() {
   const [stats, setStats] = useState(null);
@@ -715,6 +1098,9 @@ function OverviewTab() {
       {stats.pipeline_stages && (
         <PipelineFunnel pipeline={stats.pipeline_stages} />
       )}
+
+      {/* Target vs Actual */}
+      <TargetVsActual />
 
       {/* P&L Dashboard */}
       {pnl && (
