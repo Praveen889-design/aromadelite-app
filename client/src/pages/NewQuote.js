@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import { useQuoteBuilder } from '../context/QuoteBuilderContext';
@@ -71,6 +71,40 @@ export default function NewQuote() {
     });
   }, [products, activeCat, search]);
 
+  // Count how many visible products can still be added (not yet in cart with default variant/size)
+  const addableCount = useMemo(() => filtered.filter((p) => {
+    const firstSize    = (p.pack_sizes || [])[0];
+    const firstVariant = (p.variants || [])[0] || null;
+    if (!firstSize) return false;
+    return !cartKeys.has(`${p.id}|${firstVariant || ''}|${firstSize.size}`);
+  }).length, [filtered, cartKeys]);
+
+  // Add all visible products (qty=1, first variant, first pack size) that aren't already in cart
+  const addAllVisible = useCallback(() => {
+    let added = 0;
+    for (const p of filtered) {
+      const firstSize    = (p.pack_sizes || [])[0];
+      const firstVariant = (p.variants || [])[0] || null;
+      if (!firstSize) continue;
+      if (cartKeys.has(`${p.id}|${firstVariant || ''}|${firstSize.size}`)) continue;
+      addItem({
+        product_id:    p.id,
+        product_name:  p.name,
+        category_id:   p.category_id,
+        category_name: p.category_name,
+        variant:       firstVariant,
+        pack_size:     firstSize.size,
+        quantity:      1,
+        unit_price:    firstSize.price,
+        gst_percent:   p.gst_percent,
+        hsn_code:      p.hsn_code,
+      });
+      added++;
+    }
+    if (added > 0) toast(`Added ${added} product${added !== 1 ? 's' : ''} to quote.`, { kind: 'success' });
+    else toast('All visible products are already in the quote.', { kind: 'info' });
+  }, [filtered, cartKeys, addItem, toast]);
+
   // GST breakdown
   const gstBreakdown = useMemo(() => {
     const buckets = { 12: { base: 0, gst: 0 }, 18: { base: 0, gst: 0 } };
@@ -135,6 +169,7 @@ export default function NewQuote() {
     <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
       {/* LEFT PANEL — Product Browser */}
       <section className="lg:col-span-3 bg-white rounded-xl border border-slate-200 p-4">
+        {/* Search + Add-All bar */}
         <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
           <input
             type="search"
@@ -143,9 +178,27 @@ export default function NewQuote() {
             placeholder="Search products by name…"
             className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-600"
           />
-          <div className="text-xs text-slate-500">{filtered.length} of {products.length}</div>
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-xs text-slate-500 whitespace-nowrap">
+              {filtered.length} of {products.length}
+            </span>
+            {!loading && addableCount > 0 && (
+              <button
+                type="button"
+                onClick={addAllVisible}
+                title={`Add all ${addableCount} product${addableCount !== 1 ? 's' : ''} in current view to the quote with Qty 1`}
+                className="flex items-center gap-1.5 whitespace-nowrap text-xs font-semibold px-3 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-300 transition-colors"
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+                Select All ({addableCount})
+              </button>
+            )}
+          </div>
         </div>
 
+        {/* Category tabs */}
         <div className="mt-3 -mx-1 px-1 overflow-x-auto">
           <div className="inline-flex gap-1.5 min-w-full pb-1">
             <CategoryTab active={activeCat === 'all'} onClick={() => setActiveCat('all')}>All</CategoryTab>
@@ -161,6 +214,24 @@ export default function NewQuote() {
             ))}
           </div>
         </div>
+
+        {/* Quick-quote hint banner when a category is selected */}
+        {!loading && activeCat !== 'all' && filtered.length > 0 && (
+          <div className="mt-2 flex items-center justify-between gap-3 bg-cyan-50 border border-cyan-200 rounded-lg px-3 py-2">
+            <p className="text-xs text-cyan-700">
+              <span className="font-semibold">Quick quote:</span> Hit <strong>Select All</strong> to add all {filtered.length} products in this category at Qty 1, then click <strong>Generate Quote</strong>.
+            </p>
+            {addableCount > 0 && (
+              <button
+                type="button"
+                onClick={addAllVisible}
+                className="shrink-0 text-xs font-semibold px-3 py-1 rounded-lg bg-cyan-600 hover:bg-cyan-700 text-white transition-colors"
+              >
+                Select All
+              </button>
+            )}
+          </div>
+        )}
 
         {loading ? (
           <div className="mt-6 text-sm text-slate-500">Loading catalog…</div>
