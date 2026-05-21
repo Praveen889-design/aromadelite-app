@@ -289,19 +289,101 @@ const TeamRow = ({ emp, rank, best }) => {
   );
 };
 
+// ─── P&L table ───────────────────────────────────────────────
+const fmtINR = (v) =>
+  new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(v || 0);
+
+const PnlTable = ({ title, rows, emptyMsg = 'No data' }) => (
+  <div style={{
+    background: '#FFFFFF', border: '1px solid #ECFEFF',
+    borderRadius: 14, overflow: 'hidden',
+    boxShadow: '0 2px 10px rgba(8,42,56,.04)',
+  }}>
+    <div style={{ padding: '14px 16px 10px', borderBottom: '1px solid #F1F5F9' }}>
+      <h3 style={{
+        margin: 0,
+        fontFamily: "'Nunito', sans-serif", fontWeight: 800, fontSize: 14,
+        color: '#164E63',
+      }}>{title}</h3>
+    </div>
+    {rows.length === 0 ? (
+      <div style={{
+        padding: 24, textAlign: 'center',
+        fontFamily: "'Source Sans 3', sans-serif", fontSize: 13, color: '#6B7280',
+      }}>{emptyMsg}</div>
+    ) : (
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr style={{ background: '#F8FAFC' }}>
+              {['Name', 'Revenue', 'COGS', 'Gross Profit', 'Margin'].map((h, i) => (
+                <th key={i} style={{
+                  fontFamily: "'Source Sans 3', sans-serif", fontWeight: 700, fontSize: 10,
+                  color: '#0E7490', letterSpacing: '.07em', textTransform: 'uppercase',
+                  padding: '9px 12px', textAlign: i === 0 ? 'left' : 'right',
+                  borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap',
+                }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r, i) => (
+              <tr key={i} style={{ borderBottom: '1px solid #F1F5F9', background: '#FFFFFF' }}>
+                <td style={{
+                  padding: '10px 12px',
+                  fontFamily: "'Nunito', sans-serif", fontWeight: 700, fontSize: 13,
+                  color: '#164E63', maxWidth: 180,
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}>{r.name}</td>
+                <td style={{
+                  textAlign: 'right', padding: '10px 12px',
+                  fontFamily: "'DM Mono', monospace", fontSize: 12, color: '#0E7490',
+                }}>{fmtINR(r.revenue)}</td>
+                <td style={{
+                  textAlign: 'right', padding: '10px 12px',
+                  fontFamily: "'DM Mono', monospace", fontSize: 12, color: '#6B7280',
+                }}>{fmtINR(r.cogs)}</td>
+                <td style={{
+                  textAlign: 'right', padding: '10px 12px',
+                  fontFamily: "'DM Mono', monospace", fontSize: 12,
+                  color: r.profit >= 0 ? '#065F46' : '#991B1B',
+                  fontWeight: 700,
+                }}>{fmtINR(r.profit)}</td>
+                <td style={{ textAlign: 'right', padding: '10px 12px' }}>
+                  <span style={{
+                    display: 'inline-block',
+                    background: r.margin >= 30 ? '#D1FAE5' : r.margin >= 10 ? '#FEF3C7' : '#FEE2E2',
+                    color: r.margin >= 30 ? '#065F46' : r.margin >= 10 ? '#92400E' : '#991B1B',
+                    fontFamily: "'DM Mono', monospace", fontSize: 11, fontWeight: 700,
+                    padding: '2px 8px', borderRadius: 999,
+                  }}>{r.margin}%</span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )}
+  </div>
+);
+
 // ─── Overview dashboard tab ──────────────────────────────────
 function OverviewTab() {
   const [stats, setStats] = useState(null);
+  const [pnl, setPnl] = useState(null);
   const [loading, setLoading] = useState(true);
   const token = localStorage.getItem('token');
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch('/api/dashboard/stats', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      setStats(data.stats);
+      const [statsRes, pnlRes] = await Promise.all([
+        fetch('/api/dashboard/stats', { headers: { Authorization: `Bearer ${token}` } }),
+        fetch('/api/reports/pnl',     { headers: { Authorization: `Bearer ${token}` } }),
+      ]);
+      const statsData = await statsRes.json();
+      const pnlData   = await pnlRes.json();
+      setStats(statsData.stats);
+      setPnl(pnlData);
     } catch (e) {
       console.error(e);
     } finally {
@@ -432,6 +514,37 @@ function OverviewTab() {
           <LeadsByBiz data={stats.leads_by_client_type || {}} />
         </div>
       </div>
+
+      {/* P&L Dashboard */}
+      {pnl && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 10,
+            paddingTop: 4,
+          }}>
+            <h3 style={{
+              margin: 0,
+              fontFamily: "'Nunito', sans-serif", fontWeight: 900, fontSize: 16,
+              color: '#164E63',
+            }}>Profit &amp; Loss</h3>
+            <span style={{
+              background: '#D1FAE5', color: '#065F46',
+              fontFamily: "'Source Sans 3', sans-serif", fontWeight: 700, fontSize: 9.5,
+              padding: '2px 8px', borderRadius: 4, letterSpacing: '.06em', textTransform: 'uppercase',
+            }}>Converted Leads Only</span>
+          </div>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+            gap: 14,
+          }}>
+            <PnlTable title="By Category"  rows={pnl.by_category  || []} emptyMsg="No converted leads yet" />
+            <PnlTable title="By Product"   rows={pnl.by_product   || []} emptyMsg="No converted leads yet" />
+            <PnlTable title="By Associate" rows={pnl.by_associate || []} emptyMsg="No converted leads yet" />
+            <PnlTable title="By City"      rows={pnl.by_city      || []} emptyMsg="No converted leads yet" />
+          </div>
+        </div>
+      )}
 
       {/* Top products + Recent activity */}
       <div style={{

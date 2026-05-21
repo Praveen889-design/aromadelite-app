@@ -102,4 +102,109 @@ router.get('/summary', async (req, res) => {
   }
 });
 
+// P&L breakdown — converted leads only
+router.get('/pnl', async (req, res) => {
+  try {
+    const { from, to } = req.query;
+    const vals = [];
+    const $v = (v) => { vals.push(v); return `$${vals.length}`; };
+    const where = [`l.status = 'converted'`, `l.quote_id IS NOT NULL`];
+    if (from) where.push(`l.created_at::date >= ${$v(from)}::date`);
+    if (to)   where.push(`l.created_at::date <= ${$v(to)}::date`);
+    const whereSql = 'WHERE ' + where.join(' AND ');
+
+    // Fetch converted leads with quote items + associate + city
+    const leadsRes = await pool.query(`
+      SELECT l.id, e.name AS associate_name,
+             q.client_city, q.items
+      FROM leads l
+      JOIN employees e ON e.id = l.employee_id
+      JOIN quotes q ON q.id = l.quote_id
+      ${whereSql}
+    `, vals);
+
+    if (!leadsRes.rows.length) {
+      return res.json({ by_category: [], by_product: [], by_associate: [], by_city: [] });
+    }
+
+    // Collect all product ids
+    const productIdSet = new Set();
+    const parsedLeads = leadsRes.rows.map((row) => {
+      let items = [];
+      try { items = JSON.parse(row.items) || []; } catch {/* */}
+      if (Array.isArray(items)) {
+        for (const it of items) if (it.product_id) productIdSet.add(it.product_id);
+      }
+      return { ...row, items: Array.isArray(items) ? items : [] };
+    });
+
+    // Fetch product details: name, category, manufacturing_cost
+    let productMap = {};
+    if (productIdSet.size) {
+      const ids = [...productIdSet];
+      const ph = ids.map((_, i) => `$${vals.length + i + 1}`).join(',');
+      const prodRes = await pool.query(`
+        SELECT p.id, p.name AS product_name, p.manufacturing_cost,
+               c.name AS category_name
+        FROM products p JOIN product_categories c ON c.id = p.category_id
+        WHERE p.id IN (${ph})
+      `, [...vals, ...ids]);
+      productMap = Object.fromEntries(prodRes.rows.map((r) => [r.id, r]));
+    }
+
+    // Aggregate P&L
+    const catAgg      = new Map();
+    const prodAgg     = new Map();
+    const assocAgg    = new Map();
+    const cityAgg     = new Map();
+
+    const upsert = (map, key, delta) => {
+      const cur = map.get(key) || { revenue: 0, cogs: 0 };
+      cur.revenue += delta.revenue;
+      cur.cogs    += delta.cogs;
+      map.set(key, cur);
+    };
+
+    for (const lead of parsedLeads) {
+      for (const it of lead.items) {
+        const qty   = Number(it.quantity) || 0;
+        const price = Number(it.unit_price) || 0;
+        const prod  = productMap[it.product_id] || {};
+        const mfg   = Number(prod.manufacturing_cost) || 0;
+        const delta = { revenue: qty * price, cogs: qty * mfg };
+
+        const cat   = prod.category_name || 'Uncategorized';
+        const pname = prod.product_name || it.product_name || `Product #${it.product_id}`;
+        const city  = lead.client_city || 'Unknown';
+        const assoc = lead.associate_name || 'Unknown';
+
+        upsert(catAgg,   cat,   delta);
+        upsert(prodAgg,  pname, delta);
+        upsert(assocAgg, assoc, delta);
+        upsert(cityAgg,  city,  delta);
+      }
+    }
+
+    const fmt = (map) =>
+      [...map.entries()]
+        .map(([name, v]) => ({
+          name,
+          revenue: +v.revenue.toFixed(2),
+          cogs:    +v.cogs.toFixed(2),
+          profit:  +(v.revenue - v.cogs).toFixed(2),
+          margin:  v.revenue > 0 ? +(((v.revenue - v.cogs) / v.revenue) * 100).toFixed(1) : 0,
+        }))
+        .sort((a, b) => b.profit - a.profit);
+
+    res.json({
+      by_category:  fmt(catAgg),
+      by_product:   fmt(prodAgg),
+      by_associate: fmt(assocAgg),
+      by_city:      fmt(cityAgg),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
