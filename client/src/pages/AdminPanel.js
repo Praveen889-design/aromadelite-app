@@ -4,6 +4,7 @@ import ProductsTab from './admin/ProductsTab';
 import QuotesTab from './admin/QuotesTab';
 import LeadsTab from './admin/LeadsTab';
 import ReportsTab from './admin/ReportsTab';
+import PriceDeviationTab from './admin/PriceDeviationTab';
 import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
 import { useToast } from '../components/Toast';
@@ -1829,12 +1830,13 @@ function OverviewTab() {
 
 // ─── Main panel ──────────────────────────────────────────────
 const TABS = [
-  { id: 'overview',  label: 'Overview' },
-  { id: 'team',      label: 'Team' },
-  { id: 'products',  label: 'Products' },
-  { id: 'quotes',    label: 'All Quotes' },
-  { id: 'leads',     label: 'All Leads' },
-  { id: 'reports',   label: 'Reports' },
+  { id: 'overview',   label: 'Overview'   },
+  { id: 'team',       label: 'Team'       },
+  { id: 'products',   label: 'Products'   },
+  { id: 'quotes',     label: 'All Quotes' },
+  { id: 'leads',      label: 'All Leads'  },
+  { id: 'discounts',  label: '💸 Discounts' },
+  { id: 'reports',    label: 'Reports'    },
 ];
 
 export default function AdminPanel() {
@@ -1896,6 +1898,7 @@ export default function AdminPanel() {
         {tab === 'products'  && <ProductsTab />}
         {tab === 'quotes'    && <QuotesTab initialFilters={tabFilters} />}
         {tab === 'leads'     && <LeadsTab />}
+        {tab === 'discounts' && <PriceDeviationTab />}
         {tab === 'reports'   && <ReportsTab />}
       </div>
     </div>

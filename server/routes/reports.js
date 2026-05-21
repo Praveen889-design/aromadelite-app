@@ -207,6 +207,209 @@ router.get('/pnl', async (req, res) => {
   }
 });
 
+// GET /api/reports/price-deviation?period=all|month|quarter|year&from=&to=
+router.get('/price-deviation', async (req, res) => {
+  try {
+    const { period, from, to } = req.query;
+
+    const vals = [];
+    const $v   = (v) => { vals.push(v); return `$${vals.length}`; };
+    const where = [];
+    if (from)   where.push(`q.created_at::date >= ${$v(from)}::date`);
+    if (to)     where.push(`q.created_at::date <= ${$v(to)}::date`);
+    if (!from && !to && period && period !== 'all') {
+      const trunc = { month: 'month', quarter: 'quarter', year: 'year' }[period];
+      if (trunc) where.push(`q.created_at >= DATE_TRUNC('${trunc}', CURRENT_DATE)`);
+    }
+    const whereSql = where.length ? 'WHERE ' + where.join(' AND ') : '';
+
+    // Fetch quotes with items + associate info
+    const qRes = await pool.query(`
+      SELECT q.id, q.quote_number, q.status, q.created_at,
+             q.client_name, q.client_business_name, q.client_type, q.client_city,
+             q.total_amount, q.items,
+             e.name       AS employee_name,
+             e.employee_id AS employee_code,
+             e.region
+      FROM quotes q
+      JOIN employees e ON e.id = q.employee_id
+      ${whereSql}
+      ORDER BY q.created_at DESC
+    `, vals);
+
+    // Collect all product ids for catalog-price fallback
+    const pidSet = new Set();
+    const parsed = qRes.rows.map((row) => {
+      let items = [];
+      try { items = JSON.parse(row.items) || []; } catch {/* */}
+      if (!Array.isArray(items)) items = [];
+      for (const it of items) if (it.product_id) pidSet.add(it.product_id);
+      return { ...row, items };
+    });
+
+    // Fetch base_price from products (fallback when system_price not in item)
+    let productPriceMap = {};
+    if (pidSet.size) {
+      const ids = [...pidSet];
+      const ph  = ids.map((_, i) => `$${vals.length + i + 1}`).join(',');
+      const pRes = await pool.query(
+        `SELECT id, name AS product_name, base_price, category_id,
+                (SELECT name FROM product_categories c WHERE c.id = p.category_id) AS category_name
+         FROM products p WHERE p.id IN (${ph})`,
+        [...vals, ...ids]
+      );
+      productPriceMap = Object.fromEntries(pRes.rows.map((r) => [r.id, r]));
+    }
+
+    // Aggregation accumulators
+    const assocMap  = new Map();
+    const prodMap   = new Map();
+    const typeMap   = new Map();
+    const quoteRows = [];
+
+    let totalCatalog = 0, totalQuoted = 0, totalDiscount = 0;
+    let discountedItems = 0, aboveCatalogItems = 0;
+
+    for (const q of parsed) {
+      let qCatalog = 0, qQuoted = 0, qDiscount = 0, qAbove = 0;
+      const itemDetails = [];
+
+      for (const it of q.items) {
+        const qty    = Number(it.quantity)   || 0;
+        if (!qty) continue;
+        const quoted = Number(it.unit_price) || 0;
+        const prod   = productPriceMap[it.product_id] || {};
+        // system_price stored in item JSON > product base_price > quoted (0 deviation)
+        const catalog = Number(it.system_price) > 0
+          ? Number(it.system_price)
+          : (Number(prod.base_price) > 0 ? Number(prod.base_price) : quoted);
+
+        const lineQuoted  = qty * quoted;
+        const lineCatalog = qty * catalog;
+        const lineDiff    = lineCatalog - lineQuoted;   // positive = discount, negative = above catalog
+        const diffPct     = catalog > 0 ? (lineDiff / lineCatalog) * 100 : 0;
+
+        qQuoted   += lineQuoted;
+        qCatalog  += lineCatalog;
+        qDiscount += lineDiff;
+        if (lineDiff > 0) { discountedItems++; qAbove += 0; }
+        else if (lineDiff < 0) { aboveCatalogItems++; }
+
+        const pName = prod.product_name || it.product_name || `#${it.product_id || '?'}`;
+        const pCat  = prod.category_name || 'Uncategorized';
+
+        // By product
+        const pk = pName;
+        const pc = prodMap.get(pk) || { name: pName, category: pCat, catalog: 0, quoted: 0, discount: 0, items: 0 };
+        pc.catalog  += lineCatalog;
+        pc.quoted   += lineQuoted;
+        pc.discount += lineDiff;
+        pc.items    += qty;
+        prodMap.set(pk, pc);
+
+        itemDetails.push({ name: pName, category: pCat, qty, catalog, quoted, discount_pct: +diffPct.toFixed(1) });
+      }
+
+      totalCatalog  += qCatalog;
+      totalQuoted   += qQuoted;
+      totalDiscount += qDiscount;
+
+      // By associate
+      const ak = q.employee_code;
+      const ac = assocMap.get(ak) || {
+        name: q.employee_name, code: q.employee_code, region: q.region,
+        catalog: 0, quoted: 0, discount: 0, quotes: 0, discounted_quotes: 0,
+      };
+      ac.catalog  += qCatalog;
+      ac.quoted   += qQuoted;
+      ac.discount += qDiscount;
+      ac.quotes   += 1;
+      if (qDiscount > 0.01) ac.discounted_quotes += 1;
+      assocMap.set(ak, ac);
+
+      // By client type
+      const tk = (q.client_type || 'Other').toLowerCase();
+      const tc = typeMap.get(tk) || { type: q.client_type || 'Other', catalog: 0, quoted: 0, discount: 0, quotes: 0 };
+      tc.catalog  += qCatalog;
+      tc.quoted   += qQuoted;
+      tc.discount += qDiscount;
+      tc.quotes   += 1;
+      typeMap.set(tk, tc);
+
+      // Quote-level row (only include quotes that have some deviation)
+      if (Math.abs(qDiscount) > 0.01) {
+        const discPct = qCatalog > 0 ? (qDiscount / qCatalog) * 100 : 0;
+        quoteRows.push({
+          id: q.id,
+          quote_number: q.quote_number,
+          status: q.status,
+          created_at: q.created_at,
+          client: q.client_business_name || q.client_name,
+          client_type: q.client_type,
+          client_city: q.client_city,
+          employee_name: q.employee_name,
+          employee_code: q.employee_code,
+          catalog_value:  +qCatalog.toFixed(2),
+          quoted_value:   +qQuoted.toFixed(2),
+          discount_amount: +qDiscount.toFixed(2),
+          discount_pct:   +discPct.toFixed(1),
+          items: itemDetails,
+        });
+      }
+    }
+
+    const fmt = (v) => +Number(v).toFixed(2);
+    const pct = (d, c) => c > 0 ? +(( d / c) * 100).toFixed(1) : 0;
+
+    const fmtAssoc = [...assocMap.values()]
+      .map((a) => ({
+        ...a,
+        catalog:  fmt(a.catalog),  quoted:  fmt(a.quoted),
+        discount: fmt(a.discount), discount_pct: pct(a.discount, a.catalog),
+      }))
+      .sort((a, b) => b.discount - a.discount);
+
+    const fmtProd = [...prodMap.values()]
+      .map((p) => ({
+        ...p,
+        catalog:  fmt(p.catalog),  quoted:  fmt(p.quoted),
+        discount: fmt(p.discount), discount_pct: pct(p.discount, p.catalog),
+      }))
+      .sort((a, b) => b.discount - a.discount);
+
+    const fmtType = [...typeMap.values()]
+      .map((t) => ({
+        ...t,
+        catalog:  fmt(t.catalog),  quoted:  fmt(t.quoted),
+        discount: fmt(t.discount), discount_pct: pct(t.discount, t.catalog),
+      }))
+      .sort((a, b) => b.discount - a.discount);
+
+    const avgDiscPct = totalCatalog > 0
+      ? +((totalDiscount / totalCatalog) * 100).toFixed(1) : 0;
+
+    res.json({
+      period: period || 'all',
+      summary: {
+        total_quotes:      qRes.rows.length,
+        quotes_with_deviation: quoteRows.length,
+        total_catalog:     fmt(totalCatalog),
+        total_quoted:      fmt(totalQuoted),
+        total_discount:    fmt(totalDiscount),
+        avg_discount_pct:  avgDiscPct,
+        discounted_items:  discountedItems,
+        above_catalog_items: aboveCatalogItems,
+      },
+      by_associate: fmtAssoc,
+      by_product:   fmtProd,
+      by_client_type: fmtType,
+      quote_details: quoteRows,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/reports/top-clients?limit=10&period=all|month|quarter|year
 router.get('/top-clients', async (req, res) => {
   try {
