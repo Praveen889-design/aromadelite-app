@@ -6,6 +6,14 @@ import api from '../utils/api';
 import { useToast } from '../components/Toast';
 import { amountInWords } from '../utils/amountInWords';
 
+/* ─── Platform helpers ──────────────────────────────────────── */
+const isCapacitor = () =>
+  typeof window !== 'undefined' && !!(window.Capacitor?.isNativePlatform?.());
+const canNativeShare = () =>
+  typeof navigator !== 'undefined' && typeof navigator.share === 'function';
+const canShareFiles = () =>
+  canNativeShare() && typeof navigator.canShare === 'function' && navigator.canShare({ files: [new File(['x'], 'x.pdf', { type: 'application/pdf' })] });
+
 const formatINR = (n) =>
   new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(n || 0);
 
@@ -54,6 +62,24 @@ const CheckIcon = (p) => (
   </svg>
 );
 
+const ShareIcon = (p) => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+       strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}>
+    <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+    <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+    <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+  </svg>
+);
+
+const SharePdfIcon = (p) => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+       strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}>
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+    <polyline points="14 2 14 8 20 8"/>
+    <path d="M10 12v6M10 18l-2-2M10 18l2-2"/>
+  </svg>
+);
+
 // Group items by category, preserving original index for the # column.
 const groupByCategory = (items) => {
   const groups = new Map();
@@ -75,6 +101,7 @@ export default function QuotePreview() {
   const [error, setError] = useState('');
   const [downloading, setDownloading] = useState(false);
   const [marking, setMarking] = useState(false);
+  const [sharingPdf, setSharingPdf] = useState(false);
   const docRef = useRef(null);
 
   const fetchQuote = async () => {
@@ -144,36 +171,147 @@ export default function QuotePreview() {
     }
   };
 
-  const onShareWhatsApp = () => {
-    // Format dates as DD/MM/YYYY for the WA message
-    const ddmmyyyy = (iso) => {
+  /* ── Build rich WhatsApp message ───────────────────────────── */
+  const buildWhatsAppMessage = () => {
+    const ddmm = (iso) => {
       if (!iso) return '—';
-      const d = new Date(iso.length === 10 ? iso : iso + 'Z');
-      const dd = String(d.getDate()).padStart(2, '0');
-      const mm = String(d.getMonth() + 1).padStart(2, '0');
-      return `${dd}/${mm}/${d.getFullYear()}`;
+      const d = new Date(iso.length === 10 ? iso + 'T00:00:00' : iso);
+      return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
     };
-    const msg =
-`Hi ${client.name},
+    const fmtAmt = (n) =>
+      new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(n || 0);
 
-Quote from *Aromadelite – Sri Vemuri Sai Enterprises*
-Quote No: ${quote.number}
-Date: ${ddmmyyyy(quote.created_at)}
-Valid Till: ${ddmmyyyy(quote.valid_until)}
+    const greeting = client.business_name
+      ? `Dear *${client.business_name}* (Attn: ${client.name}),`
+      : `Dear *${client.name}*,`;
 
-*Items: ${items.length} products*
-*Total Amount: ${formatINR(totals.total_amount)} (incl. GST)*
+    // Item lines grouped by category
+    const itemLines = [];
+    let serial = 1;
+    for (const [catName, catItems] of groupByCategory(items).map((g) => [g.name, g.rows])) {
+      if (catItems.length) itemLines.push(`\n📦 *${catName}*`);
+      for (const it of catItems) {
+        const sysP  = it.system_price && it.system_price !== it.unit_price
+          ? ` _(was ₹${fmtAmt(it.system_price)})_`
+          : '';
+        itemLines.push(
+          `${serial}. *${it.product_name || it.name}*` +
+          (it.variant ? ` – ${it.variant}` : '') +
+          (it.pack_size ? ` [${it.pack_size}]` : '') +
+          `\n   Qty: ${it.quantity} × ₹${fmtAmt(it.unit_price)}${sysP} = *₹${fmtAmt(it.line_total)}*`
+        );
+        serial++;
+      }
+    }
 
-For bulk supply enquiries:
-📞 6304382947
+    const discountLine = totals.subtotal < items.reduce((s, i) => s + (i.quantity || 0) * (i.system_price || i.unit_price || 0), 0)
+      ? `🏷️ Client Discount Applied\n` : '';
+
+    const followUp = quote.next_follow_up_date
+      ? `\n📅 *Next Follow-up:* ${ddmm(quote.next_follow_up_date)}` : '';
+    const orderDate = quote.expected_order_date
+      ? `\n🛒 *Expected Order:* ${ddmm(quote.expected_order_date)}` : '';
+
+    return `🌿 *AROMADELITE*
+_Sri Vemuri Sai Enterprises_
+
+${greeting}
+
+Thank you for your enquiry. Please find your quotation below:
+
+━━━━━━━━━━━━━━━━━━━
+📋 *Quote No:* ${quote.number}
+📅 *Date:* ${ddmm(quote.created_at)}
+⏳ *Valid Till:* ${ddmm(quote.valid_until)}
+━━━━━━━━━━━━━━━━━━━
+${itemLines.join('\n')}
+
+━━━━━━━━━━━━━━━━━━━
+${discountLine}Subtotal:  ₹${fmtAmt(totals.subtotal)}
+GST:       ₹${fmtAmt(totals.gst_amount)}
+*TOTAL:    ₹${fmtAmt(totals.total_amount)}*
+━━━━━━━━━━━━━━━━━━━${followUp}${orderDate}
+
+📞 *6304382947*
+✉️ sales@aromadelite.in
 📍 Hyderabad, Telangana
 
-_Factory-direct pricing. Reliable supply._`;
+_Reliable supply. Factory-direct pricing. Reach us anytime._
+🌿 *Aromadelite Team*`;
+  };
+
+  /* ── WhatsApp direct ────────────────────────────────────────── */
+  const onShareWhatsApp = () => {
+    const msg   = buildWhatsAppMessage();
     const phone = (client.phone || '').replace(/\D/g, '');
-    const url = phone
+    const url   = phone
       ? `https://wa.me/${phone.length === 10 ? '91' + phone : phone}?text=${encodeURIComponent(msg)}`
       : `https://wa.me/?text=${encodeURIComponent(msg)}`;
+    // On Capacitor/mobile, window.open launches the correct Intent
     window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
+  /* ── Native share sheet (text) ─────────────────────────────── */
+  const onNativeShare = async () => {
+    const msg = buildWhatsAppMessage();
+    if (canNativeShare()) {
+      try {
+        await navigator.share({ title: `Quote ${quote.number} – Aromadelite`, text: msg });
+        return;
+      } catch (e) {
+        if (e.name === 'AbortError') return; // user dismissed — not an error
+      }
+    }
+    // Fallback → WhatsApp link
+    onShareWhatsApp();
+  };
+
+  /* ── Share as PDF file ─────────────────────────────────────── */
+  const onSharePdf = async () => {
+    if (!docRef.current) return;
+    setSharingPdf(true);
+    try {
+      const canvas = await html2canvas(docRef.current, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({ unit: 'pt', format: 'a4', compress: true });
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+      const imgH = (canvas.height * pageW) / canvas.width;
+      let remaining = imgH, y = 0;
+      while (remaining > 0) {
+        pdf.addImage(imgData, 'PNG', 0, y, pageW, imgH, undefined, 'FAST');
+        remaining -= pageH;
+        if (remaining > 0) { pdf.addPage(); y -= pageH; }
+      }
+
+      const pdfName = `Aromadelite_Quote_${quote.number}.pdf`;
+
+      // Try native file share (works in Capacitor & modern mobile browsers)
+      if (canShareFiles()) {
+        const blob = pdf.output('blob');
+        const file = new File([blob], pdfName, { type: 'application/pdf' });
+        try {
+          await navigator.share({
+            title: `Quote ${quote.number} – Aromadelite`,
+            text: `Please find the quotation attached.`,
+            files: [file],
+          });
+          toast('PDF shared.', { kind: 'success' });
+          return;
+        } catch (e) {
+          if (e.name === 'AbortError') return;
+          // fall through to download
+        }
+      }
+
+      // Fallback: download
+      pdf.save(pdfName);
+      toast('PDF downloaded.', { kind: 'success' });
+    } catch (e) {
+      toast('PDF export failed.', { kind: 'error' });
+    } finally {
+      setSharingPdf(false);
+    }
   };
 
   const onMarkSent = async () => {
@@ -196,56 +334,112 @@ _Factory-direct pricing. Reliable supply._`;
     rejected: 'bg-rose-100 text-rose-700',
   }[quote.status] || 'bg-slate-100 text-slate-700';
 
+  /* ── derive onMobile for label tweaks ── */
+  const onMobile = isCapacitor() || (typeof window !== 'undefined' && window.innerWidth < 640);
+
   return (
     <div className="space-y-4">
-      {/* Action bar — not part of PDF */}
-      <div className="flex flex-wrap items-center gap-2 bg-white rounded-xl border border-slate-200 p-3">
-        <button
-          type="button"
-          onClick={onDownloadPdf}
-          disabled={downloading}
-          className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg px-3 py-2 disabled:opacity-60"
-        >
-          <DownloadIcon />
-          {downloading ? 'Generating PDF…' : 'Download PDF'}
-        </button>
-        <button
-          type="button"
-          onClick={onShareWhatsApp}
-          className="inline-flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium rounded-lg px-3 py-2"
-        >
-          <WhatsAppIcon />
-          Share via WhatsApp
-        </button>
-        <button
-          type="button"
-          onClick={onMarkSent}
-          disabled={marking || quote.status === 'sent' || quote.status === 'accepted'}
-          className="inline-flex items-center gap-2 bg-cyan-600 hover:bg-cyan-700 text-white text-sm font-medium rounded-lg px-3 py-2 disabled:opacity-60 disabled:cursor-not-allowed"
-        >
-          <CheckIcon />
-          {quote.status === 'sent' || quote.status === 'accepted' ? 'Already sent' : marking ? 'Updating…' : 'Mark as Sent'}
-        </button>
-        <Link
-          to="/quotes/new"
-          className="inline-flex items-center gap-2 border border-slate-300 text-slate-700 hover:bg-slate-100 text-sm font-medium rounded-lg px-3 py-2"
-        >Back to Builder</Link>
+      {/* ── Action bar — not part of PDF ── */}
+      <div className="bg-white rounded-xl border border-slate-200 p-3 space-y-2">
 
-        <div className="ml-auto flex flex-wrap items-center gap-2 text-xs text-slate-500">
+        {/* Row 1: status chip + quote number */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide ${statusPill}`}>
+            {quote.status}
+          </span>
+          <span className="text-xs font-mono text-slate-500">{quote.number}</span>
           {quote.next_follow_up_date && (
-            <span className="flex items-center gap-1 bg-cyan-50 border border-cyan-200 text-cyan-700 px-2 py-1 rounded-lg font-medium">
+            <span className="flex items-center gap-1 bg-cyan-50 border border-cyan-200 text-cyan-700 px-2 py-1 rounded-lg text-xs font-medium">
               📅 Follow-up: {formatDate(quote.next_follow_up_date)}
             </span>
           )}
           {quote.expected_order_date && (
-            <span className="flex items-center gap-1 bg-amber-50 border border-amber-200 text-amber-700 px-2 py-1 rounded-lg font-medium">
-              🛒 Expected Order: {formatDate(quote.expected_order_date)}
+            <span className="flex items-center gap-1 bg-amber-50 border border-amber-200 text-amber-700 px-2 py-1 rounded-lg text-xs font-medium">
+              🛒 Exp. Order: {formatDate(quote.expected_order_date)}
             </span>
           )}
-          <span className={`px-2 py-0.5 rounded-full font-semibold uppercase tracking-wide ${statusPill}`}>
-            {quote.status}
-          </span>
-          <span>{quote.number}</span>
+        </div>
+
+        {/* Row 2: action buttons */}
+        <div className="flex flex-wrap gap-2">
+
+          {/* WhatsApp — primary share on mobile */}
+          <button
+            type="button"
+            onClick={onShareWhatsApp}
+            className="inline-flex items-center gap-2 bg-[#25D366] hover:bg-[#1ebe59] active:bg-[#17a84e] text-white text-sm font-semibold rounded-xl px-4 py-2.5 shadow-sm"
+            style={{ minHeight: 44 }}
+          >
+            <WhatsAppIcon />
+            <span>{onMobile ? 'WhatsApp' : 'Share via WhatsApp'}</span>
+          </button>
+
+          {/* Native share sheet (works in Capacitor + modern browsers) */}
+          {canNativeShare() && (
+            <button
+              type="button"
+              onClick={onNativeShare}
+              className="inline-flex items-center gap-2 bg-violet-600 hover:bg-violet-700 active:bg-violet-800 text-white text-sm font-semibold rounded-xl px-4 py-2.5 shadow-sm"
+              style={{ minHeight: 44 }}
+            >
+              <ShareIcon />
+              <span>{onMobile ? 'Share' : 'Share Quote'}</span>
+            </button>
+          )}
+
+          {/* Share / Download PDF */}
+          <button
+            type="button"
+            onClick={onSharePdf}
+            disabled={sharingPdf}
+            className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-sm font-semibold rounded-xl px-4 py-2.5 shadow-sm disabled:opacity-60"
+            style={{ minHeight: 44 }}
+          >
+            {canShareFiles() ? <SharePdfIcon /> : <DownloadIcon />}
+            <span>
+              {sharingPdf
+                ? 'Preparing…'
+                : canShareFiles()
+                  ? (onMobile ? 'Share PDF' : 'Share PDF File')
+                  : (downloading ? 'Generating…' : 'Download PDF')}
+            </span>
+          </button>
+
+          {/* Download PDF separately when share-files is available */}
+          {canShareFiles() && (
+            <button
+              type="button"
+              onClick={onDownloadPdf}
+              disabled={downloading}
+              className="inline-flex items-center gap-2 bg-slate-600 hover:bg-slate-700 text-white text-sm font-semibold rounded-xl px-4 py-2.5 shadow-sm disabled:opacity-60"
+              style={{ minHeight: 44 }}
+            >
+              <DownloadIcon />
+              <span>{downloading ? 'Saving…' : 'Save PDF'}</span>
+            </button>
+          )}
+
+          {/* Mark as sent */}
+          <button
+            type="button"
+            onClick={onMarkSent}
+            disabled={marking || quote.status === 'sent' || quote.status === 'accepted'}
+            className="inline-flex items-center gap-2 bg-cyan-600 hover:bg-cyan-700 text-white text-sm font-semibold rounded-xl px-4 py-2.5 shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+            style={{ minHeight: 44 }}
+          >
+            <CheckIcon />
+            <span>
+              {quote.status === 'sent' || quote.status === 'accepted'
+                ? 'Sent ✓'
+                : marking ? 'Updating…' : 'Mark Sent'}
+            </span>
+          </button>
+
+          <Link
+            to="/quotes/new"
+            className="inline-flex items-center gap-1 border border-slate-300 text-slate-600 hover:bg-slate-50 text-sm font-medium rounded-xl px-4 py-2.5"
+            style={{ minHeight: 44 }}
+          >← Builder</Link>
         </div>
       </div>
 
