@@ -60,20 +60,22 @@ export default function QuotesTab({ initialFilters }) {
 
   const exportCSV = () => {
     downloadCSV(visible, [
-      { header: 'Quote',         key: 'quote_number' },
-      { header: 'Date',          get: (r) => r.created_at?.slice(0, 10) },
-      { header: 'Associate',     get: (r) => `${r.employee_code} ${r.employee_name}` },
-      { header: 'Region',        key: 'region' },
-      { header: 'Client',        key: 'client_name' },
-      { header: 'Business',      key: 'client_business_name' },
-      { header: 'Type',          key: 'client_type' },
-      { header: 'Requirement',   key: 'requirement_type' },
-      { header: 'City',          key: 'client_city' },
-      { header: 'Phone',         key: 'client_phone' },
-      { header: 'Subtotal',      key: 'subtotal' },
-      { header: 'GST',           key: 'gst_amount' },
-      { header: 'Total',         key: 'total_amount' },
-      { header: 'Status',        key: 'status' },
+      { header: 'Quote',             key: 'quote_number' },
+      { header: 'Date',              get: (r) => r.created_at?.slice(0, 10) },
+      { header: 'Associate',         get: (r) => `${r.employee_code} ${r.employee_name}` },
+      { header: 'Region',            key: 'region' },
+      { header: 'Client',            key: 'client_name' },
+      { header: 'Business',          key: 'client_business_name' },
+      { header: 'Type',              key: 'client_type' },
+      { header: 'Requirement',       key: 'requirement_type' },
+      { header: 'City',              key: 'client_city' },
+      { header: 'Phone',             key: 'client_phone' },
+      { header: 'Subtotal',          key: 'subtotal' },
+      { header: 'GST',               key: 'gst_amount' },
+      { header: 'Total',             key: 'total_amount' },
+      { header: 'Status',            key: 'status' },
+      { header: 'Next Follow-up',    key: 'next_follow_up_date' },
+      { header: 'Expected Order',    key: 'expected_order_date' },
     ], `Aromadelite_Quotes_${new Date().toISOString().slice(0,10)}.csv`);
   };
 
@@ -132,7 +134,9 @@ export default function QuotesTab({ initialFilters }) {
                 <th className="text-left px-3 py-2">Associate</th>
                 <th className="text-right px-3 py-2">Total</th>
                 <th className="text-left px-3 py-2">Status</th>
-                <th className="text-left px-3 py-2">Date</th>
+                <th className="text-left px-3 py-2">Created</th>
+                <th className="text-left px-3 py-2">Follow-up</th>
+                <th className="text-left px-3 py-2">Exp. Order</th>
                 <th className="text-right px-3 py-2">Actions</th>
               </tr>
             </thead>
@@ -162,6 +166,23 @@ export default function QuotesTab({ initialFilters }) {
                     </select>
                   </td>
                   <td className="px-3 py-2 text-xs text-slate-600">{q.created_at?.slice(0,10)}</td>
+                  <td className="px-3 py-2 text-xs">
+                    {q.next_follow_up_date ? (
+                      <span className={[
+                        'inline-block px-1.5 py-0.5 rounded font-medium',
+                        q.next_follow_up_date < new Date().toISOString().slice(0,10)
+                          ? 'bg-rose-100 text-rose-700'
+                          : 'bg-cyan-50 text-cyan-700',
+                      ].join(' ')}>
+                        {q.next_follow_up_date}
+                      </span>
+                    ) : <span className="text-slate-400">—</span>}
+                  </td>
+                  <td className="px-3 py-2 text-xs">
+                    {q.expected_order_date
+                      ? <span className="bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded font-medium">{q.expected_order_date}</span>
+                      : <span className="text-slate-400">—</span>}
+                  </td>
                   <td className="px-3 py-2 text-right">
                     <Link to={`/quotes/${q.id}`} className="text-xs px-2 py-1 rounded border border-slate-300 hover:bg-slate-100">View</Link>
                   </td>

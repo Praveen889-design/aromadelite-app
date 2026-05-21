@@ -34,11 +34,14 @@ const Field = ({ label, required, children, error }) => (
 const inputCls =
   'w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-600 focus:border-cyan-600';
 
+const todayISO = () => new Date().toISOString().slice(0, 10);
+
 export default function ClientModal({ initial, open, submitting, onClose, onSubmit }) {
   const [v, setV] = useState({
     client_name: '', client_business_name: '', client_type: 'Hospital',
     client_phone: '', client_email: '', client_city: '',
     requirement_type: 'Bulk', validity_days: 30, notes: '',
+    next_follow_up_date: '', expected_order_date: '',
   });
   const [errors, setErrors] = useState({});
 
@@ -63,6 +66,8 @@ export default function ClientModal({ initial, open, submitting, onClose, onSubm
     if (!v.client_city.trim())          e.client_city = 'Required';
     if (v.client_email && !/^\S+@\S+\.\S+$/.test(v.client_email))
       e.client_email = 'Enter a valid email';
+    if (!v.next_follow_up_date)
+      e.next_follow_up_date = 'Required — set a follow-up date before generating the quote';
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -147,6 +152,39 @@ export default function ClientModal({ initial, open, submitting, onClose, onSubm
                 placeholder="Special instructions, delivery preferences, etc."
               />
             </Field>
+          </div>
+
+          {/* ── Follow-up & Order dates ── */}
+          <div className="sm:col-span-2 border-t border-slate-100 pt-3 mt-1">
+            <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+              📅 Follow-up &amp; Order Tracking
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Field label="Next Follow-up Date" required error={errors.next_follow_up_date}>
+                <input
+                  type="date"
+                  className={inputCls}
+                  value={v.next_follow_up_date}
+                  min={todayISO()}
+                  onChange={(e) => upd({ next_follow_up_date: e.target.value })}
+                />
+                <div className="text-[10px] text-slate-400 mt-1">
+                  When should you follow up with this client?
+                </div>
+              </Field>
+              <Field label="Expected Order Date (Optional)">
+                <input
+                  type="date"
+                  className={inputCls}
+                  value={v.expected_order_date}
+                  min={v.next_follow_up_date || todayISO()}
+                  onChange={(e) => upd({ expected_order_date: e.target.value })}
+                />
+                <div className="text-[10px] text-slate-400 mt-1">
+                  When does the client expect to place the order?
+                </div>
+              </Field>
+            </div>
           </div>
         </div>
 

@@ -231,7 +231,17 @@ _Factory-direct pricing. Reliable supply._`;
           className="inline-flex items-center gap-2 border border-slate-300 text-slate-700 hover:bg-slate-100 text-sm font-medium rounded-lg px-3 py-2"
         >Back to Builder</Link>
 
-        <div className="ml-auto flex items-center gap-2 text-xs text-slate-500">
+        <div className="ml-auto flex flex-wrap items-center gap-2 text-xs text-slate-500">
+          {quote.next_follow_up_date && (
+            <span className="flex items-center gap-1 bg-cyan-50 border border-cyan-200 text-cyan-700 px-2 py-1 rounded-lg font-medium">
+              📅 Follow-up: {formatDate(quote.next_follow_up_date)}
+            </span>
+          )}
+          {quote.expected_order_date && (
+            <span className="flex items-center gap-1 bg-amber-50 border border-amber-200 text-amber-700 px-2 py-1 rounded-lg font-medium">
+              🛒 Expected Order: {formatDate(quote.expected_order_date)}
+            </span>
+          )}
           <span className={`px-2 py-0.5 rounded-full font-semibold uppercase tracking-wide ${statusPill}`}>
             {quote.status}
           </span>
@@ -302,8 +312,26 @@ _Factory-direct pricing. Reliable supply._`;
             </div>
           </div>
 
+          {/* Follow-up & Expected Order dates bar */}
+          {(quote.next_follow_up_date || quote.expected_order_date) && (
+            <div className="mt-3 flex gap-6 text-[11px]" style={{ color: '#374151' }}>
+              {quote.next_follow_up_date && (
+                <div>
+                  <span style={{ fontWeight: 600, color: '#0E7490' }}>Next Follow-up: </span>
+                  {formatDate(quote.next_follow_up_date)}
+                </div>
+              )}
+              {quote.expected_order_date && (
+                <div>
+                  <span style={{ fontWeight: 600, color: '#92400E' }}>Expected Order: </span>
+                  {formatDate(quote.expected_order_date)}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* ITEMS TABLE */}
-          <table className="w-full mt-6 border border-slate-300 text-xs" style={{ borderCollapse: 'collapse' }}>
+          <table className="w-full mt-4 border border-slate-300 text-xs" style={{ borderCollapse: 'collapse' }}>
             <thead>
               <tr className="text-slate-700" style={{ backgroundColor: '#CFFAFE' }}>
                 <th className="text-left  px-2 py-2 border border-slate-300 w-8">#</th>
@@ -336,7 +364,16 @@ _Factory-direct pricing. Reliable supply._`;
                         <td className="px-2 py-1.5 border border-slate-200 align-top text-slate-600">{it.variant || '—'}</td>
                         <td className="px-2 py-1.5 border border-slate-200 align-top text-slate-600">{it.pack_size || '—'}</td>
                         <td className="px-2 py-1.5 border border-slate-200 align-top text-right">{it.quantity}</td>
-                        <td className="px-2 py-1.5 border border-slate-200 align-top text-right">{formatINR(it.unit_price)}</td>
+                        <td className="px-2 py-1.5 border border-slate-200 align-top text-right">
+                          {it.system_price && it.system_price > it.unit_price ? (
+                            <div>
+                              <div style={{ textDecoration: 'line-through', color: '#9CA3AF', fontSize: '10px' }}>
+                                {formatINR(it.system_price)}
+                              </div>
+                              <div style={{ color: '#059669', fontWeight: 600 }}>{formatINR(it.unit_price)}</div>
+                            </div>
+                          ) : formatINR(it.unit_price)}
+                        </td>
                         <td className="px-2 py-1.5 border border-slate-200 align-top text-right">{it.gst_percent}%</td>
                         <td className="px-2 py-1.5 border border-slate-200 align-top text-right">{formatINR(gstAmt)}</td>
                         <td className="px-2 py-1.5 border border-slate-200 align-top text-right font-medium">

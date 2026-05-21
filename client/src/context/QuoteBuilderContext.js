@@ -54,7 +54,9 @@ export const QuoteBuilderProvider = ({ children }) => {
         copy[idx] = { ...copy[idx], quantity: (Number(copy[idx].quantity) || 0) + (Number(item.quantity) || 1) };
         return copy;
       }
-      return [...prev, { quantity: 1, ...item }];
+      // Preserve system_price (catalog price) separately from unit_price (quoted price)
+      const system_price = item.system_price ?? item.unit_price;
+      return [...prev, { quantity: 1, ...item, system_price }];
     });
   }, []);
 

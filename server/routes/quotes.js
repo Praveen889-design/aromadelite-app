@@ -60,20 +60,25 @@ router.post('/', async (req, res) => {
       ? totals.total_amount
       : +(totals.total_amount / 3).toFixed(2);
 
+    const nextFollowUp    = b.next_follow_up_date || null;
+    const expectedOrder   = b.expected_order_date || null;
+
     await client.query('BEGIN');
 
     const qRes = await client.query(`
       INSERT INTO quotes
         (quote_number, employee_id, client_name, client_business_name, client_type,
          client_phone, client_email, client_city, requirement_type, items,
-         subtotal, gst_amount, total_amount, validity_days, notes, status)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,'draft')
+         subtotal, gst_amount, total_amount, validity_days, notes,
+         next_follow_up_date, expected_order_date, status)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,'draft')
       RETURNING id
     `, [
       quote_number, req.user.id, b.client_name, b.client_business_name || null, b.client_type,
       b.client_phone || null, b.client_email || null, b.client_city || null,
       b.requirement_type, JSON.stringify(b.items),
       totals.subtotal, totals.gst_amount, totals.total_amount, validity_days, b.notes || null,
+      nextFollowUp, expectedOrder,
     ]);
     const quote_id = qRes.rows[0].id;
 
@@ -81,13 +86,13 @@ router.post('/', async (req, res) => {
       INSERT INTO leads
         (quote_id, employee_id, client_name, client_business_name, client_type,
          client_phone, client_email, client_city, requirement_type,
-         estimated_monthly_value, status, notes)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'new',$11)
+         estimated_monthly_value, follow_up_date, status, notes)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'new',$12)
       RETURNING id
     `, [
       quote_id, req.user.id, b.client_name, b.client_business_name || null, b.client_type,
       b.client_phone || null, b.client_email || null, b.client_city || null,
-      b.requirement_type, estMonthly, b.notes || null,
+      b.requirement_type, estMonthly, nextFollowUp, b.notes || null,
     ]);
     const lead_id = lRes.rows[0].id;
 
@@ -228,6 +233,8 @@ router.get('/:id/pdf-data', async (req, res) => {
           number: q.quote_number, status: q.status, created_at: q.created_at,
           valid_until: validUntil.toISOString().slice(0, 10),
           validity_days: q.validity_days, notes: q.notes,
+          next_follow_up_date: q.next_follow_up_date || null,
+          expected_order_date: q.expected_order_date || null,
         },
         client: {
           name: q.client_name, business_name: q.client_business_name, type: q.client_type,
@@ -244,7 +251,9 @@ router.get('/:id/pdf-data', async (req, res) => {
             product_id: it.product_id, product_name: it.product_name || it.name,
             category_name: cat.category_name || 'Items', category_icon: cat.category_icon || null,
             variant: it.variant || null, pack_size: it.pack_size || it.size || null,
-            quantity: it.quantity, unit_price: it.unit_price, gst_percent: it.gst_percent,
+            quantity: it.quantity, unit_price: it.unit_price,
+            system_price: it.system_price ?? it.unit_price,
+            gst_percent: it.gst_percent,
             line_total: +((Number(it.quantity) || 0) * (Number(it.unit_price) || 0)).toFixed(2),
           };
         }),

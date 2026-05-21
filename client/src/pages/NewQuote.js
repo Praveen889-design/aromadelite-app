@@ -132,6 +132,8 @@ export default function NewQuote() {
         requirement_type: clientPayload.requirement_type,
         validity_days: clientPayload.validity_days || 30,
         notes: clientPayload.notes || null,
+        next_follow_up_date: clientPayload.next_follow_up_date || null,
+        expected_order_date: clientPayload.expected_order_date || null,
         items: items.map((it) => ({
           product_id: it.product_id,
           product_name: it.product_name,
@@ -139,6 +141,7 @@ export default function NewQuote() {
           pack_size: it.pack_size,
           quantity: Number(it.quantity) || 0,
           unit_price: Number(it.unit_price) || 0,
+          system_price: Number(it.system_price) || Number(it.unit_price) || 0,
           gst_percent: Number(it.gst_percent) || 0,
         })),
       };
