@@ -497,17 +497,20 @@ const AGE_BUCKETS = [
 function AgingQuotesAlert() {
   const [data,      setData]      = useState(null);
   const [loading,   setLoading]   = useState(true);
+  const [err,       setErr]       = useState(null);
   const [expanded,  setExpanded]  = useState(false);
-  const [filter,    setFilter]    = useState('all'); // 'all' | 'critical' | 'warning' | 'notice'
+  const [filter,    setFilter]    = useState('all');
   const { toast }                 = useToast();
 
   const load = useCallback(async () => {
     setLoading(true);
+    setErr(null);
     try {
       const { data: res } = await api.get('/api/quotes/aging');
       setData(res);
     } catch (e) {
       console.warn('[aging]', e);
+      setErr(e?.response?.data?.error || 'Could not load aging quotes');
     } finally {
       setLoading(false);
     }
@@ -525,7 +528,52 @@ function AgingQuotesAlert() {
     }
   };
 
-  if (loading || !data || data.summary.total === 0) return null;
+  // Loading skeleton
+  if (loading) return (
+    <div style={{
+      border: '1px solid #E5E7EB', borderRadius: 14,
+      padding: '14px 18px', background: '#FAFAFA',
+      fontFamily: "'Source Sans 3', sans-serif", fontSize: 13, color: '#9CA3AF',
+    }}>⏳ Loading aging quotes…</div>
+  );
+
+  // Error state
+  if (err) return (
+    <div style={{
+      border: '1px solid #FECACA', borderRadius: 14,
+      padding: '14px 18px', background: '#FEF2F2',
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+    }}>
+      <span style={{ fontFamily: "'Source Sans 3', sans-serif", fontSize: 13, color: '#991B1B' }}>
+        ⚠ Aging Quotes: {err}
+      </span>
+      <button onClick={load} style={{
+        background: '#EF4444', color: '#fff', border: 0, borderRadius: 8,
+        padding: '5px 14px', cursor: 'pointer',
+        fontFamily: "'Nunito', sans-serif", fontWeight: 700, fontSize: 12,
+      }}>Retry</button>
+    </div>
+  );
+
+  // All-clear state — no aging quotes
+  if (!data || data.summary.total === 0) return (
+    <div style={{
+      border: '1px solid #A7F3D0', borderRadius: 14,
+      padding: '13px 18px', background: '#F0FDF4',
+      display: 'flex', alignItems: 'center', gap: 10,
+    }}>
+      <span style={{ fontSize: 18 }}>✅</span>
+      <div>
+        <span style={{
+          fontFamily: "'Nunito', sans-serif", fontWeight: 800, fontSize: 13, color: '#065F46',
+        }}>No Aging Quotes — All Clear!</span>
+        <span style={{
+          marginLeft: 8,
+          fontFamily: "'Source Sans 3', sans-serif", fontSize: 11.5, color: '#6B7280',
+        }}>All draft/sent quotes are less than 7 days old.</span>
+      </div>
+    </div>
+  );
 
   const { summary, quotes } = data;
   const visible = filter === 'all' ? quotes : quotes.filter((q) => q.bucket === filter);
@@ -874,14 +922,17 @@ function TopClients() {
   const [period,  setPeriod]  = useState('all');
   const [data,    setData]    = useState(null);
   const [loading, setLoading] = useState(true);
+  const [err,     setErr]     = useState(null);
 
   const load = useCallback(async (p) => {
     setLoading(true);
+    setErr(null);
     try {
       const { data: res } = await api.get(`/api/reports/top-clients?limit=10&period=${p}`);
       setData(res);
     } catch (e) {
       console.warn('[top-clients]', e);
+      setErr(e?.response?.data?.error || 'Could not load client data');
     } finally {
       setLoading(false);
     }
@@ -943,6 +994,20 @@ function TopClients() {
           padding: 32, textAlign: 'center',
           fontFamily: "'Source Sans 3', sans-serif", fontSize: 13, color: '#6B7280',
         }}>Loading…</div>
+      ) : err ? (
+        <div style={{
+          padding: '24px 18px', display: 'flex', alignItems: 'center',
+          justifyContent: 'space-between', gap: 12,
+        }}>
+          <span style={{ fontFamily: "'Source Sans 3', sans-serif", fontSize: 13, color: '#991B1B' }}>
+            ⚠ {err}
+          </span>
+          <button onClick={() => load(period)} style={{
+            background: '#0891B2', color: '#fff', border: 0, borderRadius: 8,
+            padding: '5px 14px', cursor: 'pointer',
+            fontFamily: "'Nunito', sans-serif", fontWeight: 700, fontSize: 12,
+          }}>Retry</button>
+        </div>
       ) : clients.length === 0 ? (
         <div style={{
           padding: 32, textAlign: 'center',

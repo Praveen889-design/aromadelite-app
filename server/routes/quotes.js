@@ -135,11 +135,23 @@ router.get('/aging', async (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
   try {
     const threshold = Math.max(1, Number(req.query.threshold) || 7);
+    // Detect optional columns added by migration (safe fallback to NULL if missing)
+    const colCheck = await pool.query(`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_name = 'quotes'
+        AND column_name IN ('next_follow_up_date','expected_order_date')
+    `);
+    const cols = new Set(colCheck.rows.map(r => r.column_name));
+    const followupSel = cols.has('next_follow_up_date')
+      ? 'q.next_follow_up_date' : 'NULL::date AS next_follow_up_date';
+    const orderDateSel = cols.has('expected_order_date')
+      ? 'q.expected_order_date' : 'NULL::date AS expected_order_date';
+
     const { rows } = await pool.query(`
       SELECT
         q.id, q.quote_number, q.status, q.total_amount,
         q.client_name, q.client_business_name, q.client_city, q.client_type,
-        q.next_follow_up_date, q.expected_order_date,
+        ${followupSel}, ${orderDateSel},
         q.created_at,
         (CURRENT_DATE - q.created_at::date) AS age_days,
         e.name  AS employee_name,
