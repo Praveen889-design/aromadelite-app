@@ -207,4 +207,66 @@ router.get('/pnl', async (req, res) => {
   }
 });
 
+// GET /api/reports/top-clients?limit=10&period=all|month|quarter|year
+router.get('/top-clients', async (req, res) => {
+  try {
+    const limit  = Math.min(50, Math.max(1, Number(req.query.limit) || 10));
+    const period = req.query.period || 'all';
+
+    const periodWhere = {
+      all:     '',
+      month:   "AND q.created_at >= DATE_TRUNC('month',  CURRENT_DATE)",
+      quarter: "AND q.created_at >= DATE_TRUNC('quarter', CURRENT_DATE)",
+      year:    "AND q.created_at >= DATE_TRUNC('year',   CURRENT_DATE)",
+    }[period] || '';
+
+    // Top clients by total quoted revenue
+    const { rows } = await pool.query(`
+      SELECT
+        COALESCE(NULLIF(TRIM(q.client_business_name), ''), q.client_name) AS client,
+        q.client_name,
+        q.client_business_name,
+        q.client_type,
+        q.client_city,
+        COUNT(*)::int                                                         AS quote_count,
+        COUNT(CASE WHEN q.status = 'accepted' THEN 1 END)::int               AS accepted_count,
+        COALESCE(SUM(q.total_amount), 0)                                      AS total_revenue,
+        COALESCE(SUM(CASE WHEN q.status = 'accepted' THEN q.total_amount ELSE 0 END), 0)
+                                                                              AS accepted_revenue,
+        MAX(q.created_at)                                                     AS last_quote_at,
+        -- most active associate for this client
+        MODE() WITHIN GROUP (ORDER BY e.name)                                 AS top_associate
+      FROM quotes q
+      JOIN employees e ON e.id = q.employee_id
+      WHERE 1=1 ${periodWhere}
+      GROUP BY
+        COALESCE(NULLIF(TRIM(q.client_business_name), ''), q.client_name),
+        q.client_name, q.client_business_name, q.client_type, q.client_city
+      ORDER BY total_revenue DESC
+      LIMIT $1
+    `, [limit]);
+
+    const clients = rows.map((r, i) => ({
+      rank:             i + 1,
+      client:           r.client,
+      client_name:      r.client_name,
+      client_type:      r.client_type,
+      client_city:      r.client_city,
+      quote_count:      Number(r.quote_count),
+      accepted_count:   Number(r.accepted_count),
+      total_revenue:    +Number(r.total_revenue).toFixed(2),
+      accepted_revenue: +Number(r.accepted_revenue).toFixed(2),
+      win_rate:         r.quote_count > 0
+        ? +(( r.accepted_count / r.quote_count) * 100).toFixed(1)
+        : 0,
+      last_quote_at:    r.last_quote_at,
+      top_associate:    r.top_associate,
+    }));
+
+    res.json({ period, clients });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

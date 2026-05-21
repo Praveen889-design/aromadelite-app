@@ -848,6 +848,245 @@ const PnlTable = ({ title, rows, emptyMsg = 'No data' }) => (
   </div>
 );
 
+// ─── Top Clients ─────────────────────────────────────────────
+const CLIENT_TYPE_CFG = {
+  hospital:   { emoji: '🏥', bg: '#DBEAFE', fg: '#1E40AF' },
+  fmc:        { emoji: '🏢', bg: '#E0E7FF', fg: '#3730A3' },
+  apartment:  { emoji: '🏙️', bg: '#D1FAE5', fg: '#065F46' },
+  restaurant: { emoji: '🍽️', bg: '#FFEDD5', fg: '#9A3412' },
+  school:     { emoji: '🏫', bg: '#FEF9C3', fg: '#92400E' },
+  contractor: { emoji: '🔧', bg: '#F3E8FF', fg: '#6B21A8' },
+  other:      { emoji: '📦', bg: '#F1F5F9', fg: '#6B7280' },
+};
+const clientTypeCfg = (t) =>
+  CLIENT_TYPE_CFG[(t || '').toLowerCase()] || CLIENT_TYPE_CFG.other;
+
+const MEDALS = ['🥇', '🥈', '🥉'];
+
+const PERIODS = [
+  { key: 'all',     label: 'All Time'     },
+  { key: 'year',    label: 'This Year'    },
+  { key: 'quarter', label: 'This Quarter' },
+  { key: 'month',   label: 'This Month'   },
+];
+
+function TopClients() {
+  const [period,  setPeriod]  = useState('all');
+  const [data,    setData]    = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async (p) => {
+    setLoading(true);
+    try {
+      const { data: res } = await api.get(`/api/reports/top-clients?limit=10&period=${p}`);
+      setData(res);
+    } catch (e) {
+      console.warn('[top-clients]', e);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { load(period); }, [load, period]);
+
+  const clients  = data?.clients || [];
+  const maxRev   = clients.length ? clients[0].total_revenue : 1;
+
+  return (
+    <div style={{
+      background: '#FFFFFF', border: '1px solid #ECFEFF',
+      borderRadius: 14, overflow: 'hidden',
+      boxShadow: '0 2px 10px rgba(8,42,56,.04)',
+    }}>
+      {/* Header */}
+      <div style={{
+        padding: '14px 18px 10px',
+        borderBottom: '1px solid #F1F5F9',
+        display: 'flex', alignItems: 'flex-start',
+        justifyContent: 'space-between', flexWrap: 'wrap', gap: 8,
+      }}>
+        <div>
+          <h3 style={{
+            margin: 0, fontFamily: "'Nunito', sans-serif",
+            fontWeight: 800, fontSize: 14, color: '#164E63',
+          }}>🏆 Top Clients by Revenue</h3>
+          <div style={{
+            fontFamily: "'Source Sans 3', sans-serif", fontSize: 11,
+            color: '#6B7280', marginTop: 2,
+          }}>
+            {loading ? 'Loading…' : `${clients.length} client${clients.length !== 1 ? 's' : ''} · by total quoted value`}
+          </div>
+        </div>
+
+        {/* Period selector */}
+        <div style={{
+          display: 'flex', gap: 4, background: '#F1F5F9',
+          borderRadius: 8, padding: 3,
+        }}>
+          {PERIODS.map((p) => (
+            <button key={p.key} onClick={() => setPeriod(p.key)} style={{
+              border: 0, borderRadius: 6, cursor: 'pointer',
+              padding: '4px 10px',
+              background: period === p.key ? '#0891B2' : 'transparent',
+              color: period === p.key ? '#fff' : '#6B7280',
+              fontFamily: "'Source Sans 3', sans-serif",
+              fontWeight: period === p.key ? 700 : 500, fontSize: 11,
+              transition: 'all .15s',
+            }}>{p.label}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* Body */}
+      {loading ? (
+        <div style={{
+          padding: 32, textAlign: 'center',
+          fontFamily: "'Source Sans 3', sans-serif", fontSize: 13, color: '#6B7280',
+        }}>Loading…</div>
+      ) : clients.length === 0 ? (
+        <div style={{
+          padding: 32, textAlign: 'center',
+          fontFamily: "'Source Sans 3', sans-serif", fontSize: 13, color: '#6B7280',
+        }}>No quote data for this period.</div>
+      ) : (
+        <div style={{ padding: '12px 18px 16px', display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {clients.map((c, i) => {
+            const cfg      = clientTypeCfg(c.client_type);
+            const barPct   = maxRev > 0 ? (c.total_revenue / maxRev) * 100 : 0;
+            const winColor = c.win_rate >= 60 ? '#059669' : c.win_rate >= 30 ? '#F59E0B' : '#EF4444';
+
+            return (
+              <div key={i} style={{
+                padding: '10px 0',
+                borderBottom: i < clients.length - 1 ? '1px solid #F8FAFC' : 'none',
+              }}>
+                {/* Row: rank + name + badges */}
+                <div style={{
+                  display: 'flex', alignItems: 'center',
+                  justifyContent: 'space-between', gap: 10, marginBottom: 7,
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                    {/* Rank */}
+                    <div style={{
+                      width: 26, height: 26, borderRadius: 8, flexShrink: 0,
+                      background: i < 3 ? '#FEF3C7' : '#F1F5F9',
+                      color: i < 3 ? '#92400E' : '#6B7280',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontFamily: "'Nunito', sans-serif", fontWeight: 800, fontSize: 12,
+                    }}>
+                      {i < 3 ? MEDALS[i] : i + 1}
+                    </div>
+
+                    {/* Name */}
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{
+                        fontFamily: "'Nunito', sans-serif", fontWeight: 800,
+                        fontSize: 13, color: '#164E63',
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      }}>{c.client}</div>
+                      <div style={{
+                        display: 'flex', alignItems: 'center', gap: 5, marginTop: 2, flexWrap: 'wrap',
+                      }}>
+                        {/* Type badge */}
+                        <span style={{
+                          background: cfg.bg, color: cfg.fg,
+                          fontFamily: "'Source Sans 3', sans-serif", fontWeight: 700, fontSize: 10,
+                          padding: '1px 6px', borderRadius: 999,
+                          display: 'inline-flex', alignItems: 'center', gap: 3,
+                        }}>{cfg.emoji} {c.client_type}</span>
+                        {/* City */}
+                        {c.client_city && (
+                          <span style={{
+                            fontFamily: "'Source Sans 3', sans-serif", fontSize: 10.5, color: '#9CA3AF',
+                          }}>📍 {c.client_city}</span>
+                        )}
+                        {/* Associate */}
+                        {c.top_associate && (
+                          <span style={{
+                            fontFamily: "'Source Sans 3', sans-serif", fontSize: 10.5, color: '#9CA3AF',
+                          }}>👤 {c.top_associate}</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right: revenue + stats */}
+                  <div style={{ flexShrink: 0, textAlign: 'right' }}>
+                    <div style={{
+                      fontFamily: "'DM Mono', monospace", fontWeight: 700,
+                      fontSize: 14, color: '#164E63',
+                    }}>{fmtL(c.total_revenue)}</div>
+                    <div style={{
+                      display: 'flex', alignItems: 'center', gap: 6,
+                      justifyContent: 'flex-end', marginTop: 2,
+                    }}>
+                      <span style={{
+                        fontFamily: "'Source Sans 3', sans-serif", fontSize: 10.5, color: '#6B7280',
+                      }}>{c.quote_count} quote{c.quote_count !== 1 ? 's' : ''}</span>
+                      {/* Win rate */}
+                      <span style={{
+                        background: winColor + '22', color: winColor,
+                        fontFamily: "'DM Mono', monospace", fontWeight: 700, fontSize: 10,
+                        padding: '1px 6px', borderRadius: 999,
+                      }}>{c.win_rate}% win</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Revenue bar */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{
+                    flex: 1, height: 6, background: '#F1F5F9',
+                    borderRadius: 999, overflow: 'hidden',
+                  }}>
+                    <div style={{
+                      height: '100%',
+                      width: `${barPct}%`,
+                      background: `linear-gradient(90deg, #0891B2, #06B6D4)`,
+                      borderRadius: 999, transition: 'width .4s ease',
+                    }} />
+                  </div>
+                  {c.accepted_revenue > 0 && (
+                    <span style={{
+                      fontFamily: "'DM Mono', monospace", fontSize: 10,
+                      color: '#059669', fontWeight: 600, whiteSpace: 'nowrap',
+                    }}>✓ {fmtL(c.accepted_revenue)}</span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Footer summary */}
+      {!loading && clients.length > 0 && (
+        <div style={{
+          padding: '10px 18px',
+          borderTop: '1px solid #F1F5F9',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8,
+        }}>
+          <span style={{
+            fontFamily: "'Source Sans 3', sans-serif", fontSize: 11, color: '#9CA3AF',
+          }}>
+            Showing top {clients.length} clients
+          </span>
+          <span style={{
+            fontFamily: "'DM Mono', monospace", fontWeight: 700, fontSize: 12, color: '#0E7490',
+          }}>
+            Total: {fmtL(clients.reduce((s, c) => s + c.total_revenue, 0))}
+            {clients.some(c => c.accepted_revenue > 0) && (
+              <span style={{ color: '#059669', marginLeft: 10 }}>
+                ✓ Accepted: {fmtL(clients.reduce((s, c) => s + c.accepted_revenue, 0))}
+              </span>
+            )}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Target vs Actual ────────────────────────────────────────
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const monthLabel = (y, m) => `${MONTHS[m - 1]} ${y}`;
@@ -1415,6 +1654,9 @@ function OverviewTab() {
       {stats.pipeline_stages && (
         <PipelineFunnel pipeline={stats.pipeline_stages} />
       )}
+
+      {/* Top Clients */}
+      <TopClients />
 
       {/* Target vs Actual */}
       <TargetVsActual />
