@@ -7,6 +7,7 @@ import ReportsTab from './admin/ReportsTab';
 import PriceDeviationTab from './admin/PriceDeviationTab';
 import CommissionTab from './admin/CommissionTab';
 import UnitsTab from './admin/UnitsTab';
+import SettingsTab from './admin/SettingsTab';
 import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
 import { useToast } from '../components/Toast';
@@ -1841,6 +1842,7 @@ const TABS = [
   { id: 'discounts',   label: '💸 Discounts'   },
   { id: 'commissions', label: '💰 Commissions' },
   { id: 'reports',     label: 'Reports'        },
+  { id: 'settings',    label: '⚙️ Settings'   },
 ];
 
 export default function AdminPanel() {
@@ -1906,6 +1908,7 @@ export default function AdminPanel() {
         {tab === 'discounts'   && <PriceDeviationTab />}
         {tab === 'commissions' && <CommissionTab />}
         {tab === 'reports'     && <ReportsTab />}
+        {tab === 'settings'    && <SettingsTab />}
       </div>
     </div>
   );
