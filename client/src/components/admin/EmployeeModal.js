@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import api from '../../utils/api';
 import { useToast } from '../Toast';
 
-const REGIONS = ['Hyderabad', 'Vijayawada', 'Warangal'];
+const REGIONS = ['Hyderabad', 'Nizamabad', 'Warangal', 'Karimnagar', 'Vijayawada', 'Guntur', 'Medak'];
 
 const Field = ({ label, children, error, required }) => (
   <label className="block">
