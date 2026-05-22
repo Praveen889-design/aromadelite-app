@@ -106,6 +106,9 @@ export default function QuotePreview() {
   const [error, setError] = useState('');
   const [downloading, setDownloading] = useState(false);
   const [marking, setMarking] = useState(false);
+  const [editDates, setEditDates] = useState(false);
+  const [datesForm, setDatesForm] = useState({ next_follow_up_date: '', expected_order_date: '' });
+  const [savingDates, setSavingDates] = useState(false);
   const [sharingPdf, setSharingPdf] = useState(false);
   const docRef = useRef(null);
 
@@ -113,12 +116,30 @@ export default function QuotePreview() {
     try {
       const res = await api.get(`/api/quotes/${id}/pdf-data`);
       setData(res.data.pdf);
+      setDatesForm({
+        next_follow_up_date:  res.data.pdf.quote.next_follow_up_date  || '',
+        expected_order_date:  res.data.pdf.quote.expected_order_date  || '',
+      });
     } catch (e) {
       setError(e?.response?.data?.error || 'Failed to load quote');
     }
   };
 
   useEffect(() => { fetchQuote(); }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const onSaveDates = async () => {
+    setSavingDates(true);
+    try {
+      await api.patch(`/api/quotes/${id}/dates`, datesForm);
+      toast('Dates updated.', { kind: 'success' });
+      setEditDates(false);
+      await fetchQuote();
+    } catch (e) {
+      toast(e?.response?.data?.error || 'Failed to save dates', { kind: 'error' });
+    } finally {
+      setSavingDates(false);
+    }
+  };
 
   const gstBuckets = useMemo(() => {
     const buckets = { 12: { base: 0, gst: 0 }, 18: { base: 0, gst: 0 } };
@@ -445,6 +466,93 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
             className="inline-flex items-center gap-1 border border-slate-300 text-slate-600 hover:bg-slate-50 text-sm font-medium rounded-xl px-4 py-2.5"
             style={{ minHeight: 44 }}
           >← Builder</Link>
+        </div>
+
+        {/* ── Follow-up / Expected Order date editor ── */}
+        <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: 12, marginTop: 4 }}>
+          {!editDates ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', flex: 1 }}>
+                <span style={{ fontSize: 12, color: '#64748b' }}>
+                  📅 <strong>Follow-up:</strong>{' '}
+                  <span style={{ color: quote.next_follow_up_date ? '#1F6BC7' : '#94a3b8' }}>
+                    {quote.next_follow_up_date ? formatDate(quote.next_follow_up_date) : 'Not set'}
+                  </span>
+                </span>
+                <span style={{ color: '#cbd5e1' }}>·</span>
+                <span style={{ fontSize: 12, color: '#64748b' }}>
+                  🛒 <strong>Exp. Order:</strong>{' '}
+                  <span style={{ color: quote.expected_order_date ? '#d97706' : '#94a3b8' }}>
+                    {quote.expected_order_date ? formatDate(quote.expected_order_date) : 'Not set'}
+                  </span>
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditDates(true)}
+                style={{
+                  fontSize: 12, fontWeight: 600, color: '#1F6BC7',
+                  background: '#EFF6FF', border: '1px solid #BFDBFE',
+                  borderRadius: 8, padding: '5px 12px', cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                }}
+              >✏️ Edit Dates</button>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'flex-end' }}>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: '#374151', marginBottom: 4 }}>📅 Next Follow-up Date</div>
+                <input
+                  type="date"
+                  value={datesForm.next_follow_up_date}
+                  onChange={(e) => setDatesForm((p) => ({ ...p, next_follow_up_date: e.target.value }))}
+                  style={{
+                    border: '1.5px solid #93C5FD', borderRadius: 8,
+                    padding: '7px 10px', fontSize: 13, outline: 'none',
+                    color: '#1e293b', background: '#fff',
+                  }}
+                />
+              </div>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: '#374151', marginBottom: 4 }}>🛒 Expected Order Date</div>
+                <input
+                  type="date"
+                  value={datesForm.expected_order_date}
+                  min={datesForm.next_follow_up_date || undefined}
+                  onChange={(e) => setDatesForm((p) => ({ ...p, expected_order_date: e.target.value }))}
+                  style={{
+                    border: '1.5px solid #FCD34D', borderRadius: 8,
+                    padding: '7px 10px', fontSize: 13, outline: 'none',
+                    color: '#1e293b', background: '#fff',
+                  }}
+                />
+              </div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button
+                  type="button"
+                  onClick={onSaveDates}
+                  disabled={savingDates}
+                  style={{
+                    fontSize: 13, fontWeight: 700, color: '#fff',
+                    background: savingDates ? '#93C5FD' : '#1F6BC7',
+                    border: 'none', borderRadius: 8,
+                    padding: '8px 16px', cursor: savingDates ? 'not-allowed' : 'pointer',
+                    minHeight: 38,
+                  }}
+                >{savingDates ? 'Saving…' : '✓ Save'}</button>
+                <button
+                  type="button"
+                  onClick={() => setEditDates(false)}
+                  style={{
+                    fontSize: 13, fontWeight: 600, color: '#64748b',
+                    background: '#fff', border: '1px solid #e2e8f0',
+                    borderRadius: 8, padding: '8px 12px', cursor: 'pointer',
+                    minHeight: 38,
+                  }}
+                >Cancel</button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

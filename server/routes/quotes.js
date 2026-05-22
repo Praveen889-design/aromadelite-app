@@ -56,7 +56,7 @@ router.post('/', async (req, res) => {
 
     const totals = computeTotals(b.items);
     const quote_number = await nextQuoteNumber();
-    const validity_days = Number(b.validity_days) || 30;
+    const validity_days = Number(b.validity_days) || 7;
     const estMonthly = b.requirement_type === 'Monthly Contract'
       ? totals.total_amount
       : +(totals.total_amount / 3).toFixed(2);
@@ -249,6 +249,33 @@ router.patch('/:id/status', async (req, res) => {
     res.status(500).json({ error: err.message });
   } finally {
     client.release();
+  }
+});
+
+// PATCH /api/quotes/:id/dates  — update follow-up & expected-order dates
+router.patch('/:id/dates', async (req, res) => {
+  try {
+    const { rows } = await pool.query('SELECT * FROM quotes WHERE id = $1', [req.params.id]);
+    if (!rows[0]) return res.status(404).json({ error: 'Quote not found' });
+    if (req.user.role !== 'admin' && rows[0].employee_id !== req.user.id) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    const nextFollowUp  = req.body.next_follow_up_date  || null;
+    const expectedOrder = req.body.expected_order_date  || null;
+    await pool.query(
+      'UPDATE quotes SET next_follow_up_date = $1, expected_order_date = $2 WHERE id = $3',
+      [nextFollowUp, expectedOrder, req.params.id]
+    );
+    // Also sync lead follow-up date
+    if (nextFollowUp) {
+      await pool.query(
+        'UPDATE leads SET follow_up_date = $1 WHERE quote_id = $2',
+        [nextFollowUp, req.params.id]
+      );
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 

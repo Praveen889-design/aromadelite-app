@@ -94,21 +94,45 @@ const QuoteCard = ({ quote, onClick }) => {
       </div>
 
       {/* Client type + date row */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
         <span style={{
-          background: '#ECFEFF', color: '#0E7490',
-          fontFamily: "'Source Sans 3', sans-serif", fontWeight: 600, fontSize: 11,
-          padding: '2px 8px', borderRadius: 999, border: '1px solid #A5F3FC',
+          background: '#EFF6FF', color: '#1F6BC7',
+          fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: 11,
+          padding: '2px 8px', borderRadius: 999, border: '1px solid #BFDBFE',
         }}>{emoji} {quote.client_type || 'Client'}</span>
-        <span style={{ fontFamily: "'Source Sans 3', sans-serif", fontSize: 11, color: '#6B7280' }}>
+        <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 11, color: '#6B7280' }}>
           {formatDate(quote.created_at)}
         </span>
-        {quote.city && (
-          <span style={{ fontFamily: "'Source Sans 3', sans-serif", fontSize: 11, color: '#6B7280' }}>
-            · {quote.city}
+        {quote.client_city && (
+          <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 11, color: '#6B7280' }}>
+            · {quote.client_city}
           </span>
         )}
       </div>
+
+      {/* Follow-up / expected order dates */}
+      {(quote.next_follow_up_date || quote.expected_order_date) && (
+        <div style={{ display: 'flex', gap: 8, marginTop: 7, flexWrap: 'wrap' }}>
+          {quote.next_follow_up_date && (
+            <span style={{
+              fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 6,
+              background: '#EFF6FF', color: '#1F6BC7', border: '1px solid #BFDBFE',
+              fontFamily: "'Inter', sans-serif",
+            }}>
+              📅 {formatDate(quote.next_follow_up_date)}
+            </span>
+          )}
+          {quote.expected_order_date && (
+            <span style={{
+              fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 6,
+              background: '#FFFBEB', color: '#92400E', border: '1px solid #FCD34D',
+              fontFamily: "'Inter', sans-serif",
+            }}>
+              🛒 {formatDate(quote.expected_order_date)}
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Status-specific footer */}
       {isRejected && quote.rejection_note && (
