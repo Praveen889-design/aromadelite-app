@@ -11,7 +11,7 @@ const emptyClient = {
   client_city: '',
   requirement_type: '',
   notes: '',
-  validity_days: 30,
+  validity_days: 7,
 };
 
 const QuoteBuilderContext = createContext(null);

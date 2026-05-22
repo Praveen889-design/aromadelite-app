@@ -40,7 +40,7 @@ export default function ClientModal({ initial, open, submitting, onClose, onSubm
   const [v, setV] = useState({
     client_name: '', client_business_name: '', client_type: 'Hospital',
     client_phone: '', client_email: '', client_city: '',
-    requirement_type: 'Bulk', validity_days: 30, notes: '',
+    requirement_type: 'Bulk', validity_days: 7, notes: '',
     next_follow_up_date: '', expected_order_date: '',
   });
   const [errors, setErrors] = useState({});

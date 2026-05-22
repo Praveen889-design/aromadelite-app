@@ -280,7 +280,7 @@ router.get('/:id/pdf-data', async (req, res) => {
     }
 
     const created = new Date(q.created_at);
-    const validUntil = new Date(created.getTime() + (q.validity_days || 30) * 86400_000);
+    const validUntil = new Date(created.getTime() + (q.validity_days || 7) * 86400_000);
 
     res.json({
       pdf: {
@@ -291,11 +291,12 @@ router.get('/:id/pdf-data', async (req, res) => {
           gstin: '36AAAAA0000A1Z5',
         },
         quote: {
-          number: q.quote_number, status: q.status, created_at: q.created_at,
+          number: q.quote_number, status: q.status,
+          created_at: created.toISOString().slice(0, 10),
           valid_until: validUntil.toISOString().slice(0, 10),
           validity_days: q.validity_days, notes: q.notes,
-          next_follow_up_date: q.next_follow_up_date || null,
-          expected_order_date: q.expected_order_date || null,
+          next_follow_up_date: q.next_follow_up_date ? String(q.next_follow_up_date).slice(0, 10) : null,
+          expected_order_date: q.expected_order_date ? String(q.expected_order_date).slice(0, 10) : null,
         },
         client: {
           name: q.client_name, business_name: q.client_business_name, type: q.client_type,

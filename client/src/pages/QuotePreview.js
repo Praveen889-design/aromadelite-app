@@ -19,17 +19,22 @@ const formatINR = (n) =>
 
 const formatDate = (iso) => {
   if (!iso) return '—';
-  const d = new Date(iso.length === 10 ? iso : iso + 'Z');
+  // Date-only strings (YYYY-MM-DD) → parse as local midnight to avoid TZ-shift
+  // Full ISO timestamps (from Postgres TIMESTAMPTZ) → parse directly
+  const s = String(iso);
+  const d = s.length === 10 ? new Date(s + 'T00:00:00') : new Date(s);
+  if (isNaN(d.getTime())) return '—';
   return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 };
 
 const COMPANY = {
   name: 'Aromadelite',
   legal: 'Sri Vemuri Sai Enterprises',
-  address: 'Hyderabad, Telangana, India',
-  phone: '+91 90000 00000',
-  email: 'sales@aromadelite.in',
-  gstin: '36AAAAA0000A1Z5',
+  address: 'SAI NAGAR HNO 8-229/8, NVV NAGAR, CHINTAL, QUTHBULLAPUR, MALKAJGIRI – 500054',
+  state: 'Telangana, State Code: 36',
+  phone: '+91 63043 82947',
+  email: 'contact@aromadelite.in',
+  gstin: '36AQJPV7026L2Z5',
 };
 
 const BANK = {
@@ -485,10 +490,11 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
                 </div>
                 <div className="text-[11px] uppercase tracking-[0.15em] text-slate-500">{COMPANY.legal}</div>
                 <div className="text-xs text-slate-600 mt-1">{COMPANY.address}</div>
-                <div className="text-xs text-slate-600">
+                <div className="text-xs text-slate-600">{COMPANY.state}</div>
+                <div className="text-xs text-slate-600 mt-0.5">
                   {COMPANY.phone} · {COMPANY.email}
                 </div>
-                <div className="text-xs text-slate-600">GSTIN: {COMPANY.gstin}</div>
+                <div className="text-xs text-slate-600">GSTIN/UIN: {COMPANY.gstin}</div>
               </div>
             </div>
             <div className="text-right">

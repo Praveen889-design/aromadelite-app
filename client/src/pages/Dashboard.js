@@ -12,7 +12,9 @@ const formatINR = (n) =>
 
 const formatDate = (iso) => {
   if (!iso) return '—';
-  const d = new Date(iso.length === 10 ? iso : iso + 'Z');
+  const s = String(iso);
+  const d = s.length === 10 ? new Date(s + 'T00:00:00') : new Date(s);
+  if (isNaN(d.getTime())) return '—';
   return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 };
 
