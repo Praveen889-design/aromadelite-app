@@ -329,7 +329,7 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
 
   const statusPill = {
     draft:    'bg-slate-100 text-slate-700',
-    sent:     'bg-cyan-100 text-cyan-800',
+    sent:     'bg-blue-100 text-blue-800',
     accepted: 'bg-emerald-100 text-emerald-800',
     rejected: 'bg-rose-100 text-rose-700',
   }[quote.status] || 'bg-slate-100 text-slate-700';
@@ -424,7 +424,7 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
             type="button"
             onClick={onMarkSent}
             disabled={marking || quote.status === 'sent' || quote.status === 'accepted'}
-            className="inline-flex items-center gap-2 bg-cyan-600 hover:bg-cyan-700 text-white text-sm font-semibold rounded-xl px-4 py-2.5 shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-2 bg-[#1F6BC7] hover:bg-[#155DA6] text-white text-sm font-semibold rounded-xl px-4 py-2.5 shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
             style={{ minHeight: 44 }}
           >
             <CheckIcon />
@@ -453,11 +453,35 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
           {/* HEADER */}
           <div className="flex items-start justify-between">
             <div className="flex items-start gap-3">
-              <div className="w-12 h-12 rounded-full flex items-center justify-center text-white font-extrabold text-xl"
-                   style={{ backgroundColor: '#0891B2' }}>A</div>
+              {/* Brand logo emblem */}
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="48" height="48" aria-label="Aromadelite" style={{ flexShrink: 0, marginTop: 2 }}>
+                <rect width="64" height="64" rx="12" fill="#1F6BC7"/>
+                <g transform="translate(32 42.24)">
+                  <g transform="translate(0 0) scale(0.21714285714285714)">
+                    <ellipse cx="-6" cy="3" rx="120" ry="4" fill="#143A6E" opacity="0.35"/>
+                    <g transform="translate(-88 0)">
+                      <rect x="-3.5" y="-8" width="7" height="12" rx="1.5" fill="#6A4527"/>
+                      <path d="M0 -82 C 24 -82 32 -58 32 -36 C 32 -14 18 -6 0 -6 C -18 -6 -32 -14 -32 -36 C -32 -58 -24 -82 0 -82 Z" fill="#3D9354"/>
+                      <path d="M-2 -74 C 12 -74 20 -56 20 -40 C 20 -28 10 -22 -2 -22 C -14 -22 -20 -32 -20 -46 C -20 -60 -16 -74 -2 -74 Z" fill="#2F7B43" opacity="0.55"/>
+                    </g>
+                    <g transform="translate(20 0)">
+                      <rect x="-42" y="-58" width="84" height="58" rx="2" fill="#F8F2E0"/>
+                      <rect x="22" y="-58" width="20" height="58" fill="#E5DBC1" opacity="0.7"/>
+                      <path d="M-52 -58 L 0 -98 L 52 -58 Z" fill="#D34B3F"/>
+                      <path d="M0 -98 L 52 -58 L 14 -58 Z" fill="#B83A2F"/>
+                      <rect x="20" y="-90" width="10" height="18" fill="#B83A2F"/>
+                      <rect x="-9" y="-28" width="18" height="28" rx="1" fill="#2E2A24"/>
+                      <circle cx="6" cy="-13" r="1.6" fill="#F8F2E0"/>
+                      <rect x="-32" y="-48" width="22" height="18" rx="1" fill="#1F6BC7"/>
+                      <line x1="-21" y1="-48" x2="-21" y2="-30" stroke="#F8F2E0" strokeWidth="1.8"/>
+                      <line x1="-32" y1="-39" x2="-10" y2="-39" stroke="#F8F2E0" strokeWidth="1.8"/>
+                    </g>
+                  </g>
+                </g>
+              </svg>
               <div>
-                <div className="text-2xl font-extrabold tracking-tight" style={{ color: '#0891B2' }}>
-                  {COMPANY.name}
+                <div style={{ fontFamily: "'Manrope', sans-serif", fontWeight: 800, fontSize: 22, letterSpacing: '-0.02em', color: '#1F6BC7', textTransform: 'lowercase' }}>
+                  {COMPANY.name.toLowerCase()}
                 </div>
                 <div className="text-[11px] uppercase tracking-[0.15em] text-slate-500">{COMPANY.legal}</div>
                 <div className="text-xs text-slate-600 mt-1">{COMPANY.address}</div>
@@ -469,7 +493,7 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
             </div>
             <div className="text-right">
               <div className="text-2xl font-bold tracking-wide text-slate-900">QUOTATION</div>
-              <div className="text-sm font-semibold mt-1" style={{ color: '#0891B2' }}>{quote.number}</div>
+              <div className="text-sm font-semibold mt-1" style={{ color: '#1F6BC7' }}>{quote.number}</div>
               <div className="text-xs text-slate-600 mt-2">
                 <div>Date: <span className="font-medium text-slate-800">{formatDate(quote.created_at)}</span></div>
                 <div>Valid Until: <span className="font-medium text-slate-800">{formatDate(quote.valid_until)}</span></div>
@@ -478,7 +502,7 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
           </div>
 
           {/* Accent line */}
-          <div className="mt-4 mb-5 h-[3px] rounded-full" style={{ backgroundColor: '#0891B2' }} />
+          <div className="mt-4 mb-5 h-[3px] rounded-full" style={{ backgroundColor: '#1F6BC7' }} />
 
           {/* BILL TO */}
           <div className="grid grid-cols-2 gap-6">
@@ -586,7 +610,7 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
                   </tr>
                 </React.Fragment>
               ))}
-              <tr style={{ backgroundColor: '#0891B2', color: '#fff' }}>
+              <tr style={{ backgroundColor: '#1F6BC7', color: '#fff' }}>
                 <td colSpan={8} className="px-2 py-2 border border-slate-300 text-right font-bold uppercase tracking-wide">
                   Grand Total (incl. GST)
                 </td>
@@ -609,7 +633,7 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
             <div className="w-80 border-t border-slate-300 mt-1" />
             <div className="w-80 flex items-baseline justify-between mt-1">
               <span className="text-sm font-semibold uppercase tracking-wide text-slate-700">Grand Total</span>
-              <span className="text-2xl font-extrabold" style={{ color: '#0891B2' }}>
+              <span className="text-2xl font-extrabold" style={{ color: '#1F6BC7' }}>
                 {formatINR(totals.total_amount)}
               </span>
             </div>

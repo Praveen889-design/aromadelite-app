@@ -40,7 +40,7 @@ const avatarColors = [
   { bg: '#E0E7FF', fg: '#3730A3' },
   { bg: '#D1FAE5', fg: '#065F46' },
   { bg: '#FEE2E2', fg: '#991B1B' },
-  { bg: '#ECFEFF', fg: '#0E7490' },
+  { bg: '#ECFEFF', fg: '#155DA6' },
 ];
 const avatarColor = (name = '') => avatarColors[name.charCodeAt(0) % avatarColors.length];
 
@@ -68,7 +68,7 @@ const CARD_HDR = {
 };
 
 // ─── KPI tile ────────────────────────────────────────────────
-const KPI = ({ glyph, label, value, sub, accent = '#0891B2' }) => (
+const KPI = ({ glyph, label, value, sub, accent = '#1F6BC7' }) => (
   <div style={{
     ...CARD, padding: '20px 20px 16px',
     position: 'relative',
@@ -168,11 +168,11 @@ const LeadsByBiz = ({ data }) => {
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
         }}>
           <div style={{
-            fontFamily: "'Nunito', sans-serif", fontWeight: 900, fontSize: 24,
-            color: '#164E63', lineHeight: 1, letterSpacing: '-.02em',
+            fontFamily: "'Manrope', sans-serif", fontWeight: 900, fontSize: 24,
+            color: '#0F1620', lineHeight: 1, letterSpacing: '-.02em',
           }}>{total}</div>
           <div style={{
-            fontFamily: "'Source Sans 3', sans-serif", fontWeight: 600, fontSize: 10,
+            fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: 10,
             color: '#6B7280', marginTop: 3, letterSpacing: '.05em', textTransform: 'uppercase',
           }}>Leads</div>
         </div>
@@ -185,7 +185,7 @@ const LeadsByBiz = ({ data }) => {
           }}>
             <span style={{
               background: it.bg, color: it.fg,
-              fontFamily: "'Source Sans 3', sans-serif", fontWeight: 700, fontSize: 10.5,
+              fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: 10.5,
               padding: '2px 8px', borderRadius: 999,
               display: 'inline-flex', alignItems: 'center', gap: 3,
             }}><span>{it.emoji}</span>{it.label}</span>
@@ -196,8 +196,8 @@ const LeadsByBiz = ({ data }) => {
               }}/>
             </div>
             <span style={{
-              fontFamily: "'DM Mono', monospace", fontWeight: 500, fontSize: 11.5,
-              color: '#164E63', textAlign: 'right',
+              fontFamily: "'Manrope', sans-serif", fontWeight: 500, fontSize: 11.5,
+              color: '#0F1620', textAlign: 'right',
             }}>{it.value}</span>
           </div>
         ))}
@@ -302,7 +302,7 @@ const TeamRow = ({ emp, rank, best }) => {
         <td key={i} style={{
           textAlign: 'right', padding: '11px 16px',
           fontWeight: i === 1 ? 700 : 600, fontSize: 13,
-          color: i === 1 ? '#0891b2' : '#0f172a',
+          color: i === 1 ? '#1F6BC7' : '#0f172a',
         }}>{v}</td>
       ))}
     </tr>
@@ -312,7 +312,7 @@ const TeamRow = ({ emp, rank, best }) => {
 // ─── Pipeline funnel ─────────────────────────────────────────
 const PIPE_STAGES = [
   { key: 'new',       label: 'New Leads',  color: '#475569', fill: '#64748B', light: '#F1F5F9' },
-  { key: 'contacted', label: 'Contacted',  color: '#0E7490', fill: '#0891B2', light: '#ECFEFF' },
+  { key: 'contacted', label: 'Contacted',  color: '#155DA6', fill: '#1F6BC7', light: '#ECFEFF' },
   { key: 'qualified', label: 'Qualified',  color: '#6D28D9', fill: '#7C3AED', light: '#EDE9FE' },
   { key: 'converted', label: 'Converted',  color: '#065F46', fill: '#059669', light: '#D1FAE5' },
 ];
@@ -337,11 +337,11 @@ const PipelineFunnel = ({ pipeline }) => {
       <div style={{ ...CARD_HDR }}>
         <div>
           <h3 style={{
-            margin: 0, fontFamily: "'Nunito', sans-serif",
-            fontWeight: 800, fontSize: 14, color: '#164E63',
+            margin: 0, fontFamily: "'Manrope', sans-serif",
+            fontWeight: 800, fontSize: 14, color: '#0F1620',
           }}>Lead Pipeline Funnel</h3>
           <div style={{
-            fontFamily: "'Source Sans 3', sans-serif", fontSize: 11,
+            fontFamily: "'Inter', sans-serif", fontSize: 11,
             color: '#6B7280', marginTop: 2,
           }}>{grandTotal} total leads · stages New → Contacted → Qualified → Converted</div>
         </div>
@@ -425,17 +425,17 @@ const PipelineFunnel = ({ pipeline }) => {
                 padding: '10px 12px', border: `1px solid ${stage.fill}33`,
               }}>
                 <div style={{
-                  fontFamily: "'Source Sans 3', sans-serif", fontWeight: 700,
+                  fontFamily: "'Inter', sans-serif", fontWeight: 700,
                   fontSize: 10, color: stage.color, textTransform: 'uppercase',
                   letterSpacing: '.06em', marginBottom: 4,
                 }}>{stage.label}</div>
                 <div style={{
-                  fontFamily: "'Nunito', sans-serif", fontWeight: 900,
+                  fontFamily: "'Manrope', sans-serif", fontWeight: 900,
                   fontSize: 22, color: stage.color, lineHeight: 1,
                 }}>{count}</div>
                 {value > 0 && (
                   <div style={{
-                    fontFamily: "'DM Mono', monospace", fontSize: 10,
+                    fontFamily: "'Manrope', sans-serif", fontSize: 10,
                     color: stage.color, opacity: .75, marginTop: 2,
                   }}>{fmtL(value)}</div>
                 )}
@@ -445,7 +445,7 @@ const PipelineFunnel = ({ pipeline }) => {
                   }}>
                     <ArrowRight style={{ color: stage.color, width: 10, height: 10 }} />
                     <span style={{
-                      fontFamily: "'Source Sans 3', sans-serif", fontSize: 10,
+                      fontFamily: "'Inter', sans-serif", fontSize: 10,
                       color: stage.color, fontWeight: 700,
                     }}>{passPct}% in</span>
                   </div>
@@ -463,18 +463,18 @@ const PipelineFunnel = ({ pipeline }) => {
             borderRadius: 8, padding: '8px 14px',
           }}>
             <div style={{
-              fontFamily: "'Source Sans 3', sans-serif", fontWeight: 700,
+              fontFamily: "'Inter', sans-serif", fontWeight: 700,
               fontSize: 12, color: '#B91C1C',
             }}>
               ✖ Lost Leads
             </div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
               <span style={{
-                fontFamily: "'Nunito', sans-serif", fontWeight: 900,
+                fontFamily: "'Manrope', sans-serif", fontWeight: 900,
                 fontSize: 20, color: '#DC2626',
               }}>{lostCount}</span>
               <span style={{
-                fontFamily: "'Source Sans 3', sans-serif", fontSize: 10,
+                fontFamily: "'Inter', sans-serif", fontSize: 10,
                 color: '#EF4444', fontWeight: 600,
               }}>
                 {grandTotal > 0 ? Math.round((lostCount / grandTotal) * 100) : 0}% of all leads
@@ -533,7 +533,7 @@ function AgingQuotesAlert() {
     <div style={{
       border: '1px solid #E5E7EB', borderRadius: 14,
       padding: '14px 18px', background: '#FAFAFA',
-      fontFamily: "'Source Sans 3', sans-serif", fontSize: 13, color: '#9CA3AF',
+      fontFamily: "'Inter', sans-serif", fontSize: 13, color: '#9CA3AF',
     }}>⏳ Loading aging quotes…</div>
   );
 
@@ -544,13 +544,13 @@ function AgingQuotesAlert() {
       padding: '14px 18px', background: '#FEF2F2',
       display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
     }}>
-      <span style={{ fontFamily: "'Source Sans 3', sans-serif", fontSize: 13, color: '#991B1B' }}>
+      <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 13, color: '#991B1B' }}>
         ⚠ Aging Quotes: {err}
       </span>
       <button onClick={load} style={{
         background: '#EF4444', color: '#fff', border: 0, borderRadius: 8,
         padding: '5px 14px', cursor: 'pointer',
-        fontFamily: "'Nunito', sans-serif", fontWeight: 700, fontSize: 12,
+        fontFamily: "'Manrope', sans-serif", fontWeight: 700, fontSize: 12,
       }}>Retry</button>
     </div>
   );
@@ -565,11 +565,11 @@ function AgingQuotesAlert() {
       <span style={{ fontSize: 18 }}>✅</span>
       <div>
         <span style={{
-          fontFamily: "'Nunito', sans-serif", fontWeight: 800, fontSize: 13, color: '#065F46',
+          fontFamily: "'Manrope', sans-serif", fontWeight: 800, fontSize: 13, color: '#065F46',
         }}>No Aging Quotes — All Clear!</span>
         <span style={{
           marginLeft: 8,
-          fontFamily: "'Source Sans 3', sans-serif", fontSize: 11.5, color: '#6B7280',
+          fontFamily: "'Inter', sans-serif", fontSize: 11.5, color: '#6B7280',
         }}>All draft/sent quotes are less than 7 days old.</span>
       </div>
     </div>
@@ -604,12 +604,12 @@ function AgingQuotesAlert() {
           }} />
           <div>
             <span style={{
-              fontFamily: "'Nunito', sans-serif", fontWeight: 800, fontSize: 14,
+              fontFamily: "'Manrope', sans-serif", fontWeight: 800, fontSize: 14,
               color: '#991B1B',
             }}>⚠ Aging Quotes Alert</span>
             <span style={{
               marginLeft: 8,
-              fontFamily: "'Source Sans 3', sans-serif", fontSize: 11.5, color: '#B91C1C',
+              fontFamily: "'Inter', sans-serif", fontSize: 11.5, color: '#B91C1C',
             }}>{summary.total} quote{summary.total !== 1 ? 's' : ''} waiting for action</span>
           </div>
         </div>
@@ -618,7 +618,7 @@ function AgingQuotesAlert() {
           {AGE_BUCKETS.map((b) => summary[b.key] > 0 && (
             <span key={b.key} style={{
               background: b.pill, color: b.fg,
-              fontFamily: "'Nunito', sans-serif", fontWeight: 800, fontSize: 11,
+              fontFamily: "'Manrope', sans-serif", fontWeight: 800, fontSize: 11,
               padding: '3px 10px', borderRadius: 999,
               border: `1px solid ${b.border}`,
             }}>
@@ -627,7 +627,7 @@ function AgingQuotesAlert() {
           ))}
           <span style={{
             marginLeft: 4, fontSize: 13, color: '#9CA3AF', fontWeight: 600,
-            fontFamily: "'Source Sans 3', sans-serif",
+            fontFamily: "'Inter', sans-serif",
           }}>{expanded ? '▲' : '▼'}</span>
         </div>
       </div>
@@ -650,7 +650,7 @@ function AgingQuotesAlert() {
                 borderColor: filter === tab.key ? '#EF4444' : '#E5E7EB',
                 borderRadius: 8, background: filter === tab.key ? '#FEF2F2' : '#fff',
                 color: filter === tab.key ? '#991B1B' : '#6B7280',
-                fontFamily: "'Source Sans 3', sans-serif", fontWeight: 700,
+                fontFamily: "'Inter', sans-serif", fontWeight: 700,
                 fontSize: 11.5, padding: '4px 12px', cursor: 'pointer',
               }}>{tab.label}</button>
             ))}
@@ -663,8 +663,8 @@ function AgingQuotesAlert() {
                 <tr style={{ background: '#F8FAFC' }}>
                   {['Age', 'Quote', 'Client', 'Associate', 'Status', 'Amount', 'Follow-up', 'Actions'].map((h, i) => (
                     <th key={i} style={{
-                      fontFamily: "'Source Sans 3', sans-serif", fontWeight: 700,
-                      fontSize: 10, color: '#0E7490', letterSpacing: '.07em',
+                      fontFamily: "'Inter', sans-serif", fontWeight: 700,
+                      fontSize: 10, color: '#155DA6', letterSpacing: '.07em',
                       textTransform: 'uppercase', padding: '8px 12px',
                       textAlign: i >= 5 ? 'right' : 'left',
                       borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap',
@@ -688,7 +688,7 @@ function AgingQuotesAlert() {
                         <span style={{
                           display: 'inline-block',
                           background: cfg.pill, color: cfg.fg,
-                          fontFamily: "'DM Mono', monospace", fontWeight: 700, fontSize: 11,
+                          fontFamily: "'Manrope', sans-serif", fontWeight: 700, fontSize: 11,
                           padding: '3px 8px', borderRadius: 999,
                           border: `1px solid ${cfg.border}`,
                           whiteSpace: 'nowrap',
@@ -697,34 +697,34 @@ function AgingQuotesAlert() {
                       {/* Quote # */}
                       <td style={{ padding: '10px 12px' }}>
                         <a href={`/quotes/${q.id}`} style={{
-                          fontFamily: "'DM Mono', monospace", fontWeight: 700,
-                          fontSize: 12, color: '#0E7490', textDecoration: 'none',
+                          fontFamily: "'Manrope', sans-serif", fontWeight: 700,
+                          fontSize: 12, color: '#155DA6', textDecoration: 'none',
                         }}>{q.quote_number}</a>
                         <div style={{
-                          fontFamily: "'Source Sans 3', sans-serif",
+                          fontFamily: "'Inter', sans-serif",
                           fontSize: 10, color: '#9CA3AF', marginTop: 1,
                         }}>{q.created_at?.slice(0, 10)}</div>
                       </td>
                       {/* Client */}
                       <td style={{ padding: '10px 12px', maxWidth: 160 }}>
                         <div style={{
-                          fontFamily: "'Nunito', sans-serif", fontWeight: 700,
-                          fontSize: 12.5, color: '#164E63',
+                          fontFamily: "'Manrope', sans-serif", fontWeight: 700,
+                          fontSize: 12.5, color: '#0F1620',
                           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                         }}>{q.client_business_name || q.client_name}</div>
                         <div style={{
-                          fontFamily: "'Source Sans 3', sans-serif",
+                          fontFamily: "'Inter', sans-serif",
                           fontSize: 10.5, color: '#6B7280',
                         }}>{q.client_name} · {q.client_city || '—'}</div>
                       </td>
                       {/* Associate */}
                       <td style={{ padding: '10px 12px' }}>
                         <div style={{
-                          fontFamily: "'Source Sans 3', sans-serif",
+                          fontFamily: "'Inter', sans-serif",
                           fontSize: 12, color: '#374151', fontWeight: 600,
                         }}>{q.employee_name}</div>
                         <div style={{
-                          fontFamily: "'DM Mono', monospace",
+                          fontFamily: "'Manrope', sans-serif",
                           fontSize: 10, color: '#9CA3AF',
                         }}>{q.employee_code}</div>
                       </td>
@@ -733,8 +733,8 @@ function AgingQuotesAlert() {
                         <span style={{
                           display: 'inline-block',
                           background: q.status === 'sent' ? '#ECFEFF' : '#F1F5F9',
-                          color:      q.status === 'sent' ? '#0E7490'  : '#374151',
-                          fontFamily: "'Source Sans 3', sans-serif", fontWeight: 700,
+                          color:      q.status === 'sent' ? '#155DA6'  : '#374151',
+                          fontFamily: "'Inter', sans-serif", fontWeight: 700,
                           fontSize: 9.5, padding: '2px 8px', borderRadius: 999,
                           textTransform: 'uppercase', letterSpacing: '.06em',
                         }}>{q.status}</span>
@@ -742,8 +742,8 @@ function AgingQuotesAlert() {
                       {/* Amount */}
                       <td style={{
                         padding: '10px 12px', textAlign: 'right',
-                        fontFamily: "'DM Mono', monospace", fontWeight: 600,
-                        fontSize: 12, color: '#164E63', whiteSpace: 'nowrap',
+                        fontFamily: "'Manrope', sans-serif", fontWeight: 600,
+                        fontSize: 12, color: '#0F1620', whiteSpace: 'nowrap',
                       }}>
                         {new Intl.NumberFormat('en-IN', {
                           style: 'currency', currency: 'INR', maximumFractionDigits: 0,
@@ -755,8 +755,8 @@ function AgingQuotesAlert() {
                           <span style={{
                             display: 'inline-block',
                             background: overdue ? '#FEE2E2' : '#ECFEFF',
-                            color: overdue ? '#991B1B' : '#0E7490',
-                            fontFamily: "'DM Mono', monospace", fontSize: 10,
+                            color: overdue ? '#991B1B' : '#155DA6',
+                            fontFamily: "'Manrope', sans-serif", fontSize: 10,
                             fontWeight: 700, padding: '2px 7px', borderRadius: 6,
                           }}>
                             {overdue ? '⚠ ' : ''}{q.next_follow_up_date}
@@ -772,7 +772,7 @@ function AgingQuotesAlert() {
                           style={{
                             background: '#D1FAE5', color: '#065F46', border: 0,
                             borderRadius: 6, padding: '4px 9px', fontSize: 11,
-                            fontFamily: "'Source Sans 3', sans-serif", fontWeight: 700,
+                            fontFamily: "'Inter', sans-serif", fontWeight: 700,
                             cursor: 'pointer', marginRight: 4,
                           }}>✓ Accept</button>
                         <button
@@ -780,7 +780,7 @@ function AgingQuotesAlert() {
                           style={{
                             background: '#FEE2E2', color: '#991B1B', border: 0,
                             borderRadius: 6, padding: '4px 9px', fontSize: 11,
-                            fontFamily: "'Source Sans 3', sans-serif", fontWeight: 700,
+                            fontFamily: "'Inter', sans-serif", fontWeight: 700,
                             cursor: 'pointer',
                           }}>✕ Reject</button>
                       </td>
@@ -798,12 +798,12 @@ function AgingQuotesAlert() {
             display: 'flex', justifyContent: 'space-between', alignItems: 'center',
           }}>
             <span style={{
-              fontFamily: "'Source Sans 3', sans-serif", fontSize: 11.5, color: '#9CA3AF',
+              fontFamily: "'Inter', sans-serif", fontSize: 11.5, color: '#9CA3AF',
             }}>
               {visible.length} quote{visible.length !== 1 ? 's' : ''} shown
             </span>
             <span style={{
-              fontFamily: "'DM Mono', monospace", fontWeight: 700, fontSize: 13,
+              fontFamily: "'Manrope', sans-serif", fontWeight: 700, fontSize: 13,
               color: '#991B1B',
             }}>
               Total at risk:{' '}
@@ -831,14 +831,14 @@ const PnlTable = ({ title, rows, emptyMsg = 'No data' }) => (
     <div style={{ padding: '14px 16px 10px', borderBottom: '1px solid #F1F5F9' }}>
       <h3 style={{
         margin: 0,
-        fontFamily: "'Nunito', sans-serif", fontWeight: 800, fontSize: 14,
-        color: '#164E63',
+        fontFamily: "'Manrope', sans-serif", fontWeight: 800, fontSize: 14,
+        color: '#0F1620',
       }}>{title}</h3>
     </div>
     {rows.length === 0 ? (
       <div style={{
         padding: 24, textAlign: 'center',
-        fontFamily: "'Source Sans 3', sans-serif", fontSize: 13, color: '#6B7280',
+        fontFamily: "'Inter', sans-serif", fontSize: 13, color: '#6B7280',
       }}>{emptyMsg}</div>
     ) : (
       <div style={{ overflowX: 'auto' }}>
@@ -847,8 +847,8 @@ const PnlTable = ({ title, rows, emptyMsg = 'No data' }) => (
             <tr style={{ background: '#F8FAFC' }}>
               {['Name', 'Revenue', 'COGS', 'Gross Profit', 'Margin'].map((h, i) => (
                 <th key={i} style={{
-                  fontFamily: "'Source Sans 3', sans-serif", fontWeight: 700, fontSize: 10,
-                  color: '#0E7490', letterSpacing: '.07em', textTransform: 'uppercase',
+                  fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: 10,
+                  color: '#155DA6', letterSpacing: '.07em', textTransform: 'uppercase',
                   padding: '9px 12px', textAlign: i === 0 ? 'left' : 'right',
                   borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap',
                 }}>{h}</th>
@@ -860,21 +860,21 @@ const PnlTable = ({ title, rows, emptyMsg = 'No data' }) => (
               <tr key={i} style={{ borderBottom: '1px solid #F1F5F9', background: '#FFFFFF' }}>
                 <td style={{
                   padding: '10px 12px',
-                  fontFamily: "'Nunito', sans-serif", fontWeight: 700, fontSize: 13,
-                  color: '#164E63', maxWidth: 180,
+                  fontFamily: "'Manrope', sans-serif", fontWeight: 700, fontSize: 13,
+                  color: '#0F1620', maxWidth: 180,
                   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                 }}>{r.name}</td>
                 <td style={{
                   textAlign: 'right', padding: '10px 12px',
-                  fontFamily: "'DM Mono', monospace", fontSize: 12, color: '#0E7490',
+                  fontFamily: "'Manrope', sans-serif", fontSize: 12, color: '#155DA6',
                 }}>{fmtINR(r.revenue)}</td>
                 <td style={{
                   textAlign: 'right', padding: '10px 12px',
-                  fontFamily: "'DM Mono', monospace", fontSize: 12, color: '#6B7280',
+                  fontFamily: "'Manrope', sans-serif", fontSize: 12, color: '#6B7280',
                 }}>{fmtINR(r.cogs)}</td>
                 <td style={{
                   textAlign: 'right', padding: '10px 12px',
-                  fontFamily: "'DM Mono', monospace", fontSize: 12,
+                  fontFamily: "'Manrope', sans-serif", fontSize: 12,
                   color: r.profit >= 0 ? '#065F46' : '#991B1B',
                   fontWeight: 700,
                 }}>{fmtINR(r.profit)}</td>
@@ -883,7 +883,7 @@ const PnlTable = ({ title, rows, emptyMsg = 'No data' }) => (
                     display: 'inline-block',
                     background: r.margin >= 30 ? '#D1FAE5' : r.margin >= 10 ? '#FEF3C7' : '#FEE2E2',
                     color: r.margin >= 30 ? '#065F46' : r.margin >= 10 ? '#92400E' : '#991B1B',
-                    fontFamily: "'DM Mono', monospace", fontSize: 11, fontWeight: 700,
+                    fontFamily: "'Manrope', sans-serif", fontSize: 11, fontWeight: 700,
                     padding: '2px 8px', borderRadius: 999,
                   }}>{r.margin}%</span>
                 </td>
@@ -958,11 +958,11 @@ function TopClients() {
       }}>
         <div>
           <h3 style={{
-            margin: 0, fontFamily: "'Nunito', sans-serif",
-            fontWeight: 800, fontSize: 14, color: '#164E63',
+            margin: 0, fontFamily: "'Manrope', sans-serif",
+            fontWeight: 800, fontSize: 14, color: '#0F1620',
           }}>🏆 Top Clients by Revenue</h3>
           <div style={{
-            fontFamily: "'Source Sans 3', sans-serif", fontSize: 11,
+            fontFamily: "'Inter', sans-serif", fontSize: 11,
             color: '#6B7280', marginTop: 2,
           }}>
             {loading ? 'Loading…' : `${clients.length} client${clients.length !== 1 ? 's' : ''} · by total quoted value`}
@@ -978,9 +978,9 @@ function TopClients() {
             <button key={p.key} onClick={() => setPeriod(p.key)} style={{
               border: 0, borderRadius: 6, cursor: 'pointer',
               padding: '4px 10px',
-              background: period === p.key ? '#0891B2' : 'transparent',
+              background: period === p.key ? '#1F6BC7' : 'transparent',
               color: period === p.key ? '#fff' : '#6B7280',
-              fontFamily: "'Source Sans 3', sans-serif",
+              fontFamily: "'Inter', sans-serif",
               fontWeight: period === p.key ? 700 : 500, fontSize: 11,
               transition: 'all .15s',
             }}>{p.label}</button>
@@ -992,26 +992,26 @@ function TopClients() {
       {loading ? (
         <div style={{
           padding: 32, textAlign: 'center',
-          fontFamily: "'Source Sans 3', sans-serif", fontSize: 13, color: '#6B7280',
+          fontFamily: "'Inter', sans-serif", fontSize: 13, color: '#6B7280',
         }}>Loading…</div>
       ) : err ? (
         <div style={{
           padding: '24px 18px', display: 'flex', alignItems: 'center',
           justifyContent: 'space-between', gap: 12,
         }}>
-          <span style={{ fontFamily: "'Source Sans 3', sans-serif", fontSize: 13, color: '#991B1B' }}>
+          <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 13, color: '#991B1B' }}>
             ⚠ {err}
           </span>
           <button onClick={() => load(period)} style={{
-            background: '#0891B2', color: '#fff', border: 0, borderRadius: 8,
+            background: '#1F6BC7', color: '#fff', border: 0, borderRadius: 8,
             padding: '5px 14px', cursor: 'pointer',
-            fontFamily: "'Nunito', sans-serif", fontWeight: 700, fontSize: 12,
+            fontFamily: "'Manrope', sans-serif", fontWeight: 700, fontSize: 12,
           }}>Retry</button>
         </div>
       ) : clients.length === 0 ? (
         <div style={{
           padding: 32, textAlign: 'center',
-          fontFamily: "'Source Sans 3', sans-serif", fontSize: 13, color: '#6B7280',
+          fontFamily: "'Inter', sans-serif", fontSize: 13, color: '#6B7280',
         }}>No quote data for this period.</div>
       ) : (
         <div style={{ padding: '12px 18px 16px', display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -1037,7 +1037,7 @@ function TopClients() {
                       background: i < 3 ? '#FEF3C7' : '#F1F5F9',
                       color: i < 3 ? '#92400E' : '#6B7280',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontFamily: "'Nunito', sans-serif", fontWeight: 800, fontSize: 12,
+                      fontFamily: "'Manrope', sans-serif", fontWeight: 800, fontSize: 12,
                     }}>
                       {i < 3 ? MEDALS[i] : i + 1}
                     </div>
@@ -1045,8 +1045,8 @@ function TopClients() {
                     {/* Name */}
                     <div style={{ minWidth: 0 }}>
                       <div style={{
-                        fontFamily: "'Nunito', sans-serif", fontWeight: 800,
-                        fontSize: 13, color: '#164E63',
+                        fontFamily: "'Manrope', sans-serif", fontWeight: 800,
+                        fontSize: 13, color: '#0F1620',
                         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                       }}>{c.client}</div>
                       <div style={{
@@ -1055,20 +1055,20 @@ function TopClients() {
                         {/* Type badge */}
                         <span style={{
                           background: cfg.bg, color: cfg.fg,
-                          fontFamily: "'Source Sans 3', sans-serif", fontWeight: 700, fontSize: 10,
+                          fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: 10,
                           padding: '1px 6px', borderRadius: 999,
                           display: 'inline-flex', alignItems: 'center', gap: 3,
                         }}>{cfg.emoji} {c.client_type}</span>
                         {/* City */}
                         {c.client_city && (
                           <span style={{
-                            fontFamily: "'Source Sans 3', sans-serif", fontSize: 10.5, color: '#9CA3AF',
+                            fontFamily: "'Inter', sans-serif", fontSize: 10.5, color: '#9CA3AF',
                           }}>📍 {c.client_city}</span>
                         )}
                         {/* Associate */}
                         {c.top_associate && (
                           <span style={{
-                            fontFamily: "'Source Sans 3', sans-serif", fontSize: 10.5, color: '#9CA3AF',
+                            fontFamily: "'Inter', sans-serif", fontSize: 10.5, color: '#9CA3AF',
                           }}>👤 {c.top_associate}</span>
                         )}
                       </div>
@@ -1078,20 +1078,20 @@ function TopClients() {
                   {/* Right: revenue + stats */}
                   <div style={{ flexShrink: 0, textAlign: 'right' }}>
                     <div style={{
-                      fontFamily: "'DM Mono', monospace", fontWeight: 700,
-                      fontSize: 14, color: '#164E63',
+                      fontFamily: "'Manrope', sans-serif", fontWeight: 700,
+                      fontSize: 14, color: '#0F1620',
                     }}>{fmtL(c.total_revenue)}</div>
                     <div style={{
                       display: 'flex', alignItems: 'center', gap: 6,
                       justifyContent: 'flex-end', marginTop: 2,
                     }}>
                       <span style={{
-                        fontFamily: "'Source Sans 3', sans-serif", fontSize: 10.5, color: '#6B7280',
+                        fontFamily: "'Inter', sans-serif", fontSize: 10.5, color: '#6B7280',
                       }}>{c.quote_count} quote{c.quote_count !== 1 ? 's' : ''}</span>
                       {/* Win rate */}
                       <span style={{
                         background: winColor + '22', color: winColor,
-                        fontFamily: "'DM Mono', monospace", fontWeight: 700, fontSize: 10,
+                        fontFamily: "'Manrope', sans-serif", fontWeight: 700, fontSize: 10,
                         padding: '1px 6px', borderRadius: 999,
                       }}>{c.win_rate}% win</span>
                     </div>
@@ -1107,13 +1107,13 @@ function TopClients() {
                     <div style={{
                       height: '100%',
                       width: `${barPct}%`,
-                      background: `linear-gradient(90deg, #0891B2, #06B6D4)`,
+                      background: `linear-gradient(90deg, #1F6BC7, #06B6D4)`,
                       borderRadius: 999, transition: 'width .4s ease',
                     }} />
                   </div>
                   {c.accepted_revenue > 0 && (
                     <span style={{
-                      fontFamily: "'DM Mono', monospace", fontSize: 10,
+                      fontFamily: "'Manrope', sans-serif", fontSize: 10,
                       color: '#059669', fontWeight: 600, whiteSpace: 'nowrap',
                     }}>✓ {fmtL(c.accepted_revenue)}</span>
                   )}
@@ -1132,12 +1132,12 @@ function TopClients() {
           display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8,
         }}>
           <span style={{
-            fontFamily: "'Source Sans 3', sans-serif", fontSize: 11, color: '#9CA3AF',
+            fontFamily: "'Inter', sans-serif", fontSize: 11, color: '#9CA3AF',
           }}>
             Showing top {clients.length} clients
           </span>
           <span style={{
-            fontFamily: "'DM Mono', monospace", fontWeight: 700, fontSize: 12, color: '#0E7490',
+            fontFamily: "'Manrope', sans-serif", fontWeight: 700, fontSize: 12, color: '#155DA6',
           }}>
             Total: {fmtL(clients.reduce((s, c) => s + c.total_revenue, 0))}
             {clients.some(c => c.accepted_revenue > 0) && (
@@ -1157,11 +1157,11 @@ const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
 const monthLabel = (y, m) => `${MONTHS[m - 1]} ${y}`;
 
 const pctColor = (p) =>
-  p >= 100 ? '#059669' : p >= 80 ? '#0891B2' : p >= 50 ? '#F59E0B' : '#EF4444';
+  p >= 100 ? '#059669' : p >= 80 ? '#1F6BC7' : p >= 50 ? '#F59E0B' : '#EF4444';
 
 const ProgBar = ({ actual, target, fmt }) => {
   if (!target) return (
-    <span style={{ fontSize: 11, color: '#9CA3AF', fontFamily: "'Source Sans 3', sans-serif" }}>
+    <span style={{ fontSize: 11, color: '#9CA3AF', fontFamily: "'Inter', sans-serif" }}>
       No target
     </span>
   );
@@ -1172,11 +1172,11 @@ const ProgBar = ({ actual, target, fmt }) => {
     <div style={{ minWidth: 120 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
         <span style={{
-          fontFamily: "'DM Mono', monospace", fontSize: 11,
-          color: '#164E63', fontWeight: 700,
+          fontFamily: "'Manrope', sans-serif", fontSize: 11,
+          color: '#0F1620', fontWeight: 700,
         }}>{fmt(actual)}</span>
         <span style={{
-          fontFamily: "'DM Mono', monospace", fontSize: 10, color: '#9CA3AF',
+          fontFamily: "'Manrope', sans-serif", fontSize: 10, color: '#9CA3AF',
         }}>/ {fmt(target)}</span>
       </div>
       <div style={{ height: 6, background: '#F1F5F9', borderRadius: 999, overflow: 'hidden' }}>
@@ -1188,7 +1188,7 @@ const ProgBar = ({ actual, target, fmt }) => {
       </div>
       <div style={{
         marginTop: 2, textAlign: 'right',
-        fontFamily: "'DM Mono', monospace", fontSize: 10,
+        fontFamily: "'Manrope', sans-serif", fontSize: 10,
         color: col, fontWeight: 700,
       }}>{pct}%</div>
     </div>
@@ -1200,7 +1200,7 @@ const statusBadge = (row) => {
   if (!hasAny) return { label: 'No Target', bg: '#F1F5F9', fg: '#6B7280' };
   const rp = row.revenue_target > 0 ? (row.actual_revenue / row.revenue_target) * 100 : 100;
   if (rp >= 100) return { label: '🏆 Exceeded',       bg: '#D1FAE5', fg: '#065F46' };
-  if (rp >= 80)  return { label: '🔵 On Track',        bg: '#ECFEFF', fg: '#0E7490' };
+  if (rp >= 80)  return { label: '🔵 On Track',        bg: '#ECFEFF', fg: '#155DA6' };
   if (rp >= 50)  return { label: '🟡 Getting There',   bg: '#FEF3C7', fg: '#92400E' };
   return             { label: '🔴 Behind',             bg: '#FEE2E2', fg: '#991B1B' };
 };
@@ -1375,11 +1375,11 @@ function TargetVsActual() {
         }}>
           <div>
             <h3 style={{
-              margin: 0, fontFamily: "'Nunito', sans-serif",
-              fontWeight: 800, fontSize: 14, color: '#164E63',
+              margin: 0, fontFamily: "'Manrope', sans-serif",
+              fontWeight: 800, fontSize: 14, color: '#0F1620',
             }}>Target vs Actual</h3>
             <div style={{
-              fontFamily: "'Source Sans 3', sans-serif", fontSize: 11,
+              fontFamily: "'Inter', sans-serif", fontSize: 11,
               color: '#6B7280', marginTop: 2,
             }}>{rows.length} associate{rows.length !== 1 ? 's' : ''} · {monthLabel(year, month)}</div>
           </div>
@@ -1392,7 +1392,7 @@ function TargetVsActual() {
                 fontWeight: 600, lineHeight: 1,
               }}>‹</button>
               <span style={{
-                fontFamily: "'DM Mono', monospace", fontSize: 11,
+                fontFamily: "'Manrope', sans-serif", fontSize: 11,
                 color: '#374151', padding: '0 6px', whiteSpace: 'nowrap',
               }}>{monthLabel(year, month)}</span>
               <button onClick={goFwd} style={{
@@ -1405,9 +1405,9 @@ function TargetVsActual() {
             <button
               onClick={() => setModalOpen(true)}
               style={{
-                background: '#0891B2', color: '#fff',
+                background: '#1F6BC7', color: '#fff',
                 border: 0, borderRadius: 8, cursor: 'pointer',
-                fontFamily: "'Nunito', sans-serif", fontWeight: 700, fontSize: 12,
+                fontFamily: "'Manrope', sans-serif", fontWeight: 700, fontSize: 12,
                 padding: '6px 14px', whiteSpace: 'nowrap',
               }}
             >Set Targets</button>
@@ -1418,12 +1418,12 @@ function TargetVsActual() {
         {loading ? (
           <div style={{
             padding: 32, textAlign: 'center',
-            fontFamily: "'Source Sans 3', sans-serif", fontSize: 13, color: '#6B7280',
+            fontFamily: "'Inter', sans-serif", fontSize: 13, color: '#6B7280',
           }}>Loading…</div>
         ) : rows.length === 0 ? (
           <div style={{
             padding: 32, textAlign: 'center',
-            fontFamily: "'Source Sans 3', sans-serif", fontSize: 13, color: '#6B7280',
+            fontFamily: "'Inter', sans-serif", fontSize: 13, color: '#6B7280',
           }}>No active associates found.</div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
@@ -1432,8 +1432,8 @@ function TargetVsActual() {
                 <tr style={{ background: '#F8FAFC' }}>
                   {['Associate', 'Revenue vs Target', 'Leads vs Target', 'Conversions', 'Status'].map((h, i) => (
                     <th key={i} style={{
-                      fontFamily: "'Source Sans 3', sans-serif", fontWeight: 700,
-                      fontSize: 10, color: '#0E7490', letterSpacing: '.07em',
+                      fontFamily: "'Inter', sans-serif", fontWeight: 700,
+                      fontSize: 10, color: '#155DA6', letterSpacing: '.07em',
                       textTransform: 'uppercase', padding: '9px 14px',
                       textAlign: i === 0 ? 'left' : i === 4 ? 'center' : 'left',
                       borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap',
@@ -1454,15 +1454,15 @@ function TargetVsActual() {
                             width: 30, height: 30, borderRadius: '50%', flexShrink: 0,
                             background: col.bg, color: col.fg,
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            fontFamily: "'Nunito', sans-serif", fontWeight: 800, fontSize: 11,
+                            fontFamily: "'Manrope', sans-serif", fontWeight: 800, fontSize: 11,
                           }}>{initials(r.name)}</div>
                           <div>
                             <div style={{
-                              fontFamily: "'Nunito', sans-serif", fontWeight: 800,
-                              fontSize: 13, color: '#164E63',
+                              fontFamily: "'Manrope', sans-serif", fontWeight: 800,
+                              fontSize: 13, color: '#0F1620',
                             }}>{r.name}</div>
                             <div style={{
-                              fontFamily: "'DM Mono', monospace", fontSize: 10, color: '#6B7280',
+                              fontFamily: "'Manrope', sans-serif", fontSize: 10, color: '#6B7280',
                             }}>{r.employee_code}{r.region ? ` · ${r.region}` : ''}</div>
                           </div>
                         </div>
@@ -1484,7 +1484,7 @@ function TargetVsActual() {
                         <span style={{
                           display: 'inline-block',
                           background: badge.bg, color: badge.fg,
-                          fontFamily: "'Source Sans 3', sans-serif", fontWeight: 700,
+                          fontFamily: "'Inter', sans-serif", fontWeight: 700,
                           fontSize: 10.5, padding: '3px 10px', borderRadius: 999,
                           whiteSpace: 'nowrap',
                         }}>{badge.label}</span>
@@ -1499,19 +1499,19 @@ function TargetVsActual() {
                   <tr style={{ background: '#F8FAFC', borderTop: '2px solid #E5E7EB' }}>
                     <td style={{
                       padding: '10px 14px',
-                      fontFamily: "'Nunito', sans-serif", fontWeight: 800,
-                      fontSize: 12, color: '#164E63',
+                      fontFamily: "'Manrope', sans-serif", fontWeight: 800,
+                      fontSize: 12, color: '#0F1620',
                     }}>Team Total</td>
                     <td style={{ padding: '10px 14px', minWidth: 160 }}>
                       <ProgBar actual={totRev} target={totTgt} fmt={fmtL} />
                     </td>
                     <td style={{
                       padding: '10px 14px',
-                      fontFamily: "'DM Mono', monospace", fontSize: 12, color: '#164E63',
+                      fontFamily: "'Manrope', sans-serif", fontSize: 12, color: '#0F1620',
                     }}>{totLd} leads</td>
                     <td style={{
                       padding: '10px 14px',
-                      fontFamily: "'DM Mono', monospace", fontSize: 12, color: '#164E63',
+                      fontFamily: "'Manrope', sans-serif", fontSize: 12, color: '#0F1620',
                     }}>{totCv} converted</td>
                     <td />
                   </tr>
@@ -1575,7 +1575,7 @@ function OverviewTab() {
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       padding: 60, color: '#6B7280',
-      fontFamily: "'Source Sans 3', sans-serif",
+      fontFamily: "'Inter', sans-serif",
     }}>Loading dashboard…</div>
   );
 
@@ -1585,15 +1585,15 @@ function OverviewTab() {
       padding: 60, gap: 12,
     }}>
       <div style={{
-        fontFamily: "'Nunito', sans-serif", fontWeight: 800, fontSize: 15, color: '#991B1B',
+        fontFamily: "'Manrope', sans-serif", fontWeight: 800, fontSize: 15, color: '#991B1B',
       }}>Dashboard failed to load</div>
       <div style={{
-        fontFamily: "'Source Sans 3', sans-serif", fontSize: 12, color: '#6B7280',
+        fontFamily: "'Inter', sans-serif", fontSize: 12, color: '#6B7280',
       }}>{error}</div>
       <button onClick={load} style={{
-        background: '#0891B2', color: '#fff', border: 0, borderRadius: 8,
+        background: '#1F6BC7', color: '#fff', border: 0, borderRadius: 8,
         padding: '8px 18px', cursor: 'pointer',
-        fontFamily: "'Nunito', sans-serif", fontWeight: 700, fontSize: 13,
+        fontFamily: "'Manrope', sans-serif", fontWeight: 700, fontSize: 13,
       }}>Retry</button>
     </div>
   );
@@ -1604,7 +1604,7 @@ function OverviewTab() {
   const bestIdx  = perf.length ? perf.reduce((bi, p, i) => p.quote_value > perf[bi].quote_value ? i : bi, 0) : -1;
   const topProds = stats.top_products || [];
   const maxUnits = topProds.length ? Math.max(...topProds.map(p => p.quantity), 1) : 1;
-  const BAR_COLORS = ['#0891B2','#0E7490','#06B6D4','#22D3EE','#67E8F9'];
+  const BAR_COLORS = ['#1F6BC7','#155DA6','#06B6D4','#22D3EE','#67E8F9'];
   const activity   = stats.recent_activity || [];
 
   return (
@@ -1616,7 +1616,7 @@ function OverviewTab() {
         gridTemplateColumns: 'repeat(auto-fit, minmax(175px, 1fr))',
         gap: 14,
       }}>
-        <KPI glyph={Ic.quote}  label="Quotes (Month)" accent="#0891B2"
+        <KPI glyph={Ic.quote}  label="Quotes (Month)" accent="#1F6BC7"
           value={stats.quotes.month.count}
           sub="all associates" />
         <KPI glyph={Ic.rupee}  label="Total Value"    accent="#059669"
@@ -1625,7 +1625,7 @@ function OverviewTab() {
         <KPI glyph={Ic.people} label="Total Leads"    accent="#22D3EE"
           value={stats.leads.total}
           sub="across team" />
-        <KPI glyph={Ic.trend}  label="Conversion"     accent="#0891B2"
+        <KPI glyph={Ic.trend}  label="Conversion"     accent="#1F6BC7"
           value={`${stats.leads.conversion_rate}%`}
           sub="lead → converted" />
       </div>
@@ -1650,8 +1650,8 @@ function OverviewTab() {
             <div>
               <h3 style={{
                 margin: 0,
-                fontFamily: "'Nunito', sans-serif", fontWeight: 800, fontSize: 14,
-                color: '#164E63',
+                fontFamily: "'Manrope', sans-serif", fontWeight: 800, fontSize: 14,
+                color: '#0F1620',
               }}>Team Performance</h3>
               <div style={{
                 fontSize: 11, color: '#64748b', marginTop: 3,
@@ -1661,7 +1661,7 @@ function OverviewTab() {
           {perf.length === 0 ? (
             <div style={{
               padding: 24, textAlign: 'center',
-              fontFamily: "'Source Sans 3', sans-serif", fontSize: 13, color: '#6B7280',
+              fontFamily: "'Inter', sans-serif", fontSize: 13, color: '#6B7280',
             }}>No associate data</div>
           ) : (
             <div style={{ overflowX: 'auto' }}>
@@ -1699,8 +1699,8 @@ function OverviewTab() {
             <div>
               <h3 style={{
                 margin: 0,
-                fontFamily: "'Nunito', sans-serif", fontWeight: 800, fontSize: 14,
-                color: '#164E63',
+                fontFamily: "'Manrope', sans-serif", fontWeight: 800, fontSize: 14,
+                color: '#0F1620',
               }}>Leads by Business Type</h3>
               <div style={{
                 fontSize: 11, color: '#64748b', marginTop: 3,
@@ -1764,17 +1764,17 @@ function OverviewTab() {
           }}>
             <h3 style={{
               margin: 0,
-              fontFamily: "'Nunito', sans-serif", fontWeight: 800, fontSize: 14,
-              color: '#164E63',
+              fontFamily: "'Manrope', sans-serif", fontWeight: 800, fontSize: 14,
+              color: '#0F1620',
             }}>Top Products</h3>
             <span style={{
-              fontFamily: "'Source Sans 3', sans-serif", fontSize: 11, color: '#6B7280',
+              fontFamily: "'Inter', sans-serif", fontSize: 11, color: '#6B7280',
             }}>by units quoted</span>
           </div>
           {topProds.length === 0 ? (
             <div style={{
               padding: '16px 0', textAlign: 'center',
-              fontFamily: "'Source Sans 3', sans-serif", fontSize: 13, color: '#6B7280',
+              fontFamily: "'Inter', sans-serif", fontSize: 13, color: '#6B7280',
             }}>No quote data yet</div>
           ) : topProds.map((p, i) => (
             <ProductBar key={i}
@@ -1796,7 +1796,7 @@ function OverviewTab() {
           {activity.length === 0 ? (
             <div style={{
               padding: '16px 0', textAlign: 'center',
-              fontFamily: "'Source Sans 3', sans-serif", fontSize: 13, color: '#6B7280',
+              fontFamily: "'Inter', sans-serif", fontSize: 13, color: '#6B7280',
             }}>No recent activity</div>
           ) : activity.map((q) => (
             <ActivityRow key={q.id}
@@ -1896,8 +1896,8 @@ export default function AdminPanel() {
                 padding: '14px 18px', border: 'none', background: 'transparent',
                 cursor: 'pointer', whiteSpace: 'nowrap', position: 'relative',
                 fontSize: 13, fontWeight: active ? 700 : 500,
-                color: active ? '#0891b2' : '#64748b',
-                borderBottom: active ? '2px solid #0891b2' : '2px solid transparent',
+                color: active ? '#1F6BC7' : '#64748b',
+                borderBottom: active ? '2px solid #1F6BC7' : '2px solid transparent',
                 transition: 'color 0.15s, border-color 0.15s',
                 marginBottom: -1,
               }}>
