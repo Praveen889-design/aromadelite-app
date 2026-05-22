@@ -6,6 +6,7 @@ import LeadsTab from './admin/LeadsTab';
 import ReportsTab from './admin/ReportsTab';
 import PriceDeviationTab from './admin/PriceDeviationTab';
 import CommissionTab from './admin/CommissionTab';
+import UnitsTab from './admin/UnitsTab';
 import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
 import { useToast } from '../components/Toast';
@@ -1836,6 +1837,7 @@ const TABS = [
   { id: 'products',   label: 'Products'   },
   { id: 'quotes',     label: 'All Quotes' },
   { id: 'leads',      label: 'All Leads'  },
+  { id: 'units',       label: '🏭 Units'       },
   { id: 'discounts',   label: '💸 Discounts'   },
   { id: 'commissions', label: '💰 Commissions' },
   { id: 'reports',     label: 'Reports'        },
@@ -1900,6 +1902,7 @@ export default function AdminPanel() {
         {tab === 'products'  && <ProductsTab />}
         {tab === 'quotes'    && <QuotesTab initialFilters={tabFilters} />}
         {tab === 'leads'     && <LeadsTab />}
+        {tab === 'units'       && <UnitsTab />}
         {tab === 'discounts'   && <PriceDeviationTab />}
         {tab === 'commissions' && <CommissionTab />}
         {tab === 'reports'     && <ReportsTab />}

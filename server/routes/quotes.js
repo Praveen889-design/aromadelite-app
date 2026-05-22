@@ -1,6 +1,7 @@
 const express = require('express');
 const pool = require('../database/db');
 const { requireAuth } = require('../middleware/auth');
+const { deductStockForQuote } = require('./units');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -225,6 +226,9 @@ router.patch('/:id/status', async (req, res) => {
         "UPDATE leads SET status = 'converted', updated_at = NOW() WHERE quote_id = $1",
         [req.params.id]
       );
+      // Auto-deduct stock from the unit in this associate's region (best-effort)
+      const quoteItems = parseJSON(rows[0].items, []);
+      await deductStockForQuote(client, Number(req.params.id), rows[0].employee_id, quoteItems);
     } else if (status === 'rejected') {
       await client.query(
         "UPDATE leads SET status = 'lost', updated_at = NOW() WHERE quote_id = $1",

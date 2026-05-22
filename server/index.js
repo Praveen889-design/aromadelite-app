@@ -24,6 +24,7 @@ const employeeRoutes  = require('./routes/employees');
 const reportRoutes    = require('./routes/reports');
 const targetRoutes      = require('./routes/targets');
 const commissionRoutes  = require('./routes/commissions');
+const unitRoutes        = require('./routes/units');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -62,6 +63,7 @@ app.use('/api/employees', employeeRoutes);
 app.use('/api/reports',   reportRoutes);
 app.use('/api/targets',     targetRoutes);
 app.use('/api/commissions', commissionRoutes);
+app.use('/api/units',       unitRoutes);
 
 // In production, serve the built React app + SPA-fallback for client-side routes.
 const clientBuildPath = path.resolve(__dirname, '../client/build');
