@@ -53,65 +53,74 @@ const relativeTime = (iso) => {
   return `${Math.floor(hrs / 24)}d ago`;
 };
 
+// ─── Shared card primitives ──────────────────────────────────
+const CARD = {
+  background: '#ffffff',
+  border: '1px solid rgba(0,0,0,0.07)',
+  borderRadius: 14,
+  boxShadow: '0 1px 3px rgba(0,0,0,0.04), 0 6px 20px rgba(0,0,0,0.05)',
+  overflow: 'hidden',
+};
+const CARD_HDR = {
+  padding: '14px 20px',
+  borderBottom: '1px solid rgba(0,0,0,0.06)',
+  display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
+};
+
 // ─── KPI tile ────────────────────────────────────────────────
 const KPI = ({ glyph, label, value, sub, accent = '#0891B2' }) => (
   <div style={{
-    background: '#FFFFFF', border: '1px solid #ECFEFF',
-    borderRadius: 14, padding: '16px 18px',
-    boxShadow: '0 2px 10px rgba(8,42,56,.04)',
-    position: 'relative', overflow: 'hidden',
+    ...CARD, padding: '20px 20px 16px',
+    position: 'relative',
+    borderTop: `3px solid ${accent}`,
   }}>
     <div style={{
-      position: 'absolute', top: 14, right: 14,
-      width: 36, height: 36, borderRadius: 10,
-      background: '#ECFEFF', color: accent,
+      position: 'absolute', top: 16, right: 16,
+      width: 40, height: 40, borderRadius: 12,
+      background: `${accent}18`,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
+      color: accent,
     }}>{glyph}</div>
     <div style={{
-      fontFamily: "'Source Sans 3', sans-serif", fontWeight: 600, fontSize: 11,
-      color: '#6B7280', letterSpacing: '.06em', textTransform: 'uppercase',
+      fontSize: 10.5, fontWeight: 700, color: '#64748b',
+      letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 10,
     }}>{label}</div>
     <div style={{
-      fontFamily: "'Nunito', sans-serif", fontWeight: 900, fontSize: 30,
-      color: '#164E63', lineHeight: 1, letterSpacing: '-.02em', marginTop: 8,
+      fontSize: 34, fontWeight: 900, color: '#0f172a',
+      lineHeight: 1, letterSpacing: '-.03em', marginBottom: 8,
     }}>{value}</div>
-    <div style={{
-      fontFamily: "'Source Sans 3', sans-serif", fontSize: 11.5,
-      color: '#6B7280', marginTop: 8,
-    }}>{sub}</div>
+    <div style={{ fontSize: 12, color: '#94a3b8' }}>{sub}</div>
   </div>
 );
 
 // ─── Horizontal bar ──────────────────────────────────────────
+const RANK_MEDALS = ['🥇', '🥈', '🥉'];
 const ProductBar = ({ rank, name, value, max, color }) => (
   <div style={{
-    display: 'grid', gridTemplateColumns: '24px 1fr 44px',
-    alignItems: 'center', gap: 10, padding: '7px 0',
+    display: 'grid', gridTemplateColumns: '28px 1fr 50px',
+    alignItems: 'center', gap: 10, padding: '8px 0',
+    borderBottom: '1px solid rgba(0,0,0,0.04)',
   }}>
     <div style={{
-      width: 22, height: 22, borderRadius: 6, flexShrink: 0,
-      background: rank === 1 ? '#FEF3C7' : '#F1F5F9',
-      color: rank === 1 ? '#92400E' : '#6B7280',
-      fontFamily: "'Nunito', sans-serif", fontWeight: 800, fontSize: 11,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-    }}>{rank}</div>
+      fontSize: rank <= 3 ? 16 : 12, textAlign: 'center', flexShrink: 0,
+      color: rank <= 3 ? undefined : '#94a3b8',
+      fontWeight: 700,
+    }}>{rank <= 3 ? RANK_MEDALS[rank - 1] : rank}</div>
     <div>
       <div style={{
-        fontFamily: "'Nunito', sans-serif", fontWeight: 700, fontSize: 12.5,
-        color: '#164E63', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        marginBottom: 4,
+        fontWeight: 600, fontSize: 12.5, color: '#1e293b',
+        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 5,
       }}>{name}</div>
-      <div style={{ height: 8, background: '#F1F5F9', borderRadius: 999, overflow: 'hidden' }}>
+      <div style={{ height: 5, background: '#f1f5f9', borderRadius: 999, overflow: 'hidden' }}>
         <div style={{
           height: '100%', width: `${(value / (max || 1)) * 100}%`,
-          background: `linear-gradient(90deg, ${color}, ${color}BB)`,
-          borderRadius: 999,
+          background: `linear-gradient(90deg, ${color}, ${color}99)`,
+          borderRadius: 999, transition: 'width 0.6s cubic-bezier(.4,0,.2,1)',
         }}/>
       </div>
     </div>
     <div style={{
-      fontFamily: "'DM Mono', monospace", fontWeight: 500, fontSize: 12,
-      color: '#164E63', textAlign: 'right',
+      fontWeight: 700, fontSize: 12, color: '#0f172a', textAlign: 'right',
     }}>{value}</div>
   </div>
 );
@@ -199,51 +208,49 @@ const LeadsByBiz = ({ data }) => {
 
 // ─── Activity row ────────────────────────────────────────────
 const KIND_CFG = {
-  accepted: { bg: '#D1FAE5', fg: '#065F46', label: 'ACCEPTED' },
-  rejected: { bg: '#FEE2E2', fg: '#991B1B', label: 'REJECTED' },
-  sent:     { bg: '#ECFEFF', fg: '#0E7490', label: 'SENT'     },
-  draft:    { bg: '#F1F5F9', fg: '#374151', label: 'DRAFT'    },
+  accepted: { bg: '#dcfce7', fg: '#15803d', dot: '#22c55e', label: 'Accepted' },
+  rejected: { bg: '#fee2e2', fg: '#b91c1c', dot: '#ef4444', label: 'Rejected' },
+  sent:     { bg: '#e0f2fe', fg: '#0369a1', dot: '#0ea5e9', label: 'Sent'     },
+  draft:    { bg: '#f1f5f9', fg: '#475569', dot: '#94a3b8', label: 'Draft'    },
 };
 
 const ActivityRow = ({ name, quoteNum, clientName, status, amount, time }) => {
-  const col   = avatarColor(name);
-  const kind  = KIND_CFG[status] || KIND_CFG.draft;
+  const col  = avatarColor(name);
+  const kind = KIND_CFG[status] || KIND_CFG.draft;
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: 10,
-      padding: '10px 0', borderBottom: '1px solid #F1F5F9',
+      display: 'flex', alignItems: 'center', gap: 12,
+      padding: '11px 0', borderBottom: '1px solid rgba(0,0,0,0.05)',
     }}>
       <div style={{
-        width: 32, height: 32, borderRadius: '50%',
-        background: col.bg, color: col.fg, flexShrink: 0,
+        width: 34, height: 34, borderRadius: '50%', flexShrink: 0,
+        background: col.bg, color: col.fg,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontFamily: "'Nunito', sans-serif", fontWeight: 800, fontSize: 11,
+        fontWeight: 800, fontSize: 11, border: `2px solid ${col.bg}`,
+        boxShadow: `0 0 0 2px ${col.fg}22`,
       }}>{initials(name)}</div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{
-          fontFamily: "'Source Sans 3', sans-serif", fontSize: 12.5,
-          color: '#374151', lineHeight: 1.3,
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        }}>
-          <span style={{ fontWeight: 700, color: '#164E63' }}>{name}</span>
-          {' · '}
-          <span style={{ fontWeight: 600 }}>{clientName}</span>
+        <div style={{ fontSize: 12.5, color: '#334155', lineHeight: 1.4,
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <span style={{ fontWeight: 700, color: '#0f172a' }}>{name}</span>
+          <span style={{ color: '#cbd5e1', margin: '0 5px' }}>·</span>
+          <span style={{ fontWeight: 500, color: '#475569' }}>{clientName}</span>
         </div>
-        <div style={{
-          fontFamily: "'DM Mono', monospace", fontSize: 10.5, color: '#6B7280', marginTop: 2,
-        }}>{quoteNum} · {time}</div>
+        <div style={{ fontSize: 10.5, color: '#94a3b8', marginTop: 2 }}>{quoteNum} · {time}</div>
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 3 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
         {amount > 0 && (
-          <span style={{
-            fontFamily: "'DM Mono', monospace", fontWeight: 500, fontSize: 12, color: '#164E63',
-          }}>{fmtL(amount)}</span>
+          <span style={{ fontWeight: 700, fontSize: 12, color: '#0f172a' }}>{fmtL(amount)}</span>
         )}
         <span style={{
+          display: 'inline-flex', alignItems: 'center', gap: 4,
           background: kind.bg, color: kind.fg,
-          fontFamily: "'Source Sans 3', sans-serif", fontWeight: 700, fontSize: 9,
-          padding: '2px 6px', borderRadius: 999, letterSpacing: '.08em',
-        }}>{kind.label}</span>
+          fontWeight: 700, fontSize: 9.5,
+          padding: '2px 8px', borderRadius: 999, letterSpacing: '.06em',
+        }}>
+          <span style={{ width: 5, height: 5, borderRadius: '50%', background: kind.dot, flexShrink: 0 }} />
+          {kind.label}
+        </span>
       </div>
     </div>
   );
@@ -258,37 +265,44 @@ const TeamRow = ({ emp, rank, best }) => {
 
   return (
     <tr style={{
-      background: best ? 'linear-gradient(90deg,#FEF3C7 0%,#FFFBEB 60%,#FFFFFF 100%)' : '#FFFFFF',
-      borderBottom: '1px solid #F1F5F9',
-      borderLeft: best ? '3px solid #F59E0B' : '3px solid transparent',
+      background: best
+        ? 'linear-gradient(90deg, #fffbeb 0%, #fefce8 50%, #ffffff 100%)'
+        : '#ffffff',
+      borderBottom: '1px solid rgba(0,0,0,0.05)',
     }}>
-      <td style={{ padding: '12px 12px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <td style={{ padding: '11px 16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {/* Rank */}
           <div style={{
-            width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
+            width: 20, height: 20, borderRadius: 6, flexShrink: 0, textAlign: 'center',
+            fontSize: rank <= 3 ? 14 : 10, lineHeight: rank <= 3 ? '20px' : '20px',
+            fontWeight: 700, color: rank > 3 ? '#94a3b8' : undefined,
+          }}>{rank <= 3 ? RANK_MEDALS[rank - 1] : rank}</div>
+          {/* Avatar */}
+          <div style={{
+            width: 34, height: 34, borderRadius: '50%', flexShrink: 0,
             background: col.bg, color: col.fg,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontFamily: "'Nunito', sans-serif", fontWeight: 800, fontSize: 12,
+            fontWeight: 800, fontSize: 12,
+            boxShadow: best ? '0 0 0 2px #f59e0b66' : 'none',
           }}>{initials(emp.name)}</div>
           <div style={{ minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-              <span style={{
-                fontFamily: "'Nunito', sans-serif", fontWeight: 800, fontSize: 13,
-                color: '#164E63', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-              }}>{emp.name}</span>
-              {best && <span style={{ color: '#D97706' }}>{Ic.trophy}</span>}
+              <span style={{ fontWeight: 700, fontSize: 13, color: '#0f172a',
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{emp.name}</span>
+              {best && <span style={{ fontSize: 12 }}>🏆</span>}
             </div>
-            <div style={{
-              fontFamily: "'DM Mono', monospace", fontSize: 10, color: '#6B7280', marginTop: 1,
-            }}>{emp.employee_id}{emp.region ? ` · ${emp.region}` : ''}</div>
+            <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 1 }}>
+              {emp.employee_id}{emp.region ? ` · ${emp.region}` : ''}
+            </div>
           </div>
         </div>
       </td>
       {[emp.quotes_count, fmtL(emp.quote_value), emp.leads_count, `${conv}%`].map((v, i) => (
         <td key={i} style={{
-          textAlign: 'right', padding: '12px 12px',
-          fontFamily: "'DM Mono', monospace", fontWeight: 500, fontSize: 13,
-          color: '#164E63',
+          textAlign: 'right', padding: '11px 16px',
+          fontWeight: i === 1 ? 700 : 600, fontSize: 13,
+          color: i === 1 ? '#0891b2' : '#0f172a',
         }}>{v}</td>
       ))}
     </tr>
@@ -318,17 +332,9 @@ const PipelineFunnel = ({ pipeline }) => {
   const overallConv = grandTotal > 0 ? Math.round((convCount / grandTotal) * 100) : 0;
 
   return (
-    <div style={{
-      background: '#FFFFFF', border: '1px solid #ECFEFF',
-      borderRadius: 14, overflow: 'hidden',
-      boxShadow: '0 2px 10px rgba(8,42,56,.04)',
-    }}>
+    <div style={{ ...CARD }}>
       {/* Card header */}
-      <div style={{
-        padding: '14px 18px 10px',
-        borderBottom: '1px solid #F1F5F9',
-        display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
-      }}>
+      <div style={{ ...CARD_HDR }}>
         <div>
           <h3 style={{
             margin: 0, fontFamily: "'Nunito', sans-serif",
@@ -340,13 +346,12 @@ const PipelineFunnel = ({ pipeline }) => {
           }}>{grandTotal} total leads · stages New → Contacted → Qualified → Converted</div>
         </div>
         <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 16 }}>
+          <div style={{ fontSize: 10, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 2 }}>
+            Overall conversion
+          </div>
           <div style={{
-            fontFamily: "'Source Sans 3', sans-serif", fontSize: 10,
-            color: '#6B7280', textTransform: 'uppercase', letterSpacing: '.06em',
-          }}>Overall conversion</div>
-          <div style={{
-            fontFamily: "'Nunito', sans-serif", fontWeight: 900,
-            fontSize: 26, color: '#059669', lineHeight: 1.1,
+            fontSize: 28, fontWeight: 900, lineHeight: 1.1,
+            color: overallConv >= 50 ? '#059669' : overallConv >= 25 ? '#d97706' : '#64748b',
           }}>{overallConv}%</div>
         </div>
       </div>
@@ -367,41 +372,32 @@ const PipelineFunnel = ({ pipeline }) => {
                 {passPct !== null && (
                   <div style={{
                     textAlign: 'center', marginBottom: 4,
-                    fontFamily: "'DM Mono', monospace", fontSize: 10, color: '#94A3B8',
+                    fontSize: 10, color: '#94a3b8', letterSpacing: '0.03em',
                   }}>
                     ▼ {passPct}% progressed from previous stage
                   </div>
                 )}
 
-                {/* Centered tapering bar */}
+                {/* Premium tapering bar */}
                 <div style={{ display: 'flex', justifyContent: 'center' }}>
                   <div style={{
-                    width: `${barPct}%`, minWidth: count > 0 ? 120 : 0,
+                    width: `${barPct}%`, minWidth: count > 0 ? 140 : 0,
                     maxWidth: '100%',
-                    background: `linear-gradient(135deg, ${stage.fill}EE, ${stage.fill})`,
-                    borderRadius: 8,
-                    height: 52,
+                    background: `linear-gradient(135deg, ${stage.fill}, ${stage.fill}CC)`,
+                    borderRadius: 10,
+                    height: 56,
                     display: 'flex', alignItems: 'center',
                     justifyContent: 'space-between',
-                    padding: '0 14px',
-                    transition: 'width .4s ease',
-                    boxShadow: `0 2px 8px ${stage.fill}44`,
+                    padding: '0 16px',
+                    transition: 'width .5s cubic-bezier(.4,0,.2,1)',
+                    boxShadow: `0 4px 16px ${stage.fill}33`,
                   }}>
-                    <span style={{
-                      fontFamily: "'Nunito', sans-serif", fontWeight: 800,
-                      fontSize: 12, color: '#fff',
-                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                    }}>{stage.label}</span>
+                    <span style={{ fontWeight: 700, fontSize: 12, color: '#fff',
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{stage.label}</span>
                     <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 8 }}>
-                      <div style={{
-                        fontFamily: "'Nunito', sans-serif", fontWeight: 900,
-                        fontSize: 20, color: '#fff', lineHeight: 1,
-                      }}>{count}</div>
+                      <div style={{ fontWeight: 900, fontSize: 22, color: '#fff', lineHeight: 1 }}>{count}</div>
                       {value > 0 && (
-                        <div style={{
-                          fontFamily: "'DM Mono', monospace", fontSize: 9,
-                          color: 'rgba(255,255,255,.75)', marginTop: 1,
-                        }}>{fmtL(value)}</div>
+                        <div style={{ fontSize: 9.5, color: 'rgba(255,255,255,.75)', marginTop: 1 }}>{fmtL(value)}</div>
                       )}
                     </div>
                   </div>
@@ -1612,13 +1608,13 @@ function OverviewTab() {
   const activity   = stats.recent_activity || [];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
       {/* KPI cards */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-        gap: 12,
+        gridTemplateColumns: 'repeat(auto-fit, minmax(175px, 1fr))',
+        gap: 14,
       }}>
         <KPI glyph={Ic.quote}  label="Quotes (Month)" accent="#0891B2"
           value={stats.quotes.month.count}
@@ -1645,14 +1641,11 @@ function OverviewTab() {
       }}>
         {/* Team table */}
         <div style={{
-          background: '#FFFFFF', border: '1px solid #ECFEFF',
-          borderRadius: 14, overflow: 'hidden',
-          boxShadow: '0 2px 10px rgba(8,42,56,.04)',
+          ...CARD,
         }}>
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            padding: '14px 16px 10px',
-            borderBottom: '1px solid #F1F5F9',
+            ...CARD_HDR,
           }}>
             <div>
               <h3 style={{
@@ -1661,7 +1654,7 @@ function OverviewTab() {
                 color: '#164E63',
               }}>Team Performance</h3>
               <div style={{
-                fontFamily: "'Source Sans 3', sans-serif", fontSize: 11, color: '#6B7280', marginTop: 2,
+                fontSize: 11, color: '#64748b', marginTop: 3,
               }}>{perf.length} associate{perf.length !== 1 ? 's' : ''} · by value</div>
             </div>
           </div>
@@ -1677,10 +1670,11 @@ function OverviewTab() {
                   <tr style={{ background: '#F8FAFC' }}>
                     {['Associate','Quotes','Value','Leads','Conv%'].map((h, i) => (
                       <th key={i} style={{
-                        fontFamily: "'Source Sans 3', sans-serif", fontWeight: 700, fontSize: 10,
-                        color: '#0E7490', letterSpacing: '.07em', textTransform: 'uppercase',
-                        padding: '9px 12px', textAlign: i === 0 ? 'left' : 'right',
-                        borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap',
+                        fontWeight: 600, fontSize: 10.5,
+                        color: '#64748b', letterSpacing: '.06em', textTransform: 'uppercase',
+                        padding: '10px 16px', textAlign: i === 0 ? 'left' : 'right',
+                        borderBottom: '1px solid rgba(0,0,0,0.07)', whiteSpace: 'nowrap',
+                        background: '#f8fafc',
                       }}>{h}</th>
                     ))}
                   </tr>
@@ -1697,9 +1691,7 @@ function OverviewTab() {
 
         {/* Leads by biz type */}
         <div style={{
-          background: '#FFFFFF', border: '1px solid #ECFEFF',
-          borderRadius: 14, padding: '14px 16px',
-          boxShadow: '0 2px 10px rgba(8,42,56,.04)',
+          ...CARD, padding: '18px 20px',
         }}>
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14,
@@ -1711,7 +1703,7 @@ function OverviewTab() {
                 color: '#164E63',
               }}>Leads by Business Type</h3>
               <div style={{
-                fontFamily: "'Source Sans 3', sans-serif", fontSize: 11, color: '#6B7280', marginTop: 2,
+                fontSize: 11, color: '#64748b', marginTop: 3,
               }}>{stats.leads.total} leads total</div>
             </div>
           </div>
@@ -1732,20 +1724,16 @@ function OverviewTab() {
 
       {/* P&L Dashboard */}
       {pnl && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 10,
-            paddingTop: 4,
-          }}>
-            <h3 style={{
-              margin: 0,
-              fontFamily: "'Nunito', sans-serif", fontWeight: 900, fontSize: 16,
-              color: '#164E63',
-            }}>Profit &amp; Loss</h3>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#0f172a' }}>
+              Profit &amp; Loss
+            </h3>
             <span style={{
-              background: '#D1FAE5', color: '#065F46',
-              fontFamily: "'Source Sans 3', sans-serif", fontWeight: 700, fontSize: 9.5,
-              padding: '2px 8px', borderRadius: 4, letterSpacing: '.06em', textTransform: 'uppercase',
+              background: '#dcfce7', color: '#15803d',
+              fontWeight: 700, fontSize: 9.5,
+              padding: '3px 10px', borderRadius: 20, letterSpacing: '.06em', textTransform: 'uppercase',
+              border: '1px solid #86efac',
             }}>Converted Leads Only</span>
           </div>
           <div style={{
@@ -1769,9 +1757,7 @@ function OverviewTab() {
       }}>
         {/* Top products */}
         <div style={{
-          background: '#FFFFFF', border: '1px solid #ECFEFF',
-          borderRadius: 14, padding: '14px 16px 12px',
-          boxShadow: '0 2px 10px rgba(8,42,56,.04)',
+          ...CARD, padding: '18px 20px 14px',
         }}>
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4,
@@ -1801,14 +1787,11 @@ function OverviewTab() {
 
         {/* Recent activity */}
         <div style={{
-          background: '#FFFFFF', border: '1px solid #ECFEFF',
-          borderRadius: 14, padding: '14px 16px 6px',
-          boxShadow: '0 2px 10px rgba(8,42,56,.04)',
+          ...CARD, padding: '18px 20px 10px',
         }}>
           <h3 style={{
             margin: '0 0 2px',
-            fontFamily: "'Nunito', sans-serif", fontWeight: 800, fontSize: 14,
-            color: '#164E63',
+            fontWeight: 700, fontSize: 14, color: '#0f172a',
           }}>Recent Activity</h3>
           {activity.length === 0 ? (
             <div style={{
@@ -1852,53 +1835,82 @@ export default function AdminPanel() {
 
   const switchTab = (id, filters = {}) => { setTab(id); setTabFilters(filters); };
 
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {/* Header row */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <h2 style={{
-          margin: 0,
-          fontFamily: "'Nunito', sans-serif", fontWeight: 900, fontSize: 20,
-          color: '#164E63',
-        }}>Admin Console</h2>
-        <span style={{
-          display: 'inline-flex', alignItems: 'center', gap: 4,
-          background: '#EF4444', color: '#FFFFFF',
-          fontFamily: "'Source Sans 3', sans-serif", fontWeight: 700, fontSize: 9.5,
-          padding: '2px 7px', borderRadius: 4, letterSpacing: '.08em', textTransform: 'uppercase',
-        }}>{Ic.shield} Admin</span>
-        {user?.name && (
-          <span style={{
-            fontFamily: "'Source Sans 3', sans-serif", fontSize: 12.5, color: '#6B7280', marginLeft: 4,
-          }}>Welcome, {user.name.split(' ')[0]}</span>
-        )}
-      </div>
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' });
 
-      {/* Tab bar */}
+  const TAB_ICONS = {
+    overview: '◉', team: '👥', products: '📦', quotes: '🧾',
+    leads: '📋', units: '🏭', discounts: '💸', commissions: '💰',
+    reports: '📊', settings: '⚙️',
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 0, minHeight: '100vh', background: '#f0f4f8' }}>
+
+      {/* ── Premium header bar ── */}
       <div style={{
-        background: '#FFFFFF', border: '1px solid #E5E7EB',
-        borderRadius: 12, padding: '4px 6px',
-        overflowX: 'auto',
+        background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 60%, #0f2744 100%)',
+        borderRadius: 16, padding: '22px 28px', marginBottom: 0,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12,
+        boxShadow: '0 4px 24px rgba(15,23,42,0.25)',
       }}>
-        <div style={{ display: 'flex', gap: 2, minWidth: 'max-content' }}>
-          {TABS.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => switchTab(t.id)}
-              style={{
-                whiteSpace: 'nowrap', padding: '7px 14px', borderRadius: 8,
-                border: 0, cursor: 'pointer', transition: 'all .15s',
-                fontFamily: "'Nunito', sans-serif", fontWeight: tab === t.id ? 800 : 600, fontSize: 13,
-                background: tab === t.id ? '#0891B2' : 'transparent',
-                color: tab === t.id ? '#FFFFFF' : '#475569',
-              }}
-            >{t.label}</button>
-          ))}
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+            <h2 style={{ margin: 0, fontSize: 22, fontWeight: 900, color: '#f1f5f9', letterSpacing: '-0.02em' }}>
+              Admin Console
+            </h2>
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: 3,
+              background: '#ef4444', color: '#fff',
+              fontSize: 9, fontWeight: 800, padding: '3px 8px', borderRadius: 5,
+              letterSpacing: '.1em', textTransform: 'uppercase',
+            }}>
+              {Ic.shield} ADMIN
+            </span>
+          </div>
+          <div style={{ fontSize: 13, color: '#94a3b8' }}>
+            Welcome back, <span style={{ color: '#e2e8f0', fontWeight: 600 }}>{user?.name?.split(' ')[0]}</span>
+            {' '}— here's your business overview
+          </div>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#cbd5e1' }}>{dateStr}</div>
+          <div style={{ fontSize: 11, color: '#475569', marginTop: 2 }}>Sri Vemuri Sai Enterprises</div>
         </div>
       </div>
 
-      {/* Tab content */}
-      <div>
+      {/* ── Tab navigation bar ── */}
+      <div style={{
+        background: '#ffffff',
+        borderBottom: '1px solid rgba(0,0,0,0.08)',
+        position: 'sticky', top: 0, zIndex: 20,
+        boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+        overflowX: 'auto',
+      }}>
+        <div style={{ display: 'flex', minWidth: 'max-content', padding: '0 4px' }}>
+          {TABS.map((t) => {
+            const active = tab === t.id;
+            return (
+              <button key={t.id} onClick={() => switchTab(t.id)} style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                padding: '14px 18px', border: 'none', background: 'transparent',
+                cursor: 'pointer', whiteSpace: 'nowrap', position: 'relative',
+                fontSize: 13, fontWeight: active ? 700 : 500,
+                color: active ? '#0891b2' : '#64748b',
+                borderBottom: active ? '2px solid #0891b2' : '2px solid transparent',
+                transition: 'color 0.15s, border-color 0.15s',
+                marginBottom: -1,
+              }}>
+                <span style={{ fontSize: 12, opacity: active ? 1 : 0.6 }}>{TAB_ICONS[t.id]}</span>
+                {t.label.replace(/[🏭💸💰⚙️]/g, '').trim()}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── Tab content ── */}
+      <div style={{ padding: '20px 0', flex: 1 }}>
         {tab === 'overview'  && <OverviewTab />}
         {tab === 'team'      && <TeamTab onSwitchTab={switchTab} />}
         {tab === 'products'  && <ProductsTab />}
