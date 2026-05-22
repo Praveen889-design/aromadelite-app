@@ -13,8 +13,7 @@ const config: CapacitorConfig = {
   bundledWebRuntime: false,
   server: {
     androidScheme: 'https',
-    // url: 'https://aromadelite.vercel.app',
-    // cleartext: true,
+    url: 'https://aromadelite-app.vercel.app',
   },
 };
 
