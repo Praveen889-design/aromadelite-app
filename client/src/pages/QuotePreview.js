@@ -38,11 +38,11 @@ const COMPANY = {
 };
 
 const BANK = {
-  name: 'Sri Vemuri Sai Enterprises',
-  bank: 'HDFC Bank',
-  branch: 'Banjara Hills, Hyderabad',
-  account: 'XXXXXXXXXXXXX',
-  ifsc: 'HDFC0000XXX',
+  name: 'SRI VEMURI SAI ENTERPRISES',
+  bank: 'INDIAN BANK',
+  branch: 'CHINTHAL',
+  account: '6878749399',
+  ifsc: 'IDIB000C135',
 };
 
 const WhatsAppIcon = (p) => (
@@ -762,33 +762,49 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
           )}
 
           {/* FOOTER */}
-          <div className="mt-6 grid grid-cols-2 gap-6 text-[11px] text-slate-600">
-            <div>
+          <div className="mt-6 text-[11px] text-slate-600">
+
+            {/* Terms row */}
+            <div className="mb-4">
               <div className="font-semibold text-slate-800 mb-1">Terms &amp; Conditions</div>
               <ul className="list-disc list-inside space-y-0.5">
-                <li>This quote is valid for {quote.validity_days || 30} days from date of issue.</li>
+                <li>This quote is valid for {quote.validity_days || 7} days from date of issue.</li>
                 <li>Prices are subject to change without prior notice.</li>
                 <li>GST will be charged as applicable.</li>
                 <li>Delivery within 5-7 working days from confirmed order.</li>
                 <li>Payment terms: 50% advance, balance against delivery.</li>
               </ul>
-
-              <div className="font-semibold text-slate-800 mt-3 mb-1">Bank Details</div>
-              <div>Account Name: {BANK.name}</div>
-              <div>Bank: {BANK.bank} · {BANK.branch}</div>
-              <div>A/C No: {BANK.account} · IFSC: {BANK.ifsc}</div>
             </div>
-            <div className="text-right flex flex-col items-end justify-between">
-              <div>
-                <div className="text-slate-700 font-semibold">For {COMPANY.legal}</div>
-                <div className="mt-12 border-t border-slate-400 w-56 ml-auto" />
-                <div className="text-[10px] uppercase tracking-[0.18em] text-slate-500 mt-1">
-                  Authorized Signatory
+
+            {/* Bank details + signatory in a bordered grid */}
+            <div style={{ border: '1px solid #CBD5E1', borderRadius: 6, overflow: 'hidden' }}>
+              {/* Header row */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
+                <div style={{ padding: '5px 10px', background: '#F1F5F9', borderBottom: '1px solid #CBD5E1', borderRight: '1px solid #CBD5E1', fontWeight: 700, color: '#1e293b', fontSize: 10.5 }}>
+                  Bank Details
+                </div>
+                <div style={{ padding: '5px 10px', background: '#F1F5F9', borderBottom: '1px solid #CBD5E1', fontWeight: 700, color: '#1e293b', fontSize: 10.5 }}>
+                  For {COMPANY.legal}
                 </div>
               </div>
-              <div className="text-[10px] text-slate-400 mt-3">
-                This is a computer-generated quotation and does not require a physical signature.
+              {/* Content row */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
+                <div style={{ padding: '10px', borderRight: '1px solid #CBD5E1', lineHeight: 1.8 }}>
+                  <div><span style={{ color: '#64748b' }}>Name:</span> <strong>{BANK.name}</strong></div>
+                  <div><span style={{ color: '#64748b' }}>Bank:</span> <strong>{BANK.bank}, {BANK.branch}</strong></div>
+                  <div><span style={{ color: '#64748b' }}>Account No.:</span> <strong>{BANK.account}</strong></div>
+                  <div><span style={{ color: '#64748b' }}>IFSC Code:</span> <strong>{BANK.ifsc}</strong></div>
+                </div>
+                <div style={{ padding: '10px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', minHeight: 80 }}>
+                  <div style={{ borderTop: '1px solid #94a3b8', width: 160, textAlign: 'center', paddingTop: 4, color: '#475569', fontSize: 10 }}>
+                    Authorized Signatory
+                  </div>
+                </div>
               </div>
+            </div>
+
+            <div style={{ marginTop: 8, textAlign: 'center', fontSize: 9.5, color: '#94a3b8' }}>
+              This is a computer-generated quotation and does not require a physical signature.
             </div>
           </div>
         </div>
