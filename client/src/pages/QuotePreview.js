@@ -795,48 +795,13 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
                   <div><span style={{ color: '#64748b' }}>Account No.:</span> <strong>{BANK.account}</strong></div>
                   <div><span style={{ color: '#64748b' }}>IFSC Code:</span> <strong>{BANK.ifsc}</strong></div>
                 </div>
-                <div style={{ padding: '10px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 110, position: 'relative' }}>
-                  {/* Signature image + stamp overlay */}
-                  <div style={{ position: 'relative', width: 160, height: 80 }}>
-                    {/* Signature photo */}
-                    <img
-                      src="/signature.png"
-                      alt="Authorized Signatory"
-                      style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'contain', mixBlendMode: 'multiply' }}
-                      onError={(e) => { e.target.style.display = 'none'; }}
-                    />
-                    {/* Circular stamp SVG */}
-                    <svg viewBox="0 0 120 120" width="80" height="80"
-                         style={{ position: 'absolute', right: -8, top: -8, opacity: 0.88 }}>
-                      <defs>
-                        <path id="outerArc" d="M 12,60 A 48,48 0 1,1 108,60 A 48,48 0 1,1 12,60"/>
-                        <path id="innerTextArc" d="M 18,60 A 42,42 0 1,1 102,60 A 42,42 0 1,1 18,60"/>
-                      </defs>
-                      {/* Outer circle */}
-                      <circle cx="60" cy="60" r="52" fill="none" stroke="#1A3FAA" strokeWidth="2.2"/>
-                      {/* Text band circle */}
-                      <circle cx="60" cy="60" r="44" fill="none" stroke="#1A3FAA" strokeWidth="1.2"/>
-                      {/* Inner decorative circle */}
-                      <circle cx="60" cy="60" r="36" fill="none" stroke="#1A3FAA" strokeWidth="0.8"/>
-                      {/* Outer arc text: SRI VEMURI SAI ENTERPRISES */}
-                      <text fontSize="7.2" fontWeight="bold" letterSpacing="1.2" fill="#1A3FAA" fontFamily="Arial, sans-serif">
-                        <textPath href="#outerArc" startOffset="8%">SRI VEMURI SAI ENTERPRISES</textPath>
-                      </text>
-                      {/* Hyderabad centre text */}
-                      <text x="60" y="57" textAnchor="middle" fontSize="7.5" fill="#1A3FAA" fontFamily="Georgia, serif" fontStyle="italic" fontWeight="bold">Hyderabad</text>
-                      {/* Simple Charminar silhouette */}
-                      <g transform="translate(48,35) scale(0.45)" fill="#1A3FAA">
-                        <rect x="10" y="28" width="4" height="16"/>
-                        <rect x="22" y="28" width="4" height="16"/>
-                        <polygon points="12,28 12,18 16,14 20,18 20,28"/>
-                        <polygon points="12,14 16,6 20,14"/>
-                        <rect x="0" y="32" width="36" height="4"/>
-                        <rect x="4" y="36" width="28" height="8"/>
-                      </g>
-                      {/* Star at bottom */}
-                      <text x="60" y="95" textAnchor="middle" fontSize="8" fill="#1A3FAA">★</text>
-                    </svg>
-                  </div>
+                <div style={{ padding: '10px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 110 }}>
+                  <img
+                    src="/signature.png"
+                    alt="Authorized Signatory"
+                    style={{ width: 160, height: 80, objectFit: 'contain', mixBlendMode: 'multiply' }}
+                    onError={(e) => { e.target.style.display = 'none'; }}
+                  />
                   <div style={{ borderTop: '1px solid #94a3b8', width: 150, textAlign: 'center', paddingTop: 4, color: '#475569', fontSize: 10, marginTop: 4 }}>
                     Authorized Signatory
                   </div>
