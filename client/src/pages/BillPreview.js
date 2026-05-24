@@ -165,42 +165,49 @@ export default function BillPreview() {
       html2canvas(headerRef.current, { scale, useCORS: true, backgroundColor: '#ffffff' }),
     ]);
 
-    const pdf    = new jsPDF({ unit: 'pt', format: 'a4', compress: true });
-    const pageW  = pdf.internal.pageSize.getWidth();
-    const pageH  = pdf.internal.pageSize.getHeight();
+    const pdf   = new jsPDF({ unit: 'pt', format: 'a4', compress: true });
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
 
     const pxToPt  = pageW / fullCanvas.width;
-    const pageHpx = Math.round(pageH / pxToPt);
-    const hdrHpx  = headerCanvas.height;
-    const hdrHpt  = hdrHpx * pxToPt;
+    const pageHpx = pageH / pxToPt; // float — no rounding to avoid drift
 
-    const cropCanvas = (src, srcY, srcH) => {
-      const c = document.createElement('canvas');
-      c.width  = src.width;
-      c.height = srcH;
-      c.getContext('2d').drawImage(src, 0, srcY, src.width, srcH, 0, 0, src.width, srcH);
-      return c.toDataURL('image/png');
+    // Normalise header to the same pixel width as fullCanvas
+    const hdrNormH = Math.round((headerCanvas.height / headerCanvas.width) * fullCanvas.width);
+    const hdrHpt   = hdrNormH * pxToPt;
+
+    // Single reusable temp canvas
+    const tmp    = document.createElement('canvas');
+    tmp.width    = fullCanvas.width;
+    const tmpCtx = tmp.getContext('2d');
+
+    const crop = (src, srcY, srcH, srcNatW) => {
+      const h = Math.ceil(Math.min(srcH, src.height - srcY));
+      if (h <= 0) return null;
+      tmp.height = h;
+      tmpCtx.clearRect(0, 0, tmp.width, h);
+      tmpCtx.drawImage(src, 0, srcY, srcNatW, srcH, 0, 0, tmp.width, h);
+      return tmp.toDataURL('image/jpeg', 0.92);
     };
 
-    const headerImgData = cropCanvas(headerCanvas, 0, hdrHpx);
+    const hdrData = crop(headerCanvas, 0, headerCanvas.height, headerCanvas.width);
 
-    // Page 1
-    const p1H = Math.min(pageHpx, fullCanvas.height);
-    pdf.addImage(cropCanvas(fullCanvas, 0, p1H), 'PNG', 0, 0, pageW, p1H * pxToPt, undefined, 'FAST');
+    const p1H    = Math.min(pageHpx, fullCanvas.height);
+    const p1Data = crop(fullCanvas, 0, p1H, fullCanvas.width);
+    pdf.addImage(p1Data, 'JPEG', 0, 0, pageW, p1H * pxToPt, undefined, 'FAST');
 
-    // Page 2+
     let srcY = pageHpx;
     while (srcY < fullCanvas.height) {
       pdf.addPage();
-      pdf.addImage(headerImgData, 'PNG', 0, 0, pageW, hdrHpt, undefined, 'FAST');
-      const sliceHpx = Math.min(pageHpx - hdrHpx, fullCanvas.height - srcY);
-      if (sliceHpx > 0) {
-        pdf.addImage(
-          cropCanvas(fullCanvas, srcY, sliceHpx),
-          'PNG', 0, hdrHpt, pageW, sliceHpx * pxToPt, undefined, 'FAST'
-        );
+      pdf.addImage(hdrData, 'JPEG', 0, 0, pageW, hdrHpt, undefined, 'FAST');
+      const sliceH = Math.min(pageHpx - hdrNormH, fullCanvas.height - srcY);
+      if (sliceH > 0) {
+        const sliceData = crop(fullCanvas, srcY, sliceH, fullCanvas.width);
+        if (sliceData) {
+          pdf.addImage(sliceData, 'JPEG', 0, hdrHpt, pageW, sliceH * pxToPt, undefined, 'FAST');
+        }
       }
-      srcY += (pageHpx - hdrHpx);
+      srcY += (pageHpx - hdrNormH);
     }
     return pdf;
   };
@@ -229,30 +236,31 @@ export default function BillPreview() {
     finally { setSharingPdf(false); }
   };
 
-  /* ── WhatsApp: PDF file on native, text link on web ── */
+  /* ── WhatsApp: always try PDF first on both web and native ── */
   const onShareWhatsApp = async () => {
-    if (isNative() && docRef.current) {
-      setSharingPdf(true);
-      try {
-        const pdf = await buildPdf();
-        await sharePdf(pdf, fileName, `Bill ${bill.number} – Aromadelite`);
-        toast('PDF shared.', { kind: 'success' });
-      } catch (e) {
-        if (e?.message !== 'Share canceled') toast('Share failed.', { kind: 'error' });
-      } finally {
-        setSharingPdf(false);
+    if (!docRef.current) return;
+    setSharingPdf(true);
+    try {
+      const pdf = await buildPdf();
+      await sharePdf(pdf, fileName, `Bill ${bill.number} – Aromadelite`);
+      toast('PDF shared.', { kind: 'success' });
+    } catch (e) {
+      const cancelled = e?.name === 'AbortError' || e?.message === 'Share canceled';
+      if (!cancelled) {
+        // Last resort: open WhatsApp with text (desktop browsers without share API)
+        const greeting  = client.business_name ? `Dear *${client.business_name}*,` : `Dear *${client.name}*,`;
+        const itemLines = items.map((it, i) =>
+          `${i + 1}. *${it.product_name}* · Qty ${it.quantity} ${it.unit || ''} × ₹${fmtNum(it.unit_price)} = *₹${fmtNum(it.line_total)}*`
+        );
+        const gstNote = isWithoutGst ? '_(Prices inclusive of GST)_\n' : `GST: ₹${fmtNum(totals.gst_amount)}\n`;
+        const msg = `🌿 *AROMADELITE — TAX INVOICE*\n_Sri Vemuri Sai Enterprises_\n\n${greeting}\n\n*Bill No:* ${bill.number}\n*Date:* ${formatDate(bill.created_at)}\n\n${itemLines.join('\n')}\n\n━━━━━━━━━━━━\n${gstNote}*TOTAL: ₹${fmtNum(grandTotal)}*\n━━━━━━━━━━━━\n\n📞 6304382947 · contact@aromadelite.in`;
+        const phone = (client.phone || '').replace(/\D/g, '');
+        window.open(phone
+          ? `https://wa.me/${phone.length === 10 ? '91' + phone : phone}?text=${encodeURIComponent(msg)}`
+          : `https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank', 'noopener,noreferrer');
       }
-    } else {
-      const greeting = client.business_name ? `Dear *${client.business_name}*,` : `Dear *${client.name}*,`;
-      const itemLines = items.map((it, i) =>
-        `${i + 1}. *${it.product_name}* · Qty ${it.quantity} ${it.unit || ''} × ₹${fmtNum(it.unit_price)} = *₹${fmtNum(it.line_total)}*`
-      );
-      const gstNote = isWithoutGst ? '_(Prices inclusive of GST)_\n' : `GST: ₹${fmtNum(totals.gst_amount)}\n`;
-      const msg = `🌿 *AROMADELITE — TAX INVOICE*\n_Sri Vemuri Sai Enterprises_\n\n${greeting}\n\n*Bill No:* ${bill.number}\n*Date:* ${formatDate(bill.created_at)}\n\n${itemLines.join('\n')}\n\n━━━━━━━━━━━━\n${gstNote}*TOTAL: ₹${fmtNum(grandTotal)}*\n━━━━━━━━━━━━\n\n📞 6304382947 · contact@aromadelite.in`;
-      const phone = (client.phone || '').replace(/\D/g, '');
-      window.open(phone
-        ? `https://wa.me/${phone.length === 10 ? '91' + phone : phone}?text=${encodeURIComponent(msg)}`
-        : `https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank', 'noopener,noreferrer');
+    } finally {
+      setSharingPdf(false);
     }
   };
 

@@ -1,84 +1,89 @@
 /**
- * pdfNative.js
- *
- * Abstracts PDF download & sharing so the same code works in:
- *   - Browser (web)          → jsPDF.save() / Web Share API
- *   - Capacitor Android APK  → @capacitor/filesystem + @capacitor/share
+ * pdfNative.js — PDF download & share for web + Capacitor Android
  */
-
-import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 
-/** true when running inside the native Android/iOS app */
-export const isNative = () => Capacitor.isNativePlatform();
-
-/** Convert a jsPDF instance → base64 string (no data-URI prefix) */
-const toBase64 = (pdf) =>
-  new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => resolve(reader.result.split(',')[1]);
-    reader.onerror   = reject;
-    reader.readAsDataURL(pdf.output('blob'));
-  });
-
 /**
- * Save the PDF to the device cache directory and return its native URI.
- * The cache dir never needs WRITE_EXTERNAL_STORAGE permission.
+ * Detect Capacitor native app via window.Capacitor (injected by the runtime).
+ * Using window.Capacitor directly is safer than importing @capacitor/core
+ * because it works even if the bundle import path has issues.
  */
-const saveToCache = async (pdf, fileName) => {
-  const base64 = await toBase64(pdf);
-  const result = await Filesystem.writeFile({
-    path:      fileName,
-    data:      base64,
-    directory: Directory.Cache,
-    recursive: true,
-  });
-  return result.uri;
+export const isNative = () => {
+  try {
+    return !!(window?.Capacitor?.isNativePlatform?.());
+  } catch {
+    return false;
+  }
 };
 
+/** jsPDF → base64 string (synchronous, no FileReader needed) */
+const pdfBase64 = (pdf) => pdf.output('datauristring').split(',')[1];
+
 /**
- * Download (save) the PDF.
- *   Native  → writes to Documents folder (appears in Files app / My Files)
- *   Web     → triggers browser download via jsPDF.save()
+ * DOWNLOAD the PDF.
+ *   Native → cache + Share sheet so user can save to Downloads/Drive/etc.
+ *   Web    → blob-URL anchor click (works in all modern browsers)
  */
 export const downloadPdf = async (pdf, fileName) => {
   if (isNative()) {
-    const base64 = await toBase64(pdf);
-    await Filesystem.writeFile({
-      path:      fileName,
-      data:      base64,
-      directory: Directory.Documents,
+    const result = await Filesystem.writeFile({
+      path: fileName,
+      data: pdfBase64(pdf),
+      directory: Directory.Cache,
       recursive: true,
     });
+    await Share.share({
+      title: fileName,
+      url: result.uri,
+      dialogTitle: 'Save PDF to…',
+    });
   } else {
-    pdf.save(fileName);
+    const blob = pdf.output('blob');
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
   }
 };
 
 /**
- * Share the PDF as a file.
- *   Native  → saves to cache, opens Android share sheet (WhatsApp, Drive, etc.)
- *   Web     → uses Web Share API with file blob; falls back to pdf.save()
+ * SHARE the PDF as a file (WhatsApp, Drive, email, etc.).
+ *   Native → Capacitor Share plugin (opens Android share sheet with the file)
+ *   Web    → Web Share API with File object; falls back to blob-URL download
  */
 export const sharePdf = async (pdf, fileName, title) => {
   if (isNative()) {
-    const uri = await saveToCache(pdf, fileName);
+    const result = await Filesystem.writeFile({
+      path: fileName,
+      data: pdfBase64(pdf),
+      directory: Directory.Cache,
+      recursive: true,
+    });
     await Share.share({
       title,
-      url:         uri,
+      url: result.uri,
       dialogTitle: 'Share PDF via…',
     });
   } else {
     const blob = pdf.output('blob');
     const file = new File([blob], fileName, { type: 'application/pdf' });
-    const canShare =
-      typeof navigator.canShare === 'function' &&
-      navigator.canShare({ files: [file] });
-    if (canShare) {
-      await navigator.share({ title, files: [file] });
-    } else {
-      pdf.save(fileName);
+    // Try Web Share API with file (works on mobile Chrome / Safari)
+    if (typeof navigator?.share === 'function') {
+      try {
+        await navigator.share({ title, files: [file] });
+        return;
+      } catch (e) {
+        if (e.name === 'AbortError') return; // user dismissed — not an error
+        // Not supported with files → fall through to download
+      }
     }
+    // Desktop fallback: download the file
+    await downloadPdf(pdf, fileName);
   }
 };

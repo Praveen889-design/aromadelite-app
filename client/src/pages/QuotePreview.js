@@ -251,48 +251,55 @@ export default function QuotePreview() {
       html2canvas(headerRef.current, { scale, useCORS: true, backgroundColor: '#ffffff' }),
     ]);
 
-    const pdf    = new jsPDF({ unit: 'pt', format: 'a4', compress: true });
-    const pageW  = pdf.internal.pageSize.getWidth();
-    const pageH  = pdf.internal.pageSize.getHeight();
+    const pdf   = new jsPDF({ unit: 'pt', format: 'a4', compress: true });
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
 
-    // px ↔ pt conversion (fullCanvas rendered at same width as pageW)
+    // pt per px — based on fullCanvas width matching pageW exactly
     const pxToPt  = pageW / fullCanvas.width;
-    const pageHpx = Math.round(pageH / pxToPt);          // page height in source pixels
-    const hdrHpx  = headerCanvas.height;                  // header height in source pixels
-    const hdrHpt  = hdrHpx * pxToPt;                     // header height in pt
+    const pageHpx = pageH / pxToPt; // keep float — rounding causes drift across pages
 
-    // Helper: crop a horizontal band out of a canvas, returns dataURL
-    const cropCanvas = (src, srcY, srcH) => {
-      const c = document.createElement('canvas');
-      c.width  = src.width;
-      c.height = srcH;
-      c.getContext('2d').drawImage(src, 0, srcY, src.width, srcH, 0, 0, src.width, srcH);
-      return c.toDataURL('image/png');
+    // Normalise header to the SAME pixel width as fullCanvas so pxToPt applies
+    // (headerCanvas may have a different natural width if the element has padding)
+    const hdrNormH = Math.round((headerCanvas.height / headerCanvas.width) * fullCanvas.width);
+    const hdrHpt   = hdrNormH * pxToPt;
+
+    // Reuse ONE temp canvas for all crops (avoids creating many large canvas objects)
+    const tmp    = document.createElement('canvas');
+    tmp.width    = fullCanvas.width;
+    const tmpCtx = tmp.getContext('2d');
+
+    const crop = (src, srcY, srcH, srcNatW) => {
+      const h = Math.ceil(Math.min(srcH, src.height - srcY));
+      if (h <= 0) return null;
+      tmp.height = h;
+      tmpCtx.clearRect(0, 0, tmp.width, h);
+      // drawImage with explicit dest width normalises header to fullCanvas width
+      tmpCtx.drawImage(src, 0, srcY, srcNatW, srcH, 0, 0, tmp.width, h);
+      return tmp.toDataURL('image/jpeg', 0.92); // JPEG = ~4× smaller than PNG
     };
 
-    const headerImgData = cropCanvas(headerCanvas, 0, hdrHpx);
+    // Pre-render normalised header once
+    const hdrData = crop(headerCanvas, 0, headerCanvas.height, headerCanvas.width);
 
-    // ── Page 1: crop exactly one page-height worth of content ──
-    const p1H = Math.min(pageHpx, fullCanvas.height);
-    pdf.addImage(cropCanvas(fullCanvas, 0, p1H), 'PNG', 0, 0, pageW, p1H * pxToPt, undefined, 'FAST');
+    // Page 1 — first slice of the full document
+    const p1H    = Math.min(pageHpx, fullCanvas.height);
+    const p1Data = crop(fullCanvas, 0, p1H, fullCanvas.width);
+    pdf.addImage(p1Data, 'JPEG', 0, 0, pageW, p1H * pxToPt, undefined, 'FAST');
 
-    // ── Page 2+: header + next content slice ──
+    // Page 2+ — header stripe + next content slice (no overlap, exact pixel boundary)
     let srcY = pageHpx;
     while (srcY < fullCanvas.height) {
       pdf.addPage();
-
-      // header at top
-      pdf.addImage(headerImgData, 'PNG', 0, 0, pageW, hdrHpt, undefined, 'FAST');
-
-      // content slice below header
-      const sliceHpx = Math.min(pageHpx - hdrHpx, fullCanvas.height - srcY);
-      if (sliceHpx > 0) {
-        pdf.addImage(
-          cropCanvas(fullCanvas, srcY, sliceHpx),
-          'PNG', 0, hdrHpt, pageW, sliceHpx * pxToPt, undefined, 'FAST'
-        );
+      pdf.addImage(hdrData, 'JPEG', 0, 0, pageW, hdrHpt, undefined, 'FAST');
+      const sliceH = Math.min(pageHpx - hdrNormH, fullCanvas.height - srcY);
+      if (sliceH > 0) {
+        const sliceData = crop(fullCanvas, srcY, sliceH, fullCanvas.width);
+        if (sliceData) {
+          pdf.addImage(sliceData, 'JPEG', 0, hdrHpt, pageW, sliceH * pxToPt, undefined, 'FAST');
+        }
       }
-      srcY += (pageHpx - hdrHpx);
+      srcY += (pageHpx - hdrNormH);
     }
     return pdf;
   };
@@ -381,29 +388,29 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
   };
 
   /* ── WhatsApp direct ────────────────────────────────────────── */
-  /* ── WhatsApp: on native share PDF file, on web send text link ── */
+  /* ── WhatsApp: always try PDF first on both web and native ── */
   const onShareWhatsApp = async () => {
-    if (isNative() && docRef.current) {
-      // Native APK → share the PDF file so receiver gets the actual document
-      setSharingPdf(true);
-      try {
-        const pdf  = await buildPdf();
-        const name = `Aromadelite_Quote_${quote.number}.pdf`;
-        await sharePdf(pdf, name, `Quote ${quote.number} – Aromadelite`);
-        toast('PDF shared.', { kind: 'success' });
-      } catch (e) {
-        if (e?.message !== 'Share canceled') toast('Share failed.', { kind: 'error' });
-      } finally {
-        setSharingPdf(false);
+    if (!docRef.current) return;
+    setSharingPdf(true);
+    try {
+      const pdf  = await buildPdf();
+      const name = `Aromadelite_Quote_${quote.number}.pdf`;
+      // sharePdf: native → Capacitor Share sheet | web → navigator.share or download
+      await sharePdf(pdf, name, `Quote ${quote.number} – Aromadelite`);
+      toast('PDF shared.', { kind: 'success' });
+    } catch (e) {
+      const cancelled = e?.name === 'AbortError' || e?.message === 'Share canceled';
+      if (!cancelled) {
+        // Last resort: open WhatsApp with text (desktop browsers without share API)
+        const msg   = buildWhatsAppMessage();
+        const phone = (client.phone || '').replace(/\D/g, '');
+        const url   = phone
+          ? `https://wa.me/${phone.length === 10 ? '91' + phone : phone}?text=${encodeURIComponent(msg)}`
+          : `https://wa.me/?text=${encodeURIComponent(msg)}`;
+        window.open(url, '_blank', 'noopener,noreferrer');
       }
-    } else {
-      // Web → open WhatsApp with the pre-filled text message
-      const msg   = buildWhatsAppMessage();
-      const phone = (client.phone || '').replace(/\D/g, '');
-      const url   = phone
-        ? `https://wa.me/${phone.length === 10 ? '91' + phone : phone}?text=${encodeURIComponent(msg)}`
-        : `https://wa.me/?text=${encodeURIComponent(msg)}`;
-      window.open(url, '_blank', 'noopener,noreferrer');
+    } finally {
+      setSharingPdf(false);
     }
   };
 
