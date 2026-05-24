@@ -6,6 +6,8 @@ import MyQuotes from './pages/MyQuotes';
 import Products from './pages/Products';
 import NewQuote from './pages/NewQuote';
 import QuotePreview from './pages/QuotePreview';
+import BillBuilder from './pages/BillBuilder';
+import BillPreview from './pages/BillPreview';
 import Leads from './pages/Leads';
 import AdminPanel from './pages/AdminPanel';
 import Layout from './components/Layout';
@@ -32,6 +34,8 @@ export default function App() {
           <Route path="quotes/new" element={<NewQuote />} />
           <Route path="quotes/:id" element={<QuotePreview />} />
           <Route path="quotes"     element={<MyQuotes />} />
+          <Route path="bills/new/:quoteId" element={<BillBuilder />} />
+          <Route path="bills/:id"          element={<BillPreview />} />
           <Route path="products"   element={<Products />} />
           <Route path="leads"      element={<Leads />} />
           <Route

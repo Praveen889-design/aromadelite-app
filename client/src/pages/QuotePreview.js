@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import api from '../utils/api';
@@ -104,8 +104,11 @@ export default function QuotePreview() {
   const { toast } = useToast();
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
+  const navigate = useNavigate();
   const [downloading, setDownloading] = useState(false);
   const [marking, setMarking] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [showStatusMenu, setShowStatusMenu] = useState(false);
   const [editDates, setEditDates] = useState(false);
   const [datesForm, setDatesForm] = useState({ next_follow_up_date: '', expected_order_date: '' });
   const [savingDates, setSavingDates] = useState(false);
@@ -353,12 +356,51 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
     }
   };
 
+  const onUpdateStatus = async (status) => {
+    setShowStatusMenu(false);
+    setUpdatingStatus(true);
+    try {
+      await api.patch(`/api/quotes/${id}/status`, { status });
+      const labels = {
+        accepted: 'Quote accepted! 🎉',
+        modifications_required: 'Marked: Modifications Required.',
+        hold: 'Quote placed on Hold.',
+        rejected: 'Quote marked as Rejected.',
+      };
+      toast(labels[status] || 'Status updated.', { kind: status === 'accepted' ? 'success' : 'info' });
+      await fetchQuote();
+    } catch (e) {
+      toast(e?.response?.data?.error || 'Failed to update status', { kind: 'error' });
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
+
   const statusPill = {
-    draft:    'bg-slate-100 text-slate-700',
-    sent:     'bg-blue-100 text-blue-800',
-    accepted: 'bg-emerald-100 text-emerald-800',
-    rejected: 'bg-rose-100 text-rose-700',
+    draft:                 'bg-slate-100 text-slate-700',
+    sent:                  'bg-blue-100 text-blue-800',
+    accepted:              'bg-emerald-100 text-emerald-800',
+    modifications_required:'bg-amber-100 text-amber-800',
+    hold:                  'bg-purple-100 text-purple-800',
+    rejected:              'bg-rose-100 text-rose-700',
   }[quote.status] || 'bg-slate-100 text-slate-700';
+
+  const statusLabel = {
+    draft:                 'Draft',
+    sent:                  'Sent',
+    accepted:              'Accepted',
+    modifications_required:'Modifications Required',
+    hold:                  'Hold',
+    rejected:              'Rejected',
+  }[quote.status] || quote.status;
+
+  /* Status options shown after quote is sent */
+  const CLIENT_STATUSES = [
+    { value: 'accepted',               label: '✅ Accepted',               color: '#059669' },
+    { value: 'modifications_required', label: '✏️ Modifications Required',  color: '#d97706' },
+    { value: 'hold',                   label: '⏸️ Hold',                    color: '#7c3aed' },
+    { value: 'rejected',               label: '❌ Rejected',                color: '#dc2626' },
+  ];
 
   /* ── derive onMobile for label tweaks ── */
   const onMobile = isCapacitor() || (typeof window !== 'undefined' && window.innerWidth < 640);
@@ -371,7 +413,7 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
         {/* Row 1: status chip + quote number */}
         <div className="flex items-center gap-2 flex-wrap">
           <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide ${statusPill}`}>
-            {quote.status}
+            {statusLabel}
           </span>
           <span className="text-xs font-mono text-slate-500">{quote.number}</span>
           {quote.next_follow_up_date && (
@@ -445,21 +487,85 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
             </button>
           )}
 
-          {/* Mark as sent */}
-          <button
-            type="button"
-            onClick={onMarkSent}
-            disabled={marking || quote.status === 'sent' || quote.status === 'accepted'}
-            className="inline-flex items-center gap-2 bg-[#1F6BC7] hover:bg-[#155DA6] text-white text-sm font-semibold rounded-xl px-4 py-2.5 shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
-            style={{ minHeight: 44 }}
-          >
-            <CheckIcon />
-            <span>
-              {quote.status === 'sent' || quote.status === 'accepted'
-                ? 'Sent ✓'
-                : marking ? 'Updating…' : 'Mark Sent'}
-            </span>
-          </button>
+          {/* Mark as sent (only for draft) */}
+          {quote.status === 'draft' && (
+            <button
+              type="button"
+              onClick={onMarkSent}
+              disabled={marking}
+              className="inline-flex items-center gap-2 bg-[#1F6BC7] hover:bg-[#155DA6] text-white text-sm font-semibold rounded-xl px-4 py-2.5 shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+              style={{ minHeight: 44 }}
+            >
+              <CheckIcon />
+              <span>{marking ? 'Updating…' : 'Mark Sent'}</span>
+            </button>
+          )}
+
+          {/* Client response status dropdown — shown once quote is sent */}
+          {['sent', 'modifications_required', 'hold'].includes(quote.status) && (
+            <div style={{ position: 'relative' }}>
+              <button
+                type="button"
+                onClick={() => setShowStatusMenu((p) => !p)}
+                disabled={updatingStatus}
+                className="inline-flex items-center gap-2 bg-slate-700 hover:bg-slate-800 text-white text-sm font-semibold rounded-xl px-4 py-2.5 shadow-sm disabled:opacity-60"
+                style={{ minHeight: 44 }}
+              >
+                <span>{updatingStatus ? 'Updating…' : '📋 Update Status'}</span>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+              </button>
+              {showStatusMenu && (
+                <div
+                  style={{
+                    position: 'absolute', top: '110%', left: 0, zIndex: 50,
+                    background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12,
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.12)', minWidth: 220,
+                    padding: 6,
+                  }}
+                >
+                  {CLIENT_STATUSES.map((s) => (
+                    <button
+                      key={s.value}
+                      type="button"
+                      onClick={() => onUpdateStatus(s.value)}
+                      style={{
+                        display: 'block', width: '100%', textAlign: 'left',
+                        padding: '9px 14px', fontSize: 13, fontWeight: 600,
+                        color: s.color, background: 'transparent', border: 'none',
+                        borderRadius: 8, cursor: 'pointer',
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = '#F8FAFC'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                    >
+                      {s.label}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setShowStatusMenu(false)}
+                    style={{
+                      display: 'block', width: '100%', textAlign: 'left',
+                      padding: '7px 14px', fontSize: 12, color: '#94a3b8',
+                      background: 'transparent', border: 'none',
+                      borderTop: '1px solid #f1f5f9', marginTop: 4, cursor: 'pointer',
+                    }}
+                  >Cancel</button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Generate Bill — shown only when accepted */}
+          {quote.status === 'accepted' && (
+            <button
+              type="button"
+              onClick={() => navigate(`/bills/new/${id}`)}
+              className="inline-flex items-center gap-2 text-white text-sm font-bold rounded-xl px-5 py-2.5 shadow-sm"
+              style={{ minHeight: 44, background: 'linear-gradient(135deg, #059669, #047857)', fontFamily: 'Manrope, sans-serif' }}
+            >
+              <span>📄 Generate Bill</span>
+            </button>
+          )}
 
           <Link
             to="/quotes/new"

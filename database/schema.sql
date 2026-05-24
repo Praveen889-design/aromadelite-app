@@ -61,7 +61,7 @@ CREATE TABLE IF NOT EXISTS quotes (
   validity_days        INTEGER NOT NULL DEFAULT 30,
   notes                TEXT,
   status               TEXT NOT NULL DEFAULT 'draft'
-                         CHECK (status IN ('draft', 'sent', 'accepted', 'rejected')),
+                         CHECK (status IN ('draft', 'sent', 'accepted', 'modifications_required', 'hold', 'rejected')),
   created_at           TEXT NOT NULL DEFAULT (datetime('now')),
   FOREIGN KEY (employee_id) REFERENCES employees(id)
 );
@@ -81,7 +81,7 @@ CREATE TABLE IF NOT EXISTS leads (
                             ('Bulk', 'Monthly Contract', 'Distributor')),
   estimated_monthly_value REAL DEFAULT 0,
   status                  TEXT NOT NULL DEFAULT 'new'
-                            CHECK (status IN ('new', 'contacted', 'qualified', 'converted', 'lost')),
+                            CHECK (status IN ('new', 'contacted', 'negotiating', 'qualified', 'converted', 'lost')),
   follow_up_date          TEXT,
   notes                   TEXT,
   created_at              TEXT NOT NULL DEFAULT (datetime('now')),
@@ -89,6 +89,37 @@ CREATE TABLE IF NOT EXISTS leads (
   FOREIGN KEY (quote_id) REFERENCES quotes(id),
   FOREIGN KEY (employee_id) REFERENCES employees(id)
 );
+
+CREATE TABLE IF NOT EXISTS bills (
+  id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+  bill_number          TEXT UNIQUE NOT NULL,              -- ARO-BILL-2025-0001
+  quote_id             INTEGER,
+  employee_id          INTEGER NOT NULL,
+  client_name          TEXT NOT NULL,
+  client_business_name TEXT,
+  client_type          TEXT,
+  client_phone         TEXT,
+  client_email         TEXT,
+  client_city          TEXT,
+  requirement_type     TEXT,
+  items                TEXT NOT NULL DEFAULT '[]',        -- JSON
+  gst_mode             TEXT NOT NULL DEFAULT 'with_gst'
+                         CHECK (gst_mode IN ('with_gst', 'without_gst')),
+  subtotal             REAL NOT NULL DEFAULT 0,
+  gst_amount           REAL NOT NULL DEFAULT 0,
+  total_amount         REAL NOT NULL DEFAULT 0,
+  notes                TEXT,
+  status               TEXT NOT NULL DEFAULT 'draft'
+                         CHECK (status IN ('draft', 'issued', 'paid', 'cancelled')),
+  created_at           TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at           TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (quote_id)    REFERENCES quotes(id),
+  FOREIGN KEY (employee_id) REFERENCES employees(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_bills_employee     ON bills(employee_id);
+CREATE INDEX IF NOT EXISTS idx_bills_quote        ON bills(quote_id);
+CREATE INDEX IF NOT EXISTS idx_bills_status       ON bills(status);
 
 CREATE INDEX IF NOT EXISTS idx_employees_role     ON employees(role);
 CREATE INDEX IF NOT EXISTS idx_products_category  ON products(category_id);

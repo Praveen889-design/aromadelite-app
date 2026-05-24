@@ -209,7 +209,7 @@ router.patch('/:id/status', async (req, res) => {
   const client = await pool.connect();
   try {
     const { status } = req.body || {};
-    if (!['draft', 'sent', 'accepted', 'rejected'].includes(status)) {
+    if (!['draft', 'sent', 'accepted', 'modifications_required', 'hold', 'rejected'].includes(status)) {
       return res.status(400).json({ error: 'Invalid status' });
     }
     const { rows } = await pool.query('SELECT * FROM quotes WHERE id = $1', [req.params.id]);
@@ -232,6 +232,11 @@ router.patch('/:id/status', async (req, res) => {
     } else if (status === 'rejected') {
       await client.query(
         "UPDATE leads SET status = 'lost', updated_at = NOW() WHERE quote_id = $1",
+        [req.params.id]
+      );
+    } else if (status === 'modifications_required' || status === 'hold') {
+      await client.query(
+        "UPDATE leads SET status = 'negotiating', updated_at = NOW() WHERE quote_id = $1 AND status NOT IN ('lost','converted')",
         [req.params.id]
       );
     } else if (status === 'sent') {

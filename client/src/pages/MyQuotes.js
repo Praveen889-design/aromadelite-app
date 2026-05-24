@@ -18,10 +18,12 @@ const CLIENT_EMOJI = {
 };
 
 const STATUS_CONFIG = {
-  sent:     { bg: '#CFFAFE', fg: '#155E75', border: '#0891B2', label: 'Sent' },
-  draft:    { bg: '#E5E7EB', fg: '#374151', border: '#9CA3AF', label: 'Draft' },
-  accepted: { bg: '#D1FAE5', fg: '#065F46', border: '#059669', label: '✓ Accepted', check: true },
-  rejected: { bg: '#FEE2E2', fg: '#991B1B', border: '#EF4444', label: 'Rejected' },
+  sent:                  { bg: '#CFFAFE', fg: '#155E75',  border: '#0891B2', label: 'Sent' },
+  draft:                 { bg: '#E5E7EB', fg: '#374151',  border: '#9CA3AF', label: 'Draft' },
+  accepted:              { bg: '#D1FAE5', fg: '#065F46',  border: '#059669', label: '✓ Accepted' },
+  modifications_required:{ bg: '#FEF3C7', fg: '#92400E',  border: '#F59E0B', label: '✏️ Modifications' },
+  hold:                  { bg: '#EDE9FE', fg: '#4C1D95',  border: '#7C3AED', label: '⏸ Hold' },
+  rejected:              { bg: '#FEE2E2', fg: '#991B1B',  border: '#EF4444', label: 'Rejected' },
 };
 
 const StatusBadge = ({ status }) => {
@@ -53,18 +55,19 @@ const FilterTab = ({ children, active, onClick }) => (
   }}>{children}</button>
 );
 
-const QuoteCard = ({ quote, onClick }) => {
+const QuoteCard = ({ quote, onClick, onGenerateBill }) => {
   const status = (quote.status || 'draft').toLowerCase();
   const isDraft = status === 'draft';
   const isRejected = status === 'rejected';
+  const isAccepted = status === 'accepted';
   const emoji = CLIENT_EMOJI[quote.client_type] || '📦';
 
   return (
     <div onClick={onClick} style={{
       background: isDraft ? '#F8FAFC' : '#FFFFFF',
       border: '1px solid',
-      borderColor: isRejected ? '#FECACA' : '#A5F3FC',
-      borderLeft: isRejected ? '4px solid #EF4444' : '1px solid #A5F3FC',
+      borderColor: isAccepted ? '#6EE7B7' : isRejected ? '#FECACA' : '#A5F3FC',
+      borderLeft: isAccepted ? '4px solid #059669' : isRejected ? '4px solid #EF4444' : '1px solid #A5F3FC',
       borderRadius: 14,
       padding: 14,
       cursor: 'pointer',
@@ -163,6 +166,27 @@ const QuoteCard = ({ quote, onClick }) => {
             fontFamily: "'Nunito', sans-serif", fontWeight: 700, fontSize: 12,
             cursor: 'pointer',
           }}>Revise Quote</button>
+        ) : isAccepted ? (
+          <>
+            <button onClick={(e) => { e.stopPropagation(); onClick(); }} style={smallActionBtn('#059669')}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+              View
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); onGenerateBill && onGenerateBill(quote.id); }}
+              style={{
+                height: 30, padding: '0 12px',
+                border: 'none', borderRadius: 8,
+                background: 'linear-gradient(135deg, #059669, #047857)',
+                color: '#FFFFFF',
+                fontFamily: "'Source Sans 3', sans-serif", fontWeight: 700, fontSize: 11.5,
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                cursor: 'pointer',
+              }}
+            >
+              📄 Generate Bill
+            </button>
+          </>
         ) : (
           <>
             <button onClick={(e) => { e.stopPropagation(); onClick(); }} style={smallActionBtn('#0E7490')}>
@@ -193,8 +217,16 @@ const smallActionBtn = (borderColor, bg) => ({
   cursor: 'pointer',
 });
 
-const FILTERS = ['all', 'draft', 'sent', 'accepted', 'rejected'];
-const FILTER_LABELS = { all: 'All', draft: 'Draft', sent: 'Sent', accepted: 'Accepted', rejected: 'Rejected' };
+const FILTERS = ['all', 'draft', 'sent', 'accepted', 'modifications_required', 'hold', 'rejected'];
+const FILTER_LABELS = {
+  all: 'All',
+  draft: 'Draft',
+  sent: 'Sent',
+  accepted: '✓ Accepted',
+  modifications_required: '✏️ Modifications',
+  hold: '⏸ Hold',
+  rejected: 'Rejected',
+};
 
 export default function MyQuotes() {
   const navigate = useNavigate();
@@ -285,6 +317,7 @@ export default function MyQuotes() {
               key={q.id}
               quote={q}
               onClick={() => navigate(`/quotes/${q.id}`)}
+              onGenerateBill={(qid) => navigate(`/bills/new/${qid}`)}
             />
           ))}
         </div>
