@@ -22,6 +22,7 @@ export default function LeadDetailModal({ leadId, open, onClose, onUpdated }) {
   const [itemsOpen, setItemsOpen] = useState(false);
   const [status, setStatus] = useState('new');
   const [followUp, setFollowUp] = useState('');
+  const [followUpNote, setFollowUpNote] = useState('');
   const [newNote, setNewNote] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -39,6 +40,7 @@ export default function LeadDetailModal({ leadId, open, onClose, onUpdated }) {
         setLead(data.lead);
         setStatus(data.lead.status);
         setFollowUp(data.lead.follow_up_date || '');
+        setFollowUpNote(data.lead.follow_up_note || '');
       } catch (e) {
         setError(e?.response?.data?.error || 'Failed to load lead');
       }
@@ -72,6 +74,7 @@ export default function LeadDetailModal({ leadId, open, onClose, onUpdated }) {
         status,
         notes: mergedNotes,
         follow_up_date: followUp || null,
+        follow_up_note: followUpNote || null,
       });
       setLead(data.lead);
       setNewNote('');
@@ -184,29 +187,44 @@ export default function LeadDetailModal({ leadId, open, onClose, onUpdated }) {
               )}
 
               {/* Update form */}
-              <section className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <label className="block">
-                  <div className="text-xs font-medium text-slate-700 mb-1">Status</div>
-                  <select
-                    value={status}
-                    onChange={(e) => setStatus(e.target.value)}
-                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-600"
-                  >
-                    {Object.entries(STATUS_LABEL).map(([v, l]) => (
-                      <option key={v} value={v}>{l}</option>
-                    ))}
-                  </select>
-                </label>
-                <label className="block">
-                  <div className="text-xs font-medium text-slate-700 mb-1">Follow-up date</div>
-                  <input
-                    type="date"
-                    value={followUp || ''}
-                    min={todayISO()}
-                    onChange={(e) => setFollowUp(e.target.value)}
-                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-600"
-                  />
-                </label>
+              <section className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <label className="block">
+                    <div className="text-xs font-medium text-slate-700 mb-1">Status</div>
+                    <select
+                      value={status}
+                      onChange={(e) => setStatus(e.target.value)}
+                      className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-600"
+                    >
+                      {Object.entries(STATUS_LABEL).map(([v, l]) => (
+                        <option key={v} value={v}>{l}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="block">
+                    <div className="text-xs font-medium text-slate-700 mb-1">Follow-up date</div>
+                    <input
+                      type="date"
+                      value={followUp || ''}
+                      min={todayISO()}
+                      onChange={(e) => setFollowUp(e.target.value)}
+                      className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-600"
+                    />
+                  </label>
+                </div>
+                {/* Follow-up note — shown only when a date is set */}
+                {followUp && (
+                  <label className="block">
+                    <div className="text-xs font-medium text-slate-700 mb-1">📌 What to follow up on</div>
+                    <input
+                      type="text"
+                      value={followUpNote}
+                      onChange={(e) => setFollowUpNote(e.target.value)}
+                      placeholder="e.g. Call about pricing, Send revised quote, Check stock…"
+                      className="w-full border border-cyan-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-600 bg-cyan-50"
+                    />
+                  </label>
+                )}
               </section>
 
               <section>

@@ -9,6 +9,7 @@ import CommissionTab from './admin/CommissionTab';
 import UnitsTab from './admin/UnitsTab';
 import SettingsTab from './admin/SettingsTab';
 import PaymentPendingTab from './admin/PaymentPendingTab';
+import FollowUpsTab from './admin/FollowUpsTab';
 import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
 import { useToast } from '../components/Toast';
@@ -1996,6 +1997,7 @@ function OverviewTab() {
 const TABS = [
   { id: 'overview',   label: 'Overview'   },
   { id: 'payment',    label: '⏳ Payments' },
+  { id: 'followups',  label: '🔔 Follow-ups' },
   { id: 'team',       label: 'Team'       },
   { id: 'products',   label: 'Products'   },
   { id: 'quotes',     label: 'All Quotes' },
@@ -2011,8 +2013,9 @@ export default function AdminPanel() {
   const { user } = useAuth();
   const [tab, setTab] = useState('overview');
   const [tabFilters, setTabFilters] = useState({});
-  const [pendingModCount, setPendingModCount]       = useState(0);
+  const [pendingModCount, setPendingModCount]         = useState(0);
   const [pendingPaymentCount, setPendingPaymentCount] = useState(0);
+  const [followUpCount, setFollowUpCount]             = useState(0);
 
   useEffect(() => {
     api.get('/api/quotes')
@@ -2024,6 +2027,9 @@ export default function AdminPanel() {
     api.get('/api/bills/payment-pending')
       .then(({ data }) => setPendingPaymentCount((data.bills || []).length))
       .catch(() => {});
+    api.get('/api/leads/followups/due')
+      .then(({ data }) => setFollowUpCount((data.leads || []).length))
+      .catch(() => {});
   }, [tab]);
 
   const switchTab = (id, filters = {}) => { setTab(id); setTabFilters(filters); };
@@ -2032,7 +2038,7 @@ export default function AdminPanel() {
   const dateStr = now.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' });
 
   const TAB_ICONS = {
-    overview: '◉', payment: '⏳', team: '👥', products: '📦', quotes: '🧾',
+    overview: '◉', payment: '⏳', followups: '🔔', team: '👥', products: '📦', quotes: '🧾',
     leads: '📋', units: '🏭', discounts: '💸', commissions: '💰',
     reports: '📊', settings: '⚙️',
   };
@@ -2083,8 +2089,9 @@ export default function AdminPanel() {
         <div style={{ display: 'flex', minWidth: 'max-content', padding: '0 4px' }}>
           {TABS.map((t) => {
             const active = tab === t.id;
-            const badge = t.id === 'quotes' && pendingModCount > 0   ? { count: pendingModCount, color: '#ea580c' }
-                        : t.id === 'payment' && pendingPaymentCount > 0 ? { count: pendingPaymentCount, color: '#d97706' }
+            const badge = t.id === 'quotes'    && pendingModCount > 0     ? { count: pendingModCount,    color: '#ea580c' }
+                        : t.id === 'payment'   && pendingPaymentCount > 0 ? { count: pendingPaymentCount, color: '#d97706' }
+                        : t.id === 'followups' && followUpCount > 0       ? { count: followUpCount,       color: '#6366f1' }
                         : null;
             return (
               <button key={t.id} onClick={() => switchTab(t.id)} style={{
@@ -2118,8 +2125,9 @@ export default function AdminPanel() {
 
       {/* ── Tab content ── */}
       <div style={{ padding: '20px 0', flex: 1 }}>
-        {tab === 'overview'  && <OverviewTab />}
-        {tab === 'payment'   && <PaymentPendingTab />}
+        {tab === 'overview'   && <OverviewTab />}
+        {tab === 'payment'    && <PaymentPendingTab />}
+        {tab === 'followups'  && <FollowUpsTab />}
         {tab === 'team'      && <TeamTab onSwitchTab={switchTab} />}
         {tab === 'products'  && <ProductsTab />}
         {tab === 'quotes'    && <QuotesTab initialFilters={tabFilters} />}

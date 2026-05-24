@@ -60,11 +60,21 @@ const STATUS_BG = {
 export default function Dashboard() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
-  const [stats, setStats]             = useState(null);
-  const [recent, setRecent]           = useState([]);
-  const [pendingPayments, setPending] = useState([]);
-  const [loading, setLoading]         = useState(true);
-  const [error, setError]             = useState('');
+  const [stats, setStats]                   = useState(null);
+  const [recent, setRecent]                 = useState([]);
+  const [pendingPayments, setPending]       = useState([]);
+  const [followUpsDue, setFollowUpsDue]     = useState([]);
+  const [rescheduling, setRescheduling]     = useState({}); // leadId → 'date' string
+  const [actionLoading, setActionLoading]   = useState({}); // leadId → bool
+  const [loading, setLoading]               = useState(true);
+  const [error, setError]                   = useState('');
+
+  const loadFollowUps = async () => {
+    try {
+      const { data } = await api.get('/api/leads/followups/due');
+      setFollowUpsDue(data.leads || []);
+    } catch { /* silent */ }
+  };
 
   useEffect(() => {
     (async () => {
@@ -83,7 +93,31 @@ export default function Dashboard() {
         setLoading(false);
       }
     })();
-  }, []);
+    loadFollowUps();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Mark a follow-up as done — clears the date so it leaves the list
+  const markDone = async (leadId) => {
+    setActionLoading((p) => ({ ...p, [leadId]: true }));
+    try {
+      await api.patch(`/api/leads/${leadId}`, { follow_up_date: null, follow_up_note: null });
+      setFollowUpsDue((p) => p.filter((l) => l.id !== leadId));
+    } catch { /* toast not needed — silent retry */ }
+    finally { setActionLoading((p) => ({ ...p, [leadId]: false })); }
+  };
+
+  // Save a rescheduled date
+  const saveReschedule = async (leadId) => {
+    const newDate = rescheduling[leadId];
+    if (!newDate) return;
+    setActionLoading((p) => ({ ...p, [leadId]: true }));
+    try {
+      await api.patch(`/api/leads/${leadId}`, { follow_up_date: newDate });
+      setFollowUpsDue((p) => p.filter((l) => l.id !== leadId)); // remove from due list
+      setRescheduling((p) => { const n = { ...p }; delete n[leadId]; return n; });
+    } catch { /* silent */ }
+    finally { setActionLoading((p) => ({ ...p, [leadId]: false })); }
+  };
 
   const greeting = useMemo(() => {
     const first = user?.name?.split(/\s+/)[0] || '';
@@ -146,6 +180,132 @@ export default function Dashboard() {
           )}
         </div>
       </div>
+
+      {/* ── FOLLOW-UP REMINDERS SECTION ── */}
+      {followUpsDue.length > 0 && (
+        <div className="rounded-xl border-2 overflow-hidden" style={{ borderColor: '#a5b4fc' }}>
+          {/* Header */}
+          <div className="flex items-center justify-between px-4 py-3"
+               style={{ background: 'linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%)', borderBottom: '1px solid #c7d2fe' }}>
+            <div className="flex items-center gap-2">
+              <span className="text-lg">🔔</span>
+              <span className="font-bold text-sm" style={{ color: '#3730a3' }}>
+                Follow-ups Due — {followUpsDue.length} lead{followUpsDue.length !== 1 ? 's' : ''}
+              </span>
+              <span className="text-xs px-2 py-0.5 rounded-full font-bold"
+                    style={{ background: '#6366f1', color: '#fff' }}>
+                Action Required
+              </span>
+            </div>
+            <Link to="/leads" className="text-xs font-semibold" style={{ color: '#4338ca', textDecoration: 'none' }}>
+              View all leads →
+            </Link>
+          </div>
+
+          {/* Lead rows */}
+          <div style={{ background: '#fff' }}>
+            {followUpsDue.map((l, i) => {
+              const dueDate = l.follow_up_date ? new Date(l.follow_up_date + 'T00:00:00') : null;
+              const today   = new Date(); today.setHours(0,0,0,0);
+              const daysOverdue = dueDate ? Math.floor((today - dueDate) / 86400000) : 0;
+              const isOverdue  = daysOverdue > 0;
+              const isRescheduling = rescheduling[l.id] !== undefined;
+              const busy = actionLoading[l.id];
+
+              return (
+                <div key={l.id}
+                     className="px-4 py-3"
+                     style={{ borderBottom: i < followUpsDue.length - 1 ? '1px solid #eef2ff' : 'none' }}>
+                  <div className="flex items-start justify-between gap-3 flex-wrap">
+                    {/* Lead info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap mb-1">
+                        <span className="font-bold text-sm text-slate-900 truncate">
+                          {l.client_business_name || l.client_name}
+                        </span>
+                        {isOverdue ? (
+                          <span className="text-xs px-2 py-0.5 rounded-full font-bold"
+                                style={{ background: '#fee2e2', color: '#991b1b' }}>
+                            {daysOverdue}d overdue
+                          </span>
+                        ) : (
+                          <span className="text-xs px-2 py-0.5 rounded-full font-bold"
+                                style={{ background: '#dcfce7', color: '#15803d' }}>
+                            Due today
+                          </span>
+                        )}
+                        <span className="text-xs px-2 py-0.5 rounded-full font-medium capitalize"
+                              style={{ background: '#f1f5f9', color: '#475569' }}>
+                          {l.status}
+                        </span>
+                      </div>
+                      {/* Follow-up note */}
+                      {l.follow_up_note && (
+                        <div className="text-xs font-semibold mb-1" style={{ color: '#4338ca' }}>
+                          📌 {l.follow_up_note}
+                        </div>
+                      )}
+                      <div className="text-xs text-slate-500">
+                        {l.client_name}{l.client_city ? ` · ${l.client_city}` : ''}
+                        {isAdmin && l.employee_name ? ` · 👤 ${l.employee_name}` : ''}
+                        {l.quote_total ? ` · ${formatINR(l.quote_total)}` : ''}
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
+                      {isRescheduling ? (
+                        <>
+                          <input
+                            type="date"
+                            min={new Date().toISOString().slice(0, 10)}
+                            value={rescheduling[l.id] || ''}
+                            onChange={(e) => setRescheduling((p) => ({ ...p, [l.id]: e.target.value }))}
+                            className="border border-indigo-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                          />
+                          <button
+                            disabled={!rescheduling[l.id] || busy}
+                            onClick={() => saveReschedule(l.id)}
+                            className="text-xs font-bold px-3 py-1.5 rounded-lg disabled:opacity-50"
+                            style={{ background: '#6366f1', color: '#fff' }}>
+                            {busy ? '…' : 'Save'}
+                          </button>
+                          <button
+                            onClick={() => setRescheduling((p) => { const n = { ...p }; delete n[l.id]; return n; })}
+                            className="text-xs font-semibold px-2 py-1.5 rounded-lg border border-slate-300 text-slate-600">
+                            Cancel
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            disabled={busy}
+                            onClick={() => markDone(l.id)}
+                            className="text-xs font-bold px-3 py-1.5 rounded-lg disabled:opacity-50"
+                            style={{ background: '#dcfce7', color: '#15803d', border: '1px solid #86efac' }}>
+                            {busy ? '…' : '✓ Done'}
+                          </button>
+                          <button
+                            onClick={() => setRescheduling((p) => ({ ...p, [l.id]: '' }))}
+                            className="text-xs font-semibold px-3 py-1.5 rounded-lg"
+                            style={{ background: '#eef2ff', color: '#4338ca', border: '1px solid #c7d2fe' }}>
+                            📅 Reschedule
+                          </button>
+                          <Link to="/leads"
+                                className="text-xs font-semibold px-3 py-1.5 rounded-lg"
+                                style={{ background: '#f8fafc', color: '#475569', border: '1px solid #e2e8f0', textDecoration: 'none' }}>
+                            Open
+                          </Link>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* ── PAYMENT PENDING ALERT SECTION ── */}
       {pendingPayments.length > 0 && (
