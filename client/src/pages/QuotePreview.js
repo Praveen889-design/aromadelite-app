@@ -143,7 +143,8 @@ export default function QuotePreview() {
   const [reviewingMod, setReviewingMod] = useState(false);
   const [rejectNote, setRejectNote] = useState('');
   const [showRejectInput, setShowRejectInput] = useState(false);
-  const docRef = useRef(null);
+  const docRef    = useRef(null);
+  const headerRef = useRef(null);
 
   const fetchQuote = async () => {
     try {
@@ -243,32 +244,41 @@ export default function QuotePreview() {
 
   const fileName = `Aromadelite_Quote_${quote.number}.pdf`;
 
+  /* ── Shared PDF builder with repeating header on every page ── */
+  const buildPdf = async () => {
+    const scale = 2;
+    const [fullCanvas, headerCanvas] = await Promise.all([
+      html2canvas(docRef.current,    { scale, useCORS: true, backgroundColor: '#ffffff' }),
+      html2canvas(headerRef.current, { scale, useCORS: true, backgroundColor: '#ffffff' }),
+    ]);
+    const fullImgData   = fullCanvas.toDataURL('image/png');
+    const headerImgData = headerCanvas.toDataURL('image/png');
+
+    const pdf   = new jsPDF({ unit: 'pt', format: 'a4', compress: true });
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
+    const fullH    = (fullCanvas.height   * pageW) / fullCanvas.width;
+    const headerH  = (headerCanvas.height * pageW) / headerCanvas.width;
+
+    // Page 1 — full content at y=0 (header is already inside the content)
+    pdf.addImage(fullImgData, 'PNG', 0, 0, pageW, fullH, undefined, 'FAST');
+
+    // Page 2+ — repeat header, then continue content below it
+    let offset = pageH; // content already shown (in pt)
+    while (offset < fullH) {
+      pdf.addPage();
+      pdf.addImage(headerImgData, 'PNG', 0, 0, pageW, headerH, undefined, 'FAST');
+      pdf.addImage(fullImgData,   'PNG', 0, headerH - offset, pageW, fullH, undefined, 'FAST');
+      offset += (pageH - headerH);
+    }
+    return pdf;
+  };
+
   const onDownloadPdf = async () => {
     if (!docRef.current) return;
     setDownloading(true);
     try {
-      const canvas = await html2canvas(docRef.current, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: '#ffffff',
-      });
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF({ unit: 'pt', format: 'a4', compress: true });
-      const pageW = pdf.internal.pageSize.getWidth();
-      const pageH = pdf.internal.pageSize.getHeight();
-      const imgW = pageW;
-      const imgH = (canvas.height * imgW) / canvas.width;
-
-      let remaining = imgH;
-      let y = 0;
-      while (remaining > 0) {
-        pdf.addImage(imgData, 'PNG', 0, y, imgW, imgH, undefined, 'FAST');
-        remaining -= pageH;
-        if (remaining > 0) {
-          pdf.addPage();
-          y -= pageH;
-        }
-      }
+      const pdf = await buildPdf();
       pdf.save(fileName);
       toast('PDF downloaded.', { kind: 'success' });
     } catch (e) {
@@ -378,19 +388,7 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
     if (!docRef.current) return;
     setSharingPdf(true);
     try {
-      const canvas = await html2canvas(docRef.current, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF({ unit: 'pt', format: 'a4', compress: true });
-      const pageW = pdf.internal.pageSize.getWidth();
-      const pageH = pdf.internal.pageSize.getHeight();
-      const imgH = (canvas.height * pageW) / canvas.width;
-      let remaining = imgH, y = 0;
-      while (remaining > 0) {
-        pdf.addImage(imgData, 'PNG', 0, y, pageW, imgH, undefined, 'FAST');
-        remaining -= pageH;
-        if (remaining > 0) { pdf.addPage(); y -= pageH; }
-      }
-
+      const pdf = await buildPdf();
       const pdfName = `Aromadelite_Quote_${quote.number}.pdf`;
 
       // Try native file share (works in Capacitor & modern mobile browsers)
@@ -1096,7 +1094,7 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
           <div style={{ border: '1.5px solid #000' }}>
 
             {/* ── Company Header ── */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '12px 16px', borderBottom: '1.5px solid #000' }}>
+            <div ref={headerRef} style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '12px 16px', borderBottom: '1.5px solid #000' }}>
               <div style={{ width: 110, height: 72, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <img src="/aromadelite-logo.png" alt="Aromadelite" style={{ width: 110, height: 'auto', maxHeight: 72, objectFit: 'contain' }} />
               </div>

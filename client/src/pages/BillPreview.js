@@ -87,7 +87,8 @@ const TD = ({ children, style }) => (
 export default function BillPreview() {
   const { id } = useParams();
   const { toast } = useToast();
-  const docRef = useRef(null);
+  const docRef    = useRef(null);
+  const headerRef = useRef(null);
 
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
@@ -156,19 +157,32 @@ export default function BillPreview() {
     }
   };
 
-  /* ── PDF builder ── */
+  /* ── PDF builder with repeating header on every page ── */
   const buildPdf = async () => {
-    const canvas = await html2canvas(docRef.current, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
-    const pdf = new jsPDF({ unit: 'pt', format: 'a4', compress: true });
+    const scale = 2;
+    const [fullCanvas, headerCanvas] = await Promise.all([
+      html2canvas(docRef.current,    { scale, useCORS: true, backgroundColor: '#ffffff' }),
+      html2canvas(headerRef.current, { scale, useCORS: true, backgroundColor: '#ffffff' }),
+    ]);
+    const fullImgData   = fullCanvas.toDataURL('image/png');
+    const headerImgData = headerCanvas.toDataURL('image/png');
+
+    const pdf   = new jsPDF({ unit: 'pt', format: 'a4', compress: true });
     const pageW = pdf.internal.pageSize.getWidth();
     const pageH = pdf.internal.pageSize.getHeight();
-    const imgH  = (canvas.height * pageW) / canvas.width;
-    const imgData = canvas.toDataURL('image/png');
-    let remaining = imgH, y = 0;
-    while (remaining > 0) {
-      pdf.addImage(imgData, 'PNG', 0, y, pageW, imgH, undefined, 'FAST');
-      remaining -= pageH;
-      if (remaining > 0) { pdf.addPage(); y -= pageH; }
+    const fullH   = (fullCanvas.height   * pageW) / fullCanvas.width;
+    const headerH = (headerCanvas.height * pageW) / headerCanvas.width;
+
+    // Page 1 — full content at y=0 (header is already inside the content)
+    pdf.addImage(fullImgData, 'PNG', 0, 0, pageW, fullH, undefined, 'FAST');
+
+    // Page 2+ — repeat header, then continue content below it
+    let offset = pageH;
+    while (offset < fullH) {
+      pdf.addPage();
+      pdf.addImage(headerImgData, 'PNG', 0, 0, pageW, headerH, undefined, 'FAST');
+      pdf.addImage(fullImgData,   'PNG', 0, headerH - offset, pageW, fullH, undefined, 'FAST');
+      offset += (pageH - headerH);
     }
     return pdf;
   };
@@ -294,7 +308,7 @@ export default function BillPreview() {
           <div style={{ border: '1.5px solid #000', marginBottom: 0 }}>
 
             {/* ── Company Header ── */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '12px 16px', borderBottom: '1.5px solid #000' }}>
+            <div ref={headerRef} style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '12px 16px', borderBottom: '1.5px solid #000' }}>
               {/* Logo */}
               <div style={{ width: 110, height: 72, display: 'flex', alignItems: 'center', justifyContent: 'center',
                 flexShrink: 0 }}>
