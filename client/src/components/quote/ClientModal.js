@@ -134,8 +134,31 @@ export default function ClientModal({ initial, open, submitting, onClose, onSubm
           </Field>
 
           <Field label="City" required error={errors.client_city}>
-            <input className={inputCls} value={v.client_city}
-              onChange={(e) => upd({ client_city: e.target.value })} placeholder="Hyderabad" />
+            <select
+              className={inputCls}
+              value={['Hyderabad','Nizamabad','Warangal','Siddipet'].includes(v.client_city) ? v.client_city : v.client_city ? 'Others' : ''}
+              onChange={(e) => {
+                if (e.target.value === 'Others') upd({ client_city: '' });
+                else upd({ client_city: e.target.value });
+              }}
+            >
+              <option value="">Select city…</option>
+              <option value="Hyderabad">Hyderabad</option>
+              <option value="Nizamabad">Nizamabad</option>
+              <option value="Warangal">Warangal</option>
+              <option value="Siddipet">Siddipet</option>
+              <option value="Others">Others</option>
+            </select>
+            {/* Free-text input shown when Others is selected */}
+            {v.client_city !== '' && !['Hyderabad','Nizamabad','Warangal','Siddipet'].includes(v.client_city) && (
+              <input
+                className={`${inputCls} mt-1.5`}
+                value={v.client_city}
+                onChange={(e) => upd({ client_city: e.target.value })}
+                placeholder="Enter city name…"
+                autoFocus
+              />
+            )}
           </Field>
           <Field label="Validity (days)">
             <input className={inputCls} type="number" min={1} max={180} value={v.validity_days}
