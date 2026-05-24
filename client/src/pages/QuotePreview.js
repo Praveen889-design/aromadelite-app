@@ -244,32 +244,56 @@ export default function QuotePreview() {
 
   const fileName = `Aromadelite_Quote_${quote.number}.pdf`;
 
-  /* ── Shared PDF builder with repeating header on every page ── */
+  /* ── Shared PDF builder — canvas-sliced, header repeats on every page ── */
   const buildPdf = async () => {
     const scale = 2;
     const [fullCanvas, headerCanvas] = await Promise.all([
       html2canvas(docRef.current,    { scale, useCORS: true, backgroundColor: '#ffffff' }),
       html2canvas(headerRef.current, { scale, useCORS: true, backgroundColor: '#ffffff' }),
     ]);
-    const fullImgData   = fullCanvas.toDataURL('image/png');
-    const headerImgData = headerCanvas.toDataURL('image/png');
 
-    const pdf   = new jsPDF({ unit: 'pt', format: 'a4', compress: true });
-    const pageW = pdf.internal.pageSize.getWidth();
-    const pageH = pdf.internal.pageSize.getHeight();
-    const fullH    = (fullCanvas.height   * pageW) / fullCanvas.width;
-    const headerH  = (headerCanvas.height * pageW) / headerCanvas.width;
+    const pdf    = new jsPDF({ unit: 'pt', format: 'a4', compress: true });
+    const pageW  = pdf.internal.pageSize.getWidth();
+    const pageH  = pdf.internal.pageSize.getHeight();
 
-    // Page 1 — full content at y=0 (header is already inside the content)
-    pdf.addImage(fullImgData, 'PNG', 0, 0, pageW, fullH, undefined, 'FAST');
+    // px ↔ pt conversion (fullCanvas rendered at same width as pageW)
+    const pxToPt  = pageW / fullCanvas.width;
+    const pageHpx = Math.round(pageH / pxToPt);          // page height in source pixels
+    const hdrHpx  = headerCanvas.height;                  // header height in source pixels
+    const hdrHpt  = hdrHpx * pxToPt;                     // header height in pt
 
-    // Page 2+ — repeat header, then continue content below it
-    let offset = pageH; // content already shown (in pt)
-    while (offset < fullH) {
+    // Helper: crop a horizontal band out of a canvas, returns dataURL
+    const cropCanvas = (src, srcY, srcH) => {
+      const c = document.createElement('canvas');
+      c.width  = src.width;
+      c.height = srcH;
+      c.getContext('2d').drawImage(src, 0, srcY, src.width, srcH, 0, 0, src.width, srcH);
+      return c.toDataURL('image/png');
+    };
+
+    const headerImgData = cropCanvas(headerCanvas, 0, hdrHpx);
+
+    // ── Page 1: crop exactly one page-height worth of content ──
+    const p1H = Math.min(pageHpx, fullCanvas.height);
+    pdf.addImage(cropCanvas(fullCanvas, 0, p1H), 'PNG', 0, 0, pageW, p1H * pxToPt, undefined, 'FAST');
+
+    // ── Page 2+: header + next content slice ──
+    let srcY = pageHpx;
+    while (srcY < fullCanvas.height) {
       pdf.addPage();
-      pdf.addImage(headerImgData, 'PNG', 0, 0, pageW, headerH, undefined, 'FAST');
-      pdf.addImage(fullImgData,   'PNG', 0, headerH - offset, pageW, fullH, undefined, 'FAST');
-      offset += (pageH - headerH);
+
+      // header at top
+      pdf.addImage(headerImgData, 'PNG', 0, 0, pageW, hdrHpt, undefined, 'FAST');
+
+      // content slice below header
+      const sliceHpx = Math.min(pageHpx - hdrHpx, fullCanvas.height - srcY);
+      if (sliceHpx > 0) {
+        pdf.addImage(
+          cropCanvas(fullCanvas, srcY, sliceHpx),
+          'PNG', 0, hdrHpt, pageW, sliceHpx * pxToPt, undefined, 'FAST'
+        );
+      }
+      srcY += (pageHpx - hdrHpx);
     }
     return pdf;
   };
