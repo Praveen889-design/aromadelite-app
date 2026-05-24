@@ -5,8 +5,12 @@ const { requireAuth } = require('../middleware/auth');
 const router = express.Router();
 router.use(requireAuth);
 
+// bills.items is JSONB — pg driver returns it already parsed as a JS array/object.
+// TEXT columns (like quotes.items) still come as strings needing JSON.parse.
+// This function handles both cases.
 const parseJSON = (s, fallback = null) => {
   if (s == null) return fallback;
+  if (typeof s !== 'string') return s; // already parsed by pg (JSONB column)
   try { return JSON.parse(s); } catch { return fallback; }
 };
 
