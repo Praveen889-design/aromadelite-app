@@ -801,7 +801,15 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
               </thead>
               <tbody>
                 {items.map((it, i) => {
-                  const lineTotal = it.line_total || 0;
+                  const lineTotal  = it.line_total || 0;
+                  const gst        = Number(it.gst_percent) || 0;
+                  // For without_gst: show GST-inclusive unit price so client sees one clean number
+                  const dispUnit   = isWithoutGst
+                    ? +(it.unit_price * (1 + gst / 100)).toFixed(2)
+                    : it.unit_price;
+                  const dispSysUnit = isWithoutGst
+                    ? +(it.system_price * (1 + gst / 100)).toFixed(2)
+                    : it.system_price;
                   return (
                     <tr key={i} style={{ background: i % 2 === 0 ? '#ffffff' : '#fafafa' }}>
                       <TD style={{ textAlign: 'center', color: '#666' }}>{i + 1}</TD>
@@ -820,11 +828,11 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
                         {it.system_price && it.system_price > it.unit_price ? (
                           <div>
                             <div style={{ textDecoration: 'line-through', color: '#9CA3AF', fontSize: 9 }}>
-                              ₹ {fmtNum(it.system_price)}
+                              ₹ {fmtNum(dispSysUnit)}
                             </div>
-                            <div style={{ color: '#059669', fontWeight: 600 }}>₹ {fmtNum(it.unit_price)}</div>
+                            <div style={{ color: '#059669', fontWeight: 600 }}>₹ {fmtNum(dispUnit)}</div>
                           </div>
-                        ) : `₹ ${fmtNum(it.unit_price)}`}
+                        ) : `₹ ${fmtNum(dispUnit)}`}
                       </TD>
                       <TD style={{ textAlign: 'right', borderRight: 'none', fontWeight: 600 }}>
                         ₹ {fmtNum(lineTotal)}
