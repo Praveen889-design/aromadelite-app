@@ -1394,11 +1394,9 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
               Terms &amp; Conditions:
             </div>
             <div style={{ padding: '6px 10px', fontSize: 10, color: '#555', lineHeight: 1.7 }}>
-              1. This quotation is valid for {quote.validity_days || 7} days from date of issue.
+              1. This quotation is valid for 7 days from date of issue.
               &nbsp;&nbsp;2. Prices are subject to change without prior notice.
-              &nbsp;&nbsp;3. {isWithoutGst ? 'Prices are inclusive of applicable GST.' : 'GST (CGST + SGST) will be charged as applicable.'}
-              &nbsp;&nbsp;4. Delivery within 5–7 working days from confirmed order.
-              &nbsp;&nbsp;5. Payment terms: 50% advance, balance against delivery.
+              &nbsp;&nbsp;3. Delivery within 3–5 working days from confirmed order.
             </div>
           </div>
 
