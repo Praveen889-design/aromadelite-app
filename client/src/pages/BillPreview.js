@@ -90,12 +90,19 @@ export default function BillPreview() {
   const docRef    = useRef(null);
   const headerRef = useRef(null);
 
-  const [data, setData] = useState(null);
-  const [error, setError] = useState('');
-  const [downloading, setDownloading] = useState(false);
-  const [sharingPdf, setSharingPdf] = useState(false);
-  const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [data, setData]                       = useState(null);
+  const [error, setError]                     = useState('');
+  const [downloading, setDownloading]         = useState(false);
+  const [sharingPdf, setSharingPdf]           = useState(false);
+  const [updatingStatus, setUpdatingStatus]   = useState(false);
   const [updatingPayment, setUpdatingPayment] = useState(false);
+
+  // Partial payments
+  const [payments, setPayments]               = useState([]);
+  const [showPayPanel, setShowPayPanel]       = useState(false);
+  const [payForm, setPayForm]                 = useState({ amount: '', method: 'cash', date: new Date().toISOString().slice(0,10), notes: '' });
+  const [savingPay, setSavingPay]             = useState(false);
+  const [deletingPay, setDeletingPay]         = useState(null);
 
   const fetchBill = async () => {
     try {
@@ -105,7 +112,54 @@ export default function BillPreview() {
       setError(e?.response?.data?.error || 'Failed to load bill');
     }
   };
-  useEffect(() => { fetchBill(); }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const fetchPayments = async () => {
+    try {
+      const res = await api.get(`/api/bills/${id}/payments`);
+      setPayments(res.data.payments || []);
+    } catch { /* silent */ }
+  };
+
+  useEffect(() => {
+    fetchBill();
+    fetchPayments();
+  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const recordPayment = async () => {
+    if (!payForm.amount || isNaN(Number(payForm.amount)) || Number(payForm.amount) <= 0) {
+      toast('Enter a valid amount', { kind: 'error' }); return;
+    }
+    setSavingPay(true);
+    try {
+      await api.post(`/api/bills/${id}/payments`, {
+        amount: Number(payForm.amount),
+        payment_method: payForm.method,
+        payment_date: payForm.date,
+        notes: payForm.notes || null,
+      });
+      toast('✅ Payment recorded!', { kind: 'success' });
+      setPayForm({ amount: '', method: 'cash', date: new Date().toISOString().slice(0,10), notes: '' });
+      setShowPayPanel(false);
+      await Promise.all([fetchBill(), fetchPayments()]);
+    } catch (e) {
+      toast(e?.response?.data?.error || 'Failed to record payment', { kind: 'error' });
+    } finally {
+      setSavingPay(false);
+    }
+  };
+
+  const deletePayment = async (pid) => {
+    setDeletingPay(pid);
+    try {
+      await api.delete(`/api/bills/${id}/payments/${pid}`);
+      toast('Payment entry removed', { kind: 'success' });
+      await Promise.all([fetchBill(), fetchPayments()]);
+    } catch (e) {
+      toast(e?.response?.data?.error || 'Failed', { kind: 'error' });
+    } finally {
+      setDeletingPay(null);
+    }
+  };
 
   const isWithoutGst = data?.bill?.gst_mode === 'without_gst';
 
@@ -144,7 +198,7 @@ export default function BillPreview() {
     cancelled: 'bg-rose-100 text-rose-700',
   }[bill.status] || 'bg-slate-100 text-slate-700';
 
-  /* ── Toggle payment status ── */
+  /* ── Mark full payment completed / revert to pending ── */
   const onTogglePayment = async () => {
     const newStatus = bill.payment_status === 'completed' ? 'pending' : 'completed';
     setUpdatingPayment(true);
@@ -152,11 +206,11 @@ export default function BillPreview() {
       await api.patch(`/api/bills/${id}/payment`, { payment_status: newStatus });
       toast(
         newStatus === 'completed'
-          ? '✅ Payment marked as completed. Lead converted!'
-          : 'Payment marked as pending.',
+          ? '✅ Full payment marked completed. Lead converted!'
+          : 'Payment reverted to pending.',
         { kind: 'success' }
       );
-      await fetchBill();
+      await Promise.all([fetchBill(), fetchPayments()]);
     } catch (e) {
       toast(e?.response?.data?.error || 'Failed to update payment', { kind: 'error' });
     } finally {
@@ -326,18 +380,22 @@ export default function BillPreview() {
             </button>
           )}
 
-          {/* ── Payment status toggle ── */}
+          {/* ── Payment status button ── */}
           {bill.payment_status === 'completed' ? (
             <button type="button" onClick={onTogglePayment} disabled={updatingPayment}
               className="inline-flex items-center gap-2 text-sm font-semibold rounded-xl px-4 py-2.5 shadow-sm disabled:opacity-60"
               style={{ minHeight: 44, background: '#d1fae5', color: '#065f46', border: '1.5px solid #6ee7b7' }}>
-              <span>{updatingPayment ? 'Updating…' : '✅ Payment Completed'}</span>
+              <span>{updatingPayment ? 'Updating…' : '✅ Paid in Full'}</span>
             </button>
           ) : (
-            <button type="button" onClick={onTogglePayment} disabled={updatingPayment}
-              className="inline-flex items-center gap-2 text-sm font-semibold rounded-xl px-4 py-2.5 shadow-sm disabled:opacity-60"
-              style={{ minHeight: 44, background: '#fef3c7', color: '#92400e', border: '1.5px solid #fcd34d' }}>
-              <span>{updatingPayment ? 'Updating…' : '⏳ Mark Payment Received'}</span>
+            <button type="button" onClick={() => setShowPayPanel((v) => !v)}
+              className="inline-flex items-center gap-2 text-sm font-semibold rounded-xl px-4 py-2.5 shadow-sm"
+              style={{ minHeight: 44,
+                background: bill.payment_status === 'partial' ? '#ede9fe' : '#fef3c7',
+                color:      bill.payment_status === 'partial' ? '#5b21b6' : '#92400e',
+                border:     bill.payment_status === 'partial' ? '1.5px solid #c4b5fd' : '1.5px solid #fcd34d',
+              }}>
+              <span>{bill.payment_status === 'partial' ? '💰 Partial — Record More' : '⏳ Record Payment'}</span>
             </button>
           )}
 
@@ -354,6 +412,202 @@ export default function BillPreview() {
           </Link>
         </div>
       </div>
+
+      {/* ── Payment Panel ── */}
+      {bill.payment_status !== 'completed' && (
+        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+          {/* Summary bar */}
+          <div className="flex items-center justify-between px-4 py-3 flex-wrap gap-2"
+               style={{ background: bill.payment_status === 'partial' ? 'linear-gradient(135deg,#faf5ff,#ede9fe)' : 'linear-gradient(135deg,#fffbeb,#fef3c7)',
+                        borderBottom: '1px solid #e2e8f0' }}>
+            <div className="flex gap-6 flex-wrap">
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Bill Total</div>
+                <div className="text-lg font-bold text-slate-900">{fmtINR(grandTotal)}</div>
+              </div>
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Paid</div>
+                <div className="text-lg font-bold text-emerald-700">{fmtINR(bill.amount_paid || 0)}</div>
+              </div>
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Balance Due</div>
+                <div className="text-lg font-bold text-rose-600">{fmtINR(Math.max(0, grandTotal - (bill.amount_paid || 0)))}</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {bill.payment_status === 'partial' && (
+                <button type="button" onClick={onTogglePayment} disabled={updatingPayment}
+                  className="text-xs font-bold px-3 py-1.5 rounded-lg disabled:opacity-50"
+                  style={{ background: '#d1fae5', color: '#065f46', border: '1px solid #6ee7b7' }}>
+                  {updatingPayment ? '…' : '✅ Mark Fully Paid'}
+                </button>
+              )}
+              <button type="button" onClick={() => setShowPayPanel((v) => !v)}
+                className="text-xs font-bold px-3 py-1.5 rounded-lg"
+                style={{ background: '#6366f1', color: '#fff', border: 'none', cursor: 'pointer' }}>
+                {showPayPanel ? 'Cancel' : '+ Record Payment'}
+              </button>
+            </div>
+          </div>
+
+          {/* Progress bar */}
+          {grandTotal > 0 && (
+            <div style={{ height: 6, background: '#f1f5f9' }}>
+              <div style={{
+                height: '100%',
+                width: `${Math.min(100, ((bill.amount_paid || 0) / grandTotal) * 100)}%`,
+                background: bill.payment_status === 'partial' ? '#8b5cf6' : '#10b981',
+                transition: 'width .4s',
+              }} />
+            </div>
+          )}
+
+          {/* Record payment form */}
+          {showPayPanel && (
+            <div className="px-4 py-4 border-b border-slate-100 space-y-3">
+              <div className="text-sm font-bold text-slate-800 mb-2">Record a Payment</div>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div>
+                  <label className="text-xs font-medium text-slate-600 block mb-1">Amount (₹) *</label>
+                  <input type="number" min="1" step="0.01"
+                    placeholder={`Max ${fmtINR(Math.max(0, grandTotal - (bill.amount_paid||0)))}`}
+                    value={payForm.amount}
+                    onChange={(e) => setPayForm((p) => ({ ...p, amount: e.target.value }))}
+                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-600 block mb-1">Method</label>
+                  <select value={payForm.method}
+                    onChange={(e) => setPayForm((p) => ({ ...p, method: e.target.value }))}
+                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <option value="cash">Cash</option>
+                    <option value="upi">UPI</option>
+                    <option value="bank_transfer">Bank Transfer</option>
+                    <option value="cheque">Cheque</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-600 block mb-1">Date</label>
+                  <input type="date" value={payForm.date}
+                    onChange={(e) => setPayForm((p) => ({ ...p, date: e.target.value }))}
+                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-600 block mb-1">Notes</label>
+                  <input type="text" placeholder="e.g. Ref no, cheque no…"
+                    value={payForm.notes}
+                    onChange={(e) => setPayForm((p) => ({ ...p, notes: e.target.value }))}
+                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button type="button" onClick={recordPayment} disabled={savingPay || !payForm.amount}
+                  className="px-5 py-2 text-sm font-bold rounded-lg disabled:opacity-50"
+                  style={{ background: '#6366f1', color: '#fff', border: 'none', cursor: savingPay ? 'not-allowed' : 'pointer' }}>
+                  {savingPay ? 'Saving…' : 'Save Payment'}
+                </button>
+                <button type="button" onClick={() => setShowPayPanel(false)}
+                  className="px-4 py-2 text-sm font-medium rounded-lg border border-slate-300 text-slate-600">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Payment history */}
+          {payments.length > 0 && (
+            <div className="divide-y divide-slate-100">
+              <div className="px-4 py-2 text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                Payment History
+              </div>
+              {payments.map((p) => (
+                <div key={p.id} className="flex items-center justify-between px-4 py-2.5 gap-3 flex-wrap">
+                  <div className="flex items-center gap-3">
+                    <span className="text-lg">
+                      {p.payment_method === 'cash' ? '💵' : p.payment_method === 'upi' ? '📱' : p.payment_method === 'cheque' ? '🧾' : '🏦'}
+                    </span>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-sm text-emerald-700">{fmtINR(p.amount)}</span>
+                        <span className="text-xs px-2 py-0.5 rounded-full capitalize font-medium"
+                              style={{ background: '#f1f5f9', color: '#475569' }}>
+                          {p.payment_method.replace('_',' ')}
+                        </span>
+                      </div>
+                      <div className="text-xs text-slate-500 mt-0.5">
+                        {new Date(p.payment_date + 'T00:00:00').toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' })}
+                        {p.recorded_by_name ? ` · by ${p.recorded_by_name}` : ''}
+                        {p.notes ? ` · ${p.notes}` : ''}
+                      </div>
+                    </div>
+                  </div>
+                  <button type="button"
+                    disabled={deletingPay === p.id}
+                    onClick={() => deletePayment(p.id)}
+                    className="text-xs text-rose-500 hover:text-rose-700 font-medium disabled:opacity-40 px-2 py-1 rounded">
+                    {deletingPay === p.id ? '…' : '✕ Remove'}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── When fully paid: compact receipt strip ── */}
+      {bill.payment_status === 'completed' && (
+        <div className="rounded-xl border border-emerald-200 overflow-hidden" style={{ background: '#f0fdf4' }}>
+          <div className="flex items-center justify-between px-4 py-3 flex-wrap gap-2">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">✅</span>
+              <div>
+                <div className="font-bold text-emerald-800 text-sm">Fully Paid — {fmtINR(grandTotal)}</div>
+                <div className="text-xs text-emerald-600">Lead converted · all payments received</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={() => setShowPayPanel((v) => !v)}
+                className="text-xs font-medium px-3 py-1.5 rounded-lg border border-emerald-200 text-emerald-700">
+                {showPayPanel ? 'Hide history' : `History (${payments.length})`}
+              </button>
+              <button type="button" onClick={onTogglePayment} disabled={updatingPayment}
+                className="text-xs font-medium px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 disabled:opacity-50">
+                {updatingPayment ? '…' : 'Revert to Pending'}
+              </button>
+            </div>
+          </div>
+          {showPayPanel && payments.length > 0 && (
+            <div className="border-t border-emerald-100 divide-y divide-emerald-50">
+              {payments.map((p) => (
+                <div key={p.id} className="flex items-center justify-between px-4 py-2.5 gap-3 flex-wrap">
+                  <div className="flex items-center gap-3">
+                    <span className="text-lg">
+                      {p.payment_method === 'cash' ? '💵' : p.payment_method === 'upi' ? '📱' : p.payment_method === 'cheque' ? '🧾' : '🏦'}
+                    </span>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-sm text-emerald-700">{fmtINR(p.amount)}</span>
+                        <span className="text-xs px-2 py-0.5 rounded-full capitalize font-medium"
+                              style={{ background: '#f1f5f9', color: '#475569' }}>
+                          {p.payment_method.replace('_',' ')}
+                        </span>
+                      </div>
+                      <div className="text-xs text-slate-500 mt-0.5">
+                        {new Date(p.payment_date + 'T00:00:00').toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' })}
+                        {p.recorded_by_name ? ` · by ${p.recorded_by_name}` : ''}
+                        {p.notes ? ` · ${p.notes}` : ''}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ══════════════════════════════════════════════════
           TAX INVOICE DOCUMENT  (Mediciti Template)

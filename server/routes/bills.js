@@ -140,7 +140,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-// GET /api/bills/payment-pending  — all bills with pending payment (admin sees all, associate sees own)
+// GET /api/bills/payment-pending  — pending + partial bills (admin sees all, associate sees own)
 // NOTE: must be declared BEFORE /:id to avoid "payment-pending" being parsed as an integer id
 router.get('/payment-pending', async (req, res) => {
   try {
@@ -149,13 +149,13 @@ router.get('/payment-pending', async (req, res) => {
       ? await pool.query(`
           SELECT b.*, e.name AS employee_name, e.employee_id AS employee_code, e.region
           FROM bills b JOIN employees e ON e.id = b.employee_id
-          WHERE b.payment_status = 'pending' AND b.status != 'cancelled'
+          WHERE b.payment_status IN ('pending','partial') AND b.status != 'cancelled'
           ORDER BY b.created_at DESC
         `)
       : await pool.query(`
           SELECT b.*, e.name AS employee_name, e.employee_id AS employee_code, e.region
           FROM bills b JOIN employees e ON e.id = b.employee_id
-          WHERE b.payment_status = 'pending' AND b.status != 'cancelled'
+          WHERE b.payment_status IN ('pending','partial') AND b.status != 'cancelled'
             AND b.employee_id = $1
           ORDER BY b.created_at DESC
         `, [req.user.id]);
@@ -163,6 +163,151 @@ router.get('/payment-pending', async (req, res) => {
     res.json({ bills: rows.map(hydrate) });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/bills/:id/payments  — list all payment entries for a bill
+router.get('/:id/payments', async (req, res) => {
+  try {
+    const { rows: bill } = await pool.query('SELECT * FROM bills WHERE id = $1', [req.params.id]);
+    if (!bill[0]) return res.status(404).json({ error: 'Bill not found' });
+    if (req.user.role !== 'admin' && bill[0].employee_id !== req.user.id) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    const { rows } = await pool.query(`
+      SELECT p.*, e.name AS recorded_by_name
+      FROM payments p LEFT JOIN employees e ON e.id = p.recorded_by
+      WHERE p.bill_id = $1
+      ORDER BY p.payment_date DESC, p.created_at DESC
+    `, [req.params.id]);
+    res.json({ payments: rows });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/bills/:id/payments  — record a partial / full payment
+router.post('/:id/payments', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const { amount, payment_method = 'cash', payment_date, notes } = req.body || {};
+    if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
+      return res.status(400).json({ error: 'amount must be a positive number' });
+    }
+
+    const { rows: billRows } = await pool.query(
+      `SELECT b.*, q.employee_id AS quote_employee_id
+       FROM bills b LEFT JOIN quotes q ON q.id = b.quote_id
+       WHERE b.id = $1`, [req.params.id]
+    );
+    if (!billRows[0]) return res.status(404).json({ error: 'Bill not found' });
+    const bill = billRows[0];
+    if (req.user.role !== 'admin' && bill.employee_id !== req.user.id) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const payAmt  = +Number(amount).toFixed(2);
+    const newPaid = +(Number(bill.amount_paid || 0) + payAmt).toFixed(2);
+    const total   = +Number(bill.total_amount).toFixed(2);
+    const newStatus = newPaid >= total ? 'completed' : 'partial';
+
+    await client.query('BEGIN');
+
+    // Insert payment record
+    await client.query(`
+      INSERT INTO payments (bill_id, amount, payment_method, payment_date, notes, recorded_by)
+      VALUES ($1, $2, $3, $4, $5, $6)
+    `, [req.params.id, payAmt, payment_method, payment_date || new Date().toISOString().slice(0, 10), notes || null, req.user.id]);
+
+    // Update bill amount_paid, payment_status, payment_completed_at
+    await client.query(`
+      UPDATE bills
+      SET amount_paid          = $1,
+          payment_status       = $2,
+          payment_completed_at = $3,
+          updated_at           = NOW()
+      WHERE id = $4
+    `, [
+      newPaid,
+      newStatus,
+      newStatus === 'completed' ? new Date() : null,
+      req.params.id,
+    ]);
+
+    // If fully paid → convert lead + accept quote
+    if (newStatus === 'completed' && bill.quote_id) {
+      await client.query(
+        `UPDATE leads SET status = 'converted', updated_at = NOW()
+         WHERE quote_id = $1 AND status != 'converted'`, [bill.quote_id]
+      );
+      await client.query(
+        `UPDATE quotes SET status = 'accepted' WHERE id = $1 AND status != 'accepted'`, [bill.quote_id]
+      );
+    }
+
+    await client.query('COMMIT');
+
+    const updated = await pool.query('SELECT * FROM bills WHERE id = $1', [req.params.id]);
+    res.status(201).json({ bill: hydrate(updated.rows[0]), amount_paid: newPaid, payment_status: newStatus });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ error: err.message });
+  } finally {
+    client.release();
+  }
+});
+
+// DELETE /api/bills/:id/payments/:pid  — remove a payment entry (admin only or own bill)
+router.delete('/:id/payments/:pid', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const { rows: billRows } = await pool.query('SELECT * FROM bills WHERE id = $1', [req.params.id]);
+    if (!billRows[0]) return res.status(404).json({ error: 'Bill not found' });
+    const bill = billRows[0];
+    if (req.user.role !== 'admin' && bill.employee_id !== req.user.id) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const { rows: pmtRows } = await pool.query('SELECT * FROM payments WHERE id = $1 AND bill_id = $2', [req.params.pid, req.params.id]);
+    if (!pmtRows[0]) return res.status(404).json({ error: 'Payment not found' });
+
+    await client.query('BEGIN');
+
+    await client.query('DELETE FROM payments WHERE id = $1', [req.params.pid]);
+
+    // Recalculate amount_paid from remaining entries
+    const { rows: sumRows } = await client.query(
+      'SELECT COALESCE(SUM(amount), 0) AS total FROM payments WHERE bill_id = $1', [req.params.id]
+    );
+    const newPaid   = +Number(sumRows[0].total).toFixed(2);
+    const total     = +Number(bill.total_amount).toFixed(2);
+    const newStatus = newPaid <= 0 ? 'pending' : newPaid >= total ? 'completed' : 'partial';
+
+    await client.query(`
+      UPDATE bills
+      SET amount_paid          = $1,
+          payment_status       = $2,
+          payment_completed_at = $3,
+          updated_at           = NOW()
+      WHERE id = $4
+    `, [newPaid, newStatus, newStatus === 'completed' ? bill.payment_completed_at : null, req.params.id]);
+
+    // If reverted from completed → revert lead
+    if (bill.payment_status === 'completed' && newStatus !== 'completed' && bill.quote_id) {
+      await client.query(
+        `UPDATE leads SET status = 'negotiating', updated_at = NOW()
+         WHERE quote_id = $1 AND status = 'converted'`, [bill.quote_id]
+      );
+    }
+
+    await client.query('COMMIT');
+    const updated = await pool.query('SELECT * FROM bills WHERE id = $1', [req.params.id]);
+    res.json({ bill: hydrate(updated.rows[0]) });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ error: err.message });
+  } finally {
+    client.release();
   }
 });
 
@@ -213,8 +358,8 @@ router.patch('/:id/payment', async (req, res) => {
   const client = await pool.connect();
   try {
     const { payment_status } = req.body || {};
-    if (!['pending', 'completed'].includes(payment_status)) {
-      return res.status(400).json({ error: 'payment_status must be "pending" or "completed"' });
+    if (!['pending', 'partial', 'completed'].includes(payment_status)) {
+      return res.status(400).json({ error: 'payment_status must be "pending", "partial", or "completed"' });
     }
 
     const { rows } = await pool.query(
