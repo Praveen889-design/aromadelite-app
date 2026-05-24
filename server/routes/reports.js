@@ -153,15 +153,16 @@ router.get('/pnl', async (req, res) => {
     }
 
     // Aggregate P&L
-    const catAgg      = new Map();
-    const prodAgg     = new Map();
+    const catAgg      = new Map(); // key: category name
+    const prodAgg     = new Map(); // key: product name → stores category too
     const assocAgg    = new Map();
     const cityAgg     = new Map();
 
-    const upsert = (map, key, delta) => {
-      const cur = map.get(key) || { revenue: 0, cogs: 0 };
+    const upsert = (map, key, delta, extra = {}) => {
+      const cur = map.get(key) || { revenue: 0, cogs: 0, ...extra };
       cur.revenue += delta.revenue;
       cur.cogs    += delta.cogs;
+      Object.assign(cur, extra); // keep latest meta
       map.set(key, cur);
     };
 
@@ -179,16 +180,17 @@ router.get('/pnl', async (req, res) => {
         const assoc = lead.associate_name || 'Unknown';
 
         upsert(catAgg,   cat,   delta);
-        upsert(prodAgg,  pname, delta);
+        upsert(prodAgg,  pname, delta, { category: cat });
         upsert(assocAgg, assoc, delta);
         upsert(cityAgg,  city,  delta);
       }
     }
 
-    const fmt = (map) =>
+    const fmt = (map, includeCategory = false) =>
       [...map.entries()]
         .map(([name, v]) => ({
           name,
+          ...(includeCategory ? { category: v.category || '' } : {}),
           revenue: +v.revenue.toFixed(2),
           cogs:    +v.cogs.toFixed(2),
           profit:  +(v.revenue - v.cogs).toFixed(2),
@@ -198,7 +200,7 @@ router.get('/pnl', async (req, res) => {
 
     res.json({
       by_category:  fmt(catAgg),
-      by_product:   fmt(prodAgg),
+      by_product:   fmt(prodAgg, true),
       by_associate: fmt(assocAgg),
       by_city:      fmt(cityAgg),
     });

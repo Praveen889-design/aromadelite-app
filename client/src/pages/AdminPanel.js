@@ -819,83 +819,285 @@ function AgingQuotesAlert() {
   );
 }
 
-// ─── P&L table ───────────────────────────────────────────────
+// ─── P&L Dashboard ───────────────────────────────────────────
 const fmtINR = (v) =>
   new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(v || 0);
 
-const PnlTable = ({ title, rows, emptyMsg = 'No data' }) => (
+const marginColor = (m) =>
+  m >= 50 ? { bg: '#dcfce7', text: '#15803d' } :
+  m >= 30 ? { bg: '#d1fae5', text: '#065f46' } :
+  m >= 10 ? { bg: '#fef3c7', text: '#92400e' } :
+            { bg: '#fee2e2', text: '#991b1b' };
+
+// Export all data as CSV
+const exportPnlCsv = (pnl) => {
+  const rows = [];
+  rows.push(['Section', 'Name', 'Category', 'Revenue (₹)', 'COGS (₹)', 'Gross Profit (₹)', 'Margin (%)']);
+
+  (pnl.by_product || []).forEach((r) =>
+    rows.push(['Product', r.name, r.category || '', r.revenue, r.cogs, r.profit, r.margin])
+  );
+  rows.push([]);
+  (pnl.by_category || []).forEach((r) =>
+    rows.push(['Category', r.name, '', r.revenue, r.cogs, r.profit, r.margin])
+  );
+  rows.push([]);
+  (pnl.by_associate || []).forEach((r) =>
+    rows.push(['Associate', r.name, '', r.revenue, r.cogs, r.profit, r.margin])
+  );
+  rows.push([]);
+  (pnl.by_city || []).forEach((r) =>
+    rows.push(['City', r.name, '', r.revenue, r.cogs, r.profit, r.margin])
+  );
+
+  const csv = rows.map((r) => r.map((c) => `"${String(c ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url;
+  a.download = `PnL_Report_${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+};
+
+// Compact side table for associate / city
+const PnlMiniTable = ({ title, icon, rows }) => (
   <div style={{
-    background: '#FFFFFF', border: '1px solid #ECFEFF',
-    borderRadius: 14, overflow: 'hidden',
-    boxShadow: '0 2px 10px rgba(8,42,56,.04)',
+    background: '#fff', borderRadius: 14, border: '1px solid #e2e8f0',
+    overflow: 'hidden', flex: 1, minWidth: 0,
   }}>
-    <div style={{ padding: '14px 16px 10px', borderBottom: '1px solid #F1F5F9' }}>
-      <h3 style={{
-        margin: 0,
-        fontFamily: "'Manrope', sans-serif", fontWeight: 800, fontSize: 14,
-        color: '#0F1620',
-      }}>{title}</h3>
+    <div style={{
+      padding: '14px 18px 10px', borderBottom: '1px solid #f1f5f9',
+      display: 'flex', alignItems: 'center', gap: 8,
+    }}>
+      <span style={{ fontSize: 16 }}>{icon}</span>
+      <span style={{ fontWeight: 800, fontSize: 13, color: '#0f172a' }}>{title}</span>
     </div>
     {rows.length === 0 ? (
-      <div style={{
-        padding: 24, textAlign: 'center',
-        fontFamily: "'Inter', sans-serif", fontSize: 13, color: '#6B7280',
-      }}>{emptyMsg}</div>
+      <div style={{ padding: '20px 18px', color: '#94a3b8', fontSize: 13, textAlign: 'center' }}>No data yet</div>
     ) : (
-      <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr style={{ background: '#F8FAFC' }}>
-              {['Name', 'Revenue', 'COGS', 'Gross Profit', 'Margin'].map((h, i) => (
-                <th key={i} style={{
-                  fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: 10,
-                  color: '#155DA6', letterSpacing: '.07em', textTransform: 'uppercase',
-                  padding: '9px 12px', textAlign: i === 0 ? 'left' : 'right',
-                  borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap',
-                }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r, i) => (
-              <tr key={i} style={{ borderBottom: '1px solid #F1F5F9', background: '#FFFFFF' }}>
-                <td style={{
-                  padding: '10px 12px',
-                  fontFamily: "'Manrope', sans-serif", fontWeight: 700, fontSize: 13,
-                  color: '#0F1620', maxWidth: 180,
-                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                }}>{r.name}</td>
-                <td style={{
-                  textAlign: 'right', padding: '10px 12px',
-                  fontFamily: "'Manrope', sans-serif", fontSize: 12, color: '#155DA6',
-                }}>{fmtINR(r.revenue)}</td>
-                <td style={{
-                  textAlign: 'right', padding: '10px 12px',
-                  fontFamily: "'Manrope', sans-serif", fontSize: 12, color: '#6B7280',
-                }}>{fmtINR(r.cogs)}</td>
-                <td style={{
-                  textAlign: 'right', padding: '10px 12px',
-                  fontFamily: "'Manrope', sans-serif", fontSize: 12,
-                  color: r.profit >= 0 ? '#065F46' : '#991B1B',
-                  fontWeight: 700,
-                }}>{fmtINR(r.profit)}</td>
-                <td style={{ textAlign: 'right', padding: '10px 12px' }}>
-                  <span style={{
-                    display: 'inline-block',
-                    background: r.margin >= 30 ? '#D1FAE5' : r.margin >= 10 ? '#FEF3C7' : '#FEE2E2',
-                    color: r.margin >= 30 ? '#065F46' : r.margin >= 10 ? '#92400E' : '#991B1B',
-                    fontFamily: "'Manrope', sans-serif", fontSize: 11, fontWeight: 700,
-                    padding: '2px 8px', borderRadius: 999,
-                  }}>{r.margin}%</span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div style={{ padding: '8px 0' }}>
+        {rows.map((r, i) => {
+          const mc = marginColor(r.margin);
+          const pct = rows[0].revenue > 0 ? (r.revenue / rows[0].revenue) * 100 : 0;
+          return (
+            <div key={i} style={{ padding: '10px 18px', borderBottom: i < rows.length - 1 ? '1px solid #f8fafc' : 'none' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+                <span style={{ fontWeight: 700, fontSize: 13, color: '#0f172a', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontWeight: 700, fontSize: 13, color: '#1e40af' }}>{fmtINR(r.revenue)}</span>
+                  <span style={{ background: mc.bg, color: mc.text, fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 20 }}>{r.margin}%</span>
+                </div>
+              </div>
+              <div style={{ height: 4, background: '#f1f5f9', borderRadius: 4, overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${Math.min(pct, 100)}%`, background: '#3b82f6', borderRadius: 4, transition: 'width .4s' }} />
+              </div>
+            </div>
+          );
+        })}
       </div>
     )}
   </div>
 );
+
+// Main P&L dashboard component
+const PnlDashboard = ({ pnl }) => {
+  const [expandedCat, setExpandedCat] = React.useState(null);
+
+  const cats      = pnl.by_category  || [];
+  const products  = pnl.by_product   || [];
+  const associates = pnl.by_associate || [];
+  const cities    = pnl.by_city       || [];
+
+  const totalRev    = cats.reduce((s, r) => s + r.revenue, 0);
+  const totalProfit = cats.reduce((s, r) => s + r.profit, 0);
+  const totalCogs   = cats.reduce((s, r) => s + r.cogs, 0);
+  const avgMargin   = totalRev > 0 ? +((totalProfit / totalRev) * 100).toFixed(1) : 0;
+
+  const productsByCategory = React.useMemo(() => {
+    const map = {};
+    products.forEach((p) => {
+      const key = p.category || 'Uncategorized';
+      if (!map[key]) map[key] = [];
+      map[key].push(p);
+    });
+    return map;
+  }, [products]);
+
+  const kpis = [
+    { label: 'Total Revenue', value: fmtINR(totalRev), icon: '💰', color: '#1e40af', bg: '#eff6ff', border: '#bfdbfe' },
+    { label: 'Gross Profit',  value: fmtINR(totalProfit), icon: '📈', color: '#065f46', bg: '#f0fdf4', border: '#86efac' },
+    { label: 'Total COGS',    value: fmtINR(totalCogs), icon: '🏭', color: '#92400e', bg: '#fffbeb', border: '#fcd34d' },
+    { label: 'Avg Margin',    value: `${avgMargin}%`, icon: '🎯', color: marginColor(avgMargin).text, bg: marginColor(avgMargin).bg, border: marginColor(avgMargin).bg },
+  ];
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+      {/* Header row */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: '#0f172a' }}>Profit & Loss</h3>
+          <span style={{
+            background: '#dcfce7', color: '#15803d', fontWeight: 700, fontSize: 10,
+            padding: '3px 10px', borderRadius: 20, letterSpacing: '.06em', textTransform: 'uppercase',
+            border: '1px solid #86efac',
+          }}>Converted Leads Only</span>
+        </div>
+        <button
+          onClick={() => exportPnlCsv(pnl)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            padding: '8px 16px', background: '#0f172a', color: '#fff',
+            border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 12,
+            cursor: 'pointer', whiteSpace: 'nowrap',
+          }}>
+          ⬇ Export CSV
+        </button>
+      </div>
+
+      {/* KPI cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
+        {kpis.map((k, i) => (
+          <div key={i} style={{
+            background: k.bg, border: `1.5px solid ${k.border}`, borderRadius: 14,
+            padding: '14px 16px',
+          }}>
+            <div style={{ fontSize: 18, marginBottom: 6 }}>{k.icon}</div>
+            <div style={{ fontSize: 18, fontWeight: 800, color: k.color, lineHeight: 1.1 }}>{k.value}</div>
+            <div style={{ fontSize: 11, color: '#64748b', marginTop: 3, fontWeight: 600 }}>{k.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Category breakdown — main table */}
+      <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+        <div style={{
+          padding: '16px 20px 12px', borderBottom: '1px solid #f1f5f9',
+          display: 'flex', alignItems: 'center', gap: 8,
+        }}>
+          <span style={{ fontSize: 16 }}>🗂</span>
+          <span style={{ fontWeight: 800, fontSize: 14, color: '#0f172a' }}>By Category</span>
+          <span style={{ fontSize: 12, color: '#94a3b8', marginLeft: 4 }}>Click a row to see products</span>
+        </div>
+
+        {cats.length === 0 ? (
+          <div style={{ padding: 32, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>No converted leads yet</div>
+        ) : (
+          <div>
+            {/* Table header */}
+            <div style={{
+              display: 'grid', gridTemplateColumns: '1fr 120px 100px 120px 80px 32px',
+              padding: '8px 20px', background: '#f8fafc',
+              borderBottom: '1px solid #e2e8f0',
+            }}>
+              {['Category', 'Revenue', 'COGS', 'Gross Profit', 'Margin', ''].map((h, i) => (
+                <div key={i} style={{
+                  fontSize: 10, fontWeight: 700, color: '#64748b',
+                  textTransform: 'uppercase', letterSpacing: '.06em',
+                  textAlign: i === 0 ? 'left' : 'right',
+                }}>{h}</div>
+              ))}
+            </div>
+
+            {cats.map((r, idx) => {
+              const mc   = marginColor(r.margin);
+              const pct  = totalRev > 0 ? (r.revenue / totalRev) * 100 : 0;
+              const isEx = expandedCat === r.name;
+              const prods = productsByCategory[r.name] || [];
+
+              return (
+                <div key={idx}>
+                  {/* Category row */}
+                  <div
+                    onClick={() => setExpandedCat(isEx ? null : r.name)}
+                    style={{
+                      display: 'grid', gridTemplateColumns: '1fr 120px 100px 120px 80px 32px',
+                      padding: '13px 20px', cursor: 'pointer',
+                      background: isEx ? '#f8fafc' : '#fff',
+                      borderBottom: '1px solid #f1f5f9',
+                      transition: 'background .15s',
+                    }}>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: 13, color: '#0f172a', marginBottom: 4 }}>{r.name}</div>
+                      <div style={{ height: 5, background: '#e2e8f0', borderRadius: 4, overflow: 'hidden', width: '90%' }}>
+                        <div style={{ height: '100%', width: `${Math.min(pct, 100)}%`, background: '#3b82f6', borderRadius: 4 }} />
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right', fontWeight: 700, fontSize: 13, color: '#1e40af', alignSelf: 'center' }}>{fmtINR(r.revenue)}</div>
+                    <div style={{ textAlign: 'right', fontSize: 13, color: '#64748b', alignSelf: 'center' }}>{fmtINR(r.cogs)}</div>
+                    <div style={{ textAlign: 'right', fontWeight: 700, fontSize: 13, color: r.profit >= 0 ? '#065f46' : '#991b1b', alignSelf: 'center' }}>{fmtINR(r.profit)}</div>
+                    <div style={{ textAlign: 'right', alignSelf: 'center' }}>
+                      <span style={{ background: mc.bg, color: mc.text, fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 20 }}>{r.margin}%</span>
+                    </div>
+                    <div style={{ textAlign: 'right', alignSelf: 'center', fontSize: 14, color: '#94a3b8', userSelect: 'none' }}>
+                      {isEx ? '▲' : '▼'}
+                    </div>
+                  </div>
+
+                  {/* Expanded product rows */}
+                  {isEx && prods.length > 0 && (
+                    <div style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                      {/* sub-header */}
+                      <div style={{
+                        display: 'grid', gridTemplateColumns: '1fr 120px 100px 120px 80px 32px',
+                        padding: '6px 20px 4px 36px',
+                      }}>
+                        {['Product', 'Revenue', 'COGS', 'Gross Profit', 'Margin', ''].map((h, i) => (
+                          <div key={i} style={{ fontSize: 9, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', textAlign: i === 0 ? 'left' : 'right' }}>{h}</div>
+                        ))}
+                      </div>
+                      {prods.map((p, pi) => {
+                        const pmc = marginColor(p.margin);
+                        return (
+                          <div key={pi} style={{
+                            display: 'grid', gridTemplateColumns: '1fr 120px 100px 120px 80px 32px',
+                            padding: '9px 20px 9px 36px',
+                            borderTop: '1px solid #e9eef4',
+                          }}>
+                            <div style={{ fontSize: 12, color: '#334155', fontWeight: 600 }}>{p.name}</div>
+                            <div style={{ textAlign: 'right', fontSize: 12, color: '#1e40af', fontWeight: 600 }}>{fmtINR(p.revenue)}</div>
+                            <div style={{ textAlign: 'right', fontSize: 12, color: '#64748b' }}>{fmtINR(p.cogs)}</div>
+                            <div style={{ textAlign: 'right', fontSize: 12, fontWeight: 700, color: p.profit >= 0 ? '#065f46' : '#991b1b' }}>{fmtINR(p.profit)}</div>
+                            <div style={{ textAlign: 'right' }}>
+                              <span style={{ background: pmc.bg, color: pmc.text, fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 20 }}>{p.margin}%</span>
+                            </div>
+                            <div />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            {/* Totals footer */}
+            <div style={{
+              display: 'grid', gridTemplateColumns: '1fr 120px 100px 120px 80px 32px',
+              padding: '12px 20px', background: '#0f172a', borderTop: '2px solid #e2e8f0',
+            }}>
+              <div style={{ fontWeight: 800, fontSize: 12, color: '#fff' }}>TOTAL</div>
+              <div style={{ textAlign: 'right', fontWeight: 800, fontSize: 13, color: '#93c5fd' }}>{fmtINR(totalRev)}</div>
+              <div style={{ textAlign: 'right', fontWeight: 700, fontSize: 13, color: '#94a3b8' }}>{fmtINR(totalCogs)}</div>
+              <div style={{ textAlign: 'right', fontWeight: 800, fontSize: 13, color: '#6ee7b7' }}>{fmtINR(totalProfit)}</div>
+              <div style={{ textAlign: 'right' }}>
+                <span style={{ background: marginColor(avgMargin).bg, color: marginColor(avgMargin).text, fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 20 }}>{avgMargin}%</span>
+              </div>
+              <div />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Associate + City side by side */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 14 }}>
+        <PnlMiniTable title="By Associate" icon="👤" rows={associates} />
+        <PnlMiniTable title="By City"      icon="📍" rows={cities} />
+      </div>
+    </div>
+  );
+};
 
 // ─── Top Clients ─────────────────────────────────────────────
 const CLIENT_TYPE_CFG = {
@@ -1724,31 +1926,7 @@ function OverviewTab() {
       <TargetVsActual />
 
       {/* P&L Dashboard */}
-      {pnl && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#0f172a' }}>
-              Profit &amp; Loss
-            </h3>
-            <span style={{
-              background: '#dcfce7', color: '#15803d',
-              fontWeight: 700, fontSize: 9.5,
-              padding: '3px 10px', borderRadius: 20, letterSpacing: '.06em', textTransform: 'uppercase',
-              border: '1px solid #86efac',
-            }}>Converted Leads Only</span>
-          </div>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-            gap: 14,
-          }}>
-            <PnlTable title="By Category"  rows={pnl.by_category  || []} emptyMsg="No converted leads yet" />
-            <PnlTable title="By Product"   rows={pnl.by_product   || []} emptyMsg="No converted leads yet" />
-            <PnlTable title="By Associate" rows={pnl.by_associate || []} emptyMsg="No converted leads yet" />
-            <PnlTable title="By City"      rows={pnl.by_city      || []} emptyMsg="No converted leads yet" />
-          </div>
-        </div>
-      )}
+      {pnl && <PnlDashboard pnl={pnl} />}
 
       {/* Top products + Recent activity */}
       <div style={{
