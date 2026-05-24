@@ -95,8 +95,10 @@ export default function ClientProfile() {
   };
 
   /* ── Derived stats ── */
+  // For completed bills, treat full total_amount as paid (amount_paid may be 0 if toggled without recording)
   const totalBilled = history.bills.reduce((s, b) => s + Number(b.total_amount || 0), 0);
-  const totalPaid   = history.bills.reduce((s, b) => s + Number(b.amount_paid  || 0), 0);
+  const totalPaid   = history.bills.reduce((s, b) =>
+    s + (b.payment_status === 'completed' ? Number(b.total_amount || 0) : Number(b.amount_paid || 0)), 0);
   const balance     = totalBilled - totalPaid;
   const paidBills   = history.bills.filter((b) => b.payment_status === 'completed').length;
   const partialBills= history.bills.filter((b) => b.payment_status === 'partial').length;
@@ -346,8 +348,9 @@ export default function ClientProfile() {
               <div className="p-8 text-center text-slate-400 text-sm">No bills yet.</div>
             ) : history.bills.map((b) => {
               const payStyle = BILL_PAY_PILL[b.payment_status] || BILL_PAY_PILL.pending;
-              const paid  = Number(b.amount_paid || 0);
               const total = Number(b.total_amount || 0);
+              // completed bills are fully paid even if amount_paid wasn't updated via recording
+              const paid  = b.payment_status === 'completed' ? total : Number(b.amount_paid || 0);
               const bal   = total - paid;
 
               return (

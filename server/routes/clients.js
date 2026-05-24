@@ -73,7 +73,7 @@ router.get('/', async (req, res) => {
         MIN(q.created_at)             AS first_quote_at,
         COUNT(DISTINCT b.id)          AS bill_count,
         COALESCE(SUM(b.total_amount), 0)  AS total_billed,
-        COALESCE(SUM(b.amount_paid), 0)   AS total_paid,
+        COALESCE(SUM(CASE WHEN b.payment_status = 'completed' THEN b.total_amount ELSE b.amount_paid END), 0) AS total_paid,
         COUNT(DISTINCT CASE WHEN b.payment_status='completed' THEN b.id END) AS paid_bills,
         COUNT(DISTINCT CASE WHEN b.payment_status='partial'   THEN b.id END) AS partial_bills,
         COUNT(DISTINCT CASE WHEN b.payment_status='pending'   THEN b.id END) AS pending_bills,
