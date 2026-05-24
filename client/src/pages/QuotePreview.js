@@ -800,55 +800,89 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
                 </tr>
               </thead>
               <tbody>
-                {items.map((it, i) => {
-                  const lineTotal  = it.line_total || 0;
-                  const gst        = Number(it.gst_percent) || 0;
-                  // For without_gst: show GST-inclusive unit price so client sees one clean number
-                  const dispUnit   = isWithoutGst
-                    ? +(it.unit_price * (1 + gst / 100)).toFixed(2)
-                    : it.unit_price;
-                  const dispSysUnit = isWithoutGst
-                    ? +(it.system_price * (1 + gst / 100)).toFixed(2)
-                    : it.system_price;
-                  return (
-                    <tr key={i} style={{ background: i % 2 === 0 ? '#ffffff' : '#fafafa' }}>
-                      <TD style={{ textAlign: 'center', color: '#666' }}>{i + 1}</TD>
-                      <TD>
-                        <span style={{ fontWeight: 700 }}>{it.product_name}</span>
-                        {(it.variant || it.pack_size) && (
-                          <span style={{ color: '#666', fontWeight: 400 }}>
-                            {' '}({[it.variant, it.pack_size].filter(Boolean).join(', ')})
-                          </span>
+                {groupByCategory(items).map((group) => (
+                  <React.Fragment key={group.name}>
+                    {/* ── Category header row ── */}
+                    <tr>
+                      <td colSpan={7} style={{
+                        padding: '5px 10px',
+                        background: '#EFF6FF',
+                        borderTop: '1.5px solid #BFDBFE',
+                        borderBottom: '1px solid #BFDBFE',
+                        fontWeight: 800,
+                        fontSize: 11,
+                        color: '#1e40af',
+                        letterSpacing: 0.3,
+                      }}>
+                        {group.rows[0]?.category_icon && (
+                          <span style={{ marginRight: 5 }}>{group.rows[0].category_icon}</span>
                         )}
-                      </TD>
-                      <TD>{it.hsn_code || ''}</TD>
-                      <TD style={{ textAlign: 'right' }}>{fmtNum(it.quantity, 0)}</TD>
-                      <TD>{it.unit || 'Nos'}</TD>
-                      <TD style={{ textAlign: 'right' }}>
-                        {it.system_price && it.system_price > it.unit_price ? (
-                          <div>
-                            <div style={{ textDecoration: 'line-through', color: '#9CA3AF', fontSize: 9 }}>
-                              ₹ {fmtNum(dispSysUnit)}
-                            </div>
-                            <div style={{ color: '#059669', fontWeight: 600 }}>₹ {fmtNum(dispUnit)}</div>
-                          </div>
-                        ) : `₹ ${fmtNum(dispUnit)}`}
-                      </TD>
-                      <TD style={{ textAlign: 'right', borderRight: 'none', fontWeight: 600 }}>
-                        ₹ {fmtNum(lineTotal)}
-                      </TD>
+                        {group.name}
+                      </td>
                     </tr>
-                  );
-                })}
-                {/* Total row */}
-                <tr style={{ borderTop: '1.5px solid #000', fontWeight: 800, background: '#f5f5f5' }}>
-                  <td colSpan={3} style={{ padding: '6px 8px', fontSize: 12, fontWeight: 800, borderRight: '1px solid #ccc' }}>Total</td>
-                  <td style={{ padding: '6px 8px', textAlign: 'right', fontSize: 12, fontWeight: 800, borderRight: '1px solid #ccc' }}>
+                    {/* ── Items in this category ── */}
+                    {group.rows.map((it, i) => {
+                      const lineTotal   = it.line_total || 0;
+                      const gst         = Number(it.gst_percent) || 0;
+                      const dispUnit    = isWithoutGst
+                        ? +(it.unit_price * (1 + gst / 100)).toFixed(2)
+                        : it.unit_price;
+                      const dispSysUnit = isWithoutGst
+                        ? +(it.system_price * (1 + gst / 100)).toFixed(2)
+                        : it.system_price;
+                      return (
+                        <tr key={it._idx} style={{ background: i % 2 === 0 ? '#ffffff' : '#fafafa' }}>
+                          <TD style={{ textAlign: 'center', color: '#888' }}>{it._idx}</TD>
+                          <TD>
+                            <span style={{ fontWeight: 700 }}>{it.product_name}</span>
+                            {(it.variant || it.pack_size) && (
+                              <span style={{ color: '#666', fontWeight: 400 }}>
+                                {' '}({[it.variant, it.pack_size].filter(Boolean).join(', ')})
+                              </span>
+                            )}
+                          </TD>
+                          <TD>{it.hsn_code || ''}</TD>
+                          <TD style={{ textAlign: 'right' }}>{fmtNum(it.quantity, 0)}</TD>
+                          <TD>{it.unit || 'Nos'}</TD>
+                          <TD style={{ textAlign: 'right' }}>
+                            {it.system_price && it.system_price > it.unit_price ? (
+                              <div>
+                                <div style={{ textDecoration: 'line-through', color: '#9CA3AF', fontSize: 9 }}>
+                                  ₹ {fmtNum(dispSysUnit)}
+                                </div>
+                                <div style={{ color: '#059669', fontWeight: 600 }}>₹ {fmtNum(dispUnit)}</div>
+                              </div>
+                            ) : `₹ ${fmtNum(dispUnit)}`}
+                          </TD>
+                          <TD style={{ textAlign: 'right', borderRight: 'none', fontWeight: 600 }}>
+                            ₹ {fmtNum(lineTotal)}
+                          </TD>
+                        </tr>
+                      );
+                    })}
+                    {/* ── Category subtotal row ── */}
+                    <tr style={{ background: '#f8faff' }}>
+                      <td colSpan={6} style={{ padding: '4px 8px', fontSize: 10, textAlign: 'right',
+                        color: '#64748b', borderBottom: '1px solid #e2e8f0', borderRight: '1px solid #e8e8e8',
+                        fontStyle: 'italic' }}>
+                        {group.rows[0]?.category_icon} {group.name} subtotal
+                      </td>
+                      <td style={{ padding: '4px 8px', fontSize: 10, textAlign: 'right',
+                        color: '#1e40af', fontWeight: 700, borderBottom: '1px solid #e2e8f0' }}>
+                        ₹ {fmtNum(group.subtotal)}
+                      </td>
+                    </tr>
+                  </React.Fragment>
+                ))}
+                {/* ── Grand Total row ── */}
+                <tr style={{ borderTop: '2px solid #000', fontWeight: 800, background: '#f0f4ff' }}>
+                  <td colSpan={3} style={{ padding: '7px 8px', fontSize: 12, fontWeight: 900, borderRight: '1px solid #ccc', color: '#1a2b5e' }}>Total</td>
+                  <td style={{ padding: '7px 8px', textAlign: 'right', fontSize: 12, fontWeight: 900, borderRight: '1px solid #ccc', color: '#1a2b5e' }}>
                     {fmtNum(items.reduce((s, it) => s + (Number(it.quantity) || 0), 0), 0)}
                   </td>
-                  <td style={{ padding: '6px 8px', borderRight: '1px solid #ccc' }}></td>
-                  <td style={{ padding: '6px 8px', borderRight: '1px solid #ccc' }}></td>
-                  <td style={{ padding: '6px 8px', textAlign: 'right', fontSize: 12, fontWeight: 800 }}>
+                  <td style={{ padding: '7px 8px', borderRight: '1px solid #ccc' }}></td>
+                  <td style={{ padding: '7px 8px', borderRight: '1px solid #ccc' }}></td>
+                  <td style={{ padding: '7px 8px', textAlign: 'right', fontSize: 12, fontWeight: 900, color: '#1a2b5e' }}>
                     ₹ {fmtNum(subTotal)}
                   </td>
                 </tr>
