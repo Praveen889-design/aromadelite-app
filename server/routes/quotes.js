@@ -8,6 +8,7 @@ router.use(requireAuth);
 
 const parseJSON = (s, fallback = null) => {
   if (s == null) return fallback;
+  if (typeof s === 'object') return s;   // pg already parsed JSONB columns
   try { return JSON.parse(s); } catch { return fallback; }
 };
 
