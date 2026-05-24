@@ -95,6 +95,7 @@ export default function BillPreview() {
   const [downloading, setDownloading] = useState(false);
   const [sharingPdf, setSharingPdf] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [updatingPayment, setUpdatingPayment] = useState(false);
 
   const fetchBill = async () => {
     try {
@@ -142,6 +143,26 @@ export default function BillPreview() {
     paid: 'bg-emerald-100 text-emerald-800',
     cancelled: 'bg-rose-100 text-rose-700',
   }[bill.status] || 'bg-slate-100 text-slate-700';
+
+  /* ── Toggle payment status ── */
+  const onTogglePayment = async () => {
+    const newStatus = bill.payment_status === 'completed' ? 'pending' : 'completed';
+    setUpdatingPayment(true);
+    try {
+      await api.patch(`/api/bills/${id}/payment`, { payment_status: newStatus });
+      toast(
+        newStatus === 'completed'
+          ? '✅ Payment marked as completed. Lead converted!'
+          : 'Payment marked as pending.',
+        { kind: 'success' }
+      );
+      await fetchBill();
+    } catch (e) {
+      toast(e?.response?.data?.error || 'Failed to update payment', { kind: 'error' });
+    } finally {
+      setUpdatingPayment(false);
+    }
+  };
 
   /* ── Mark issued ── */
   const onMarkIssued = async () => {
@@ -302,6 +323,21 @@ export default function BillPreview() {
               className="inline-flex items-center gap-2 bg-slate-600 hover:bg-slate-700 text-white text-sm font-semibold rounded-xl px-4 py-2.5 shadow-sm disabled:opacity-60"
               style={{ minHeight: 44 }}>
               <DownloadIcon /><span>{downloading ? 'Saving…' : 'Save PDF'}</span>
+            </button>
+          )}
+
+          {/* ── Payment status toggle ── */}
+          {bill.payment_status === 'completed' ? (
+            <button type="button" onClick={onTogglePayment} disabled={updatingPayment}
+              className="inline-flex items-center gap-2 text-sm font-semibold rounded-xl px-4 py-2.5 shadow-sm disabled:opacity-60"
+              style={{ minHeight: 44, background: '#d1fae5', color: '#065f46', border: '1.5px solid #6ee7b7' }}>
+              <span>{updatingPayment ? 'Updating…' : '✅ Payment Completed'}</span>
+            </button>
+          ) : (
+            <button type="button" onClick={onTogglePayment} disabled={updatingPayment}
+              className="inline-flex items-center gap-2 text-sm font-semibold rounded-xl px-4 py-2.5 shadow-sm disabled:opacity-60"
+              style={{ minHeight: 44, background: '#fef3c7', color: '#92400e', border: '1.5px solid #fcd34d' }}>
+              <span>{updatingPayment ? 'Updating…' : '⏳ Mark Payment Received'}</span>
             </button>
           )}
 

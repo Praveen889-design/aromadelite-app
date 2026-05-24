@@ -182,6 +182,101 @@ router.patch('/:id/status', async (req, res) => {
   }
 });
 
+// PATCH /api/bills/:id/payment  — update payment status (any auth'd user owning the bill)
+router.patch('/:id/payment', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const { payment_status } = req.body || {};
+    if (!['pending', 'completed'].includes(payment_status)) {
+      return res.status(400).json({ error: 'payment_status must be "pending" or "completed"' });
+    }
+
+    const { rows } = await pool.query(
+      `SELECT b.*, q.employee_id AS quote_employee_id
+       FROM bills b LEFT JOIN quotes q ON q.id = b.quote_id
+       WHERE b.id = $1`,
+      [req.params.id]
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'Bill not found' });
+    const bill = rows[0];
+    if (req.user.role !== 'admin' && bill.employee_id !== req.user.id) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    await client.query('BEGIN');
+
+    await client.query(
+      `UPDATE bills
+       SET payment_status = $1,
+           payment_completed_at = $2,
+           updated_at = NOW()
+       WHERE id = $3`,
+      [
+        payment_status,
+        payment_status === 'completed' ? new Date() : null,
+        req.params.id,
+      ]
+    );
+
+    // When payment completed → mark lead as converted + quote as accepted
+    if (payment_status === 'completed' && bill.quote_id) {
+      await client.query(
+        `UPDATE leads SET status = 'converted', updated_at = NOW()
+         WHERE quote_id = $1 AND status != 'converted'`,
+        [bill.quote_id]
+      );
+      await client.query(
+        `UPDATE quotes SET status = 'accepted' WHERE id = $1 AND status != 'accepted'`,
+        [bill.quote_id]
+      );
+    }
+
+    // When reverted to pending → revert lead to 'negotiating' if it was just converted via payment
+    if (payment_status === 'pending' && bill.quote_id) {
+      await client.query(
+        `UPDATE leads SET status = 'negotiating', updated_at = NOW()
+         WHERE quote_id = $1 AND status = 'converted'`,
+        [bill.quote_id]
+      );
+    }
+
+    await client.query('COMMIT');
+
+    const updated = await pool.query('SELECT * FROM bills WHERE id = $1', [req.params.id]);
+    res.json({ bill: hydrate(updated.rows[0]) });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ error: err.message });
+  } finally {
+    client.release();
+  }
+});
+
+// GET /api/bills/payment-pending  — all bills with pending payment (admin sees all, associate sees own)
+router.get('/payment-pending', async (req, res) => {
+  try {
+    const isAdmin = req.user.role === 'admin';
+    const { rows } = isAdmin
+      ? await pool.query(`
+          SELECT b.*, e.name AS employee_name, e.employee_id AS employee_code, e.region
+          FROM bills b JOIN employees e ON e.id = b.employee_id
+          WHERE b.payment_status = 'pending' AND b.status != 'cancelled'
+          ORDER BY b.created_at DESC
+        `)
+      : await pool.query(`
+          SELECT b.*, e.name AS employee_name, e.employee_id AS employee_code, e.region
+          FROM bills b JOIN employees e ON e.id = b.employee_id
+          WHERE b.payment_status = 'pending' AND b.status != 'cancelled'
+            AND b.employee_id = $1
+          ORDER BY b.created_at DESC
+        `, [req.user.id]);
+
+    res.json({ bills: rows.map(hydrate) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/bills/:id/pdf-data
 router.get('/:id/pdf-data', async (req, res) => {
   try {

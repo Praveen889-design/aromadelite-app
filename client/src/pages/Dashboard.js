@@ -60,20 +60,23 @@ const STATUS_BG = {
 export default function Dashboard() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
-  const [stats, setStats] = useState(null);
-  const [recent, setRecent] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [stats, setStats]             = useState(null);
+  const [recent, setRecent]           = useState([]);
+  const [pendingPayments, setPending] = useState([]);
+  const [loading, setLoading]         = useState(true);
+  const [error, setError]             = useState('');
 
   useEffect(() => {
     (async () => {
       try {
-        const [sRes, qRes] = await Promise.all([
+        const [sRes, qRes, pyRes] = await Promise.all([
           api.get('/api/dashboard/stats'),
           api.get('/api/quotes'),
+          api.get('/api/bills/payment-pending'),
         ]);
         setStats(sRes.data.stats);
         setRecent((qRes.data.quotes || []).slice(0, 5));
+        setPending(pyRes.data.bills || []);
       } catch (e) {
         setError(e?.response?.data?.error || 'Failed to load dashboard');
       } finally {
@@ -143,6 +146,66 @@ export default function Dashboard() {
           )}
         </div>
       </div>
+
+      {/* ── PAYMENT PENDING ALERT SECTION ── */}
+      {pendingPayments.length > 0 && (
+        <div className="rounded-xl border-2 overflow-hidden" style={{ borderColor: '#fcd34d' }}>
+          {/* Header */}
+          <div className="flex items-center justify-between px-4 py-3"
+               style={{ background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)', borderBottom: '1px solid #fcd34d' }}>
+            <div className="flex items-center gap-2">
+              <span className="text-lg">⏳</span>
+              <span className="font-bold text-sm" style={{ color: '#92400e' }}>
+                Payment Pending — {pendingPayments.length} bill{pendingPayments.length !== 1 ? 's' : ''}
+              </span>
+              <span className="text-xs px-2 py-0.5 rounded-full font-bold"
+                    style={{ background: '#f59e0b', color: '#fff' }}>
+                Action Required
+              </span>
+            </div>
+            <span className="text-sm font-bold" style={{ color: '#78350f' }}>
+              {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 })
+                .format(pendingPayments.reduce((s, b) => s + Number(b.total_amount || 0), 0))}
+            </span>
+          </div>
+          {/* Bill rows */}
+          <div style={{ background: '#fff' }}>
+            {pendingPayments.map((b, i) => {
+              const age = Math.floor((Date.now() - new Date(b.created_at).getTime()) / 86400000);
+              return (
+                <div key={b.id}
+                     className="flex items-center justify-between px-4 py-3 gap-3"
+                     style={{ borderBottom: i < pendingPayments.length - 1 ? '1px solid #fef3c7' : 'none' }}>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-semibold text-sm text-slate-800 truncate">
+                        {b.client_business_name || b.client_name}
+                      </span>
+                      <span className="text-xs px-1.5 py-0.5 rounded font-medium"
+                            style={{ background: age >= 14 ? '#fee2e2' : age >= 7 ? '#ffedd5' : '#fef3c7',
+                                     color: age >= 14 ? '#991b1b' : age >= 7 ? '#9a3412' : '#92400e' }}>
+                        {age}d ago
+                      </span>
+                    </div>
+                    <div className="text-xs text-slate-500 mt-0.5 font-mono">{b.bill_number}</div>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className="font-bold text-sm" style={{ color: '#0f172a' }}>
+                      {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 })
+                        .format(b.total_amount)}
+                    </span>
+                    <Link to={`/bills/${b.id}`}
+                          className="text-xs font-semibold px-3 py-1.5 rounded-lg"
+                          style={{ background: '#f59e0b', color: '#fff', textDecoration: 'none' }}>
+                      Collect
+                    </Link>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* STAT CARDS */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

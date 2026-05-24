@@ -8,6 +8,7 @@ import PriceDeviationTab from './admin/PriceDeviationTab';
 import CommissionTab from './admin/CommissionTab';
 import UnitsTab from './admin/UnitsTab';
 import SettingsTab from './admin/SettingsTab';
+import PaymentPendingTab from './admin/PaymentPendingTab';
 import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
 import { useToast } from '../components/Toast';
@@ -1817,6 +1818,7 @@ function OverviewTab() {
 // ─── Main panel ──────────────────────────────────────────────
 const TABS = [
   { id: 'overview',   label: 'Overview'   },
+  { id: 'payment',    label: '⏳ Payments' },
   { id: 'team',       label: 'Team'       },
   { id: 'products',   label: 'Products'   },
   { id: 'quotes',     label: 'All Quotes' },
@@ -1832,9 +1834,9 @@ export default function AdminPanel() {
   const { user } = useAuth();
   const [tab, setTab] = useState('overview');
   const [tabFilters, setTabFilters] = useState({});
-  const [pendingModCount, setPendingModCount] = useState(0);
+  const [pendingModCount, setPendingModCount]       = useState(0);
+  const [pendingPaymentCount, setPendingPaymentCount] = useState(0);
 
-  // Fetch pending modification count for notification badge
   useEffect(() => {
     api.get('/api/quotes')
       .then(({ data }) => {
@@ -1842,7 +1844,10 @@ export default function AdminPanel() {
         setPendingModCount(count);
       })
       .catch(() => {});
-  }, [tab]); // re-check when switching tabs
+    api.get('/api/bills/payment-pending')
+      .then(({ data }) => setPendingPaymentCount((data.bills || []).length))
+      .catch(() => {});
+  }, [tab]);
 
   const switchTab = (id, filters = {}) => { setTab(id); setTabFilters(filters); };
 
@@ -1850,7 +1855,7 @@ export default function AdminPanel() {
   const dateStr = now.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' });
 
   const TAB_ICONS = {
-    overview: '◉', team: '👥', products: '📦', quotes: '🧾',
+    overview: '◉', payment: '⏳', team: '👥', products: '📦', quotes: '🧾',
     leads: '📋', units: '🏭', discounts: '💸', commissions: '💰',
     reports: '📊', settings: '⚙️',
   };
@@ -1901,7 +1906,9 @@ export default function AdminPanel() {
         <div style={{ display: 'flex', minWidth: 'max-content', padding: '0 4px' }}>
           {TABS.map((t) => {
             const active = tab === t.id;
-            const showBadge = t.id === 'quotes' && pendingModCount > 0;
+            const badge = t.id === 'quotes' && pendingModCount > 0   ? { count: pendingModCount, color: '#ea580c' }
+                        : t.id === 'payment' && pendingPaymentCount > 0 ? { count: pendingPaymentCount, color: '#d97706' }
+                        : null;
             return (
               <button key={t.id} onClick={() => switchTab(t.id)} style={{
                 display: 'inline-flex', alignItems: 'center', gap: 6,
@@ -1914,16 +1921,16 @@ export default function AdminPanel() {
                 marginBottom: -1,
               }}>
                 <span style={{ fontSize: 12, opacity: active ? 1 : 0.6 }}>{TAB_ICONS[t.id]}</span>
-                {t.label.replace(/[🏭💸💰⚙️]/g, '').trim()}
-                {showBadge && (
+                {t.label.replace(/[🏭💸💰⚙️⏳]/g, '').trim()}
+                {badge && (
                   <span style={{
-                    background: '#ea580c', color: '#fff',
+                    background: badge.color, color: '#fff',
                     fontSize: 9, fontWeight: 900,
                     borderRadius: '50%', minWidth: 16, height: 16,
                     display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                     padding: '0 3px', lineHeight: 1,
                   }}>
-                    {pendingModCount}
+                    {badge.count}
                   </span>
                 )}
               </button>
@@ -1935,6 +1942,7 @@ export default function AdminPanel() {
       {/* ── Tab content ── */}
       <div style={{ padding: '20px 0', flex: 1 }}>
         {tab === 'overview'  && <OverviewTab />}
+        {tab === 'payment'   && <PaymentPendingTab />}
         {tab === 'team'      && <TeamTab onSwitchTab={switchTab} />}
         {tab === 'products'  && <ProductsTab />}
         {tab === 'quotes'    && <QuotesTab initialFilters={tabFilters} />}
