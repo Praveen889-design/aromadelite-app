@@ -775,6 +775,52 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
           )}
         </div>
 
+        {/* Discount approval banner */}
+        {quote.discount_approval_status === 'pending' && (
+          <div style={{
+            background: '#fef3c7', border: '1.5px solid #fcd34d', borderRadius: 10,
+            padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10,
+          }}>
+            <span style={{ fontSize: 18 }}>⏳</span>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#92400e' }}>
+                Awaiting Discount Approval
+              </div>
+              <div style={{ fontSize: 11, color: '#a16207', marginTop: 1 }}>
+                This quote has a {Number(quote.max_discount_pct).toFixed(0)}% discount — above the approval threshold.
+                You cannot send it until an admin approves.
+              </div>
+            </div>
+          </div>
+        )}
+        {quote.discount_approval_status === 'rejected' && (
+          <div style={{
+            background: '#fef2f2', border: '1.5px solid #fca5a5', borderRadius: 10,
+            padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10,
+          }}>
+            <span style={{ fontSize: 18 }}>❌</span>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#991b1b' }}>
+                Discount Rejected
+              </div>
+              <div style={{ fontSize: 11, color: '#b91c1c', marginTop: 1 }}>
+                {quote.discount_approval_note || 'Admin rejected this discount. Please revise the pricing and create a new quote.'}
+              </div>
+            </div>
+          </div>
+        )}
+        {quote.discount_approval_status === 'approved' && (
+          <div style={{
+            background: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: 10,
+            padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 8,
+          }}>
+            <span>✅</span>
+            <span style={{ fontSize: 12, fontWeight: 600, color: '#15803d' }}>
+              Discount approved — you can send this quote.
+            </span>
+          </div>
+        )}
+
         {/* Row 2: action buttons */}
         <div className="flex flex-wrap gap-2">
 
@@ -839,8 +885,13 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
             <button
               type="button"
               onClick={onMarkSent}
-              disabled={marking}
-              className="inline-flex items-center gap-2 bg-[#1F6BC7] hover:bg-[#155DA6] text-white text-sm font-semibold rounded-xl px-4 py-2.5 shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+              disabled={marking || quote.discount_approval_status === 'pending' || quote.discount_approval_status === 'rejected'}
+              title={
+                quote.discount_approval_status === 'pending' ? 'Awaiting discount approval from admin'
+                : quote.discount_approval_status === 'rejected' ? 'Discount was rejected — revise pricing'
+                : undefined
+              }
+              className="inline-flex items-center gap-2 bg-[#1F6BC7] hover:bg-[#155DA6] text-white text-sm font-semibold rounded-xl px-4 py-2.5 shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
               style={{ minHeight: 44 }}
             >
               <CheckIcon />

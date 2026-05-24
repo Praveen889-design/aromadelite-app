@@ -4,13 +4,15 @@ import ProductsTab from './admin/ProductsTab';
 import QuotesTab from './admin/QuotesTab';
 import LeadsTab from './admin/LeadsTab';
 import ReportsTab from './admin/ReportsTab';
-import PriceDeviationTab from './admin/PriceDeviationTab';
+// PriceDeviationTab replaced by DiscountApprovalTab in the Discounts tab
+// import PriceDeviationTab from './admin/PriceDeviationTab';
 import CommissionTab from './admin/CommissionTab';
 import UnitsTab from './admin/UnitsTab';
 import SettingsTab from './admin/SettingsTab';
 import PaymentPendingTab from './admin/PaymentPendingTab';
 import FollowUpsTab from './admin/FollowUpsTab';
 import AssociatePerformanceTab from './admin/AssociatePerformanceTab';
+import DiscountApprovalTab from './admin/DiscountApprovalTab';
 import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
 import { useToast } from '../components/Toast';
@@ -2018,6 +2020,7 @@ export default function AdminPanel() {
   const [pendingModCount, setPendingModCount]         = useState(0);
   const [pendingPaymentCount, setPendingPaymentCount] = useState(0);
   const [followUpCount, setFollowUpCount]             = useState(0);
+  const [discountApprovalCount, setDiscountApprovalCount] = useState(0);
 
   useEffect(() => {
     api.get('/api/quotes')
@@ -2031,6 +2034,9 @@ export default function AdminPanel() {
       .catch(() => {});
     api.get('/api/leads/followups/due')
       .then(({ data }) => setFollowUpCount((data.leads || []).length))
+      .catch(() => {});
+    api.get('/api/quotes/pending-discount-approval')
+      .then(({ data }) => setDiscountApprovalCount((data.quotes || []).length))
       .catch(() => {});
   }, [tab]);
 
@@ -2091,9 +2097,10 @@ export default function AdminPanel() {
         <div style={{ display: 'flex', minWidth: 'max-content', padding: '0 4px' }}>
           {TABS.map((t) => {
             const active = tab === t.id;
-            const badge = t.id === 'quotes'    && pendingModCount > 0     ? { count: pendingModCount,    color: '#ea580c' }
-                        : t.id === 'payment'   && pendingPaymentCount > 0 ? { count: pendingPaymentCount, color: '#d97706' }
-                        : t.id === 'followups' && followUpCount > 0       ? { count: followUpCount,       color: '#6366f1' }
+            const badge = t.id === 'quotes'     && pendingModCount > 0        ? { count: pendingModCount,       color: '#ea580c' }
+                        : t.id === 'payment'   && pendingPaymentCount > 0    ? { count: pendingPaymentCount,   color: '#d97706' }
+                        : t.id === 'followups' && followUpCount > 0          ? { count: followUpCount,         color: '#6366f1' }
+                        : t.id === 'discounts' && discountApprovalCount > 0  ? { count: discountApprovalCount, color: '#dc2626' }
                         : null;
             return (
               <button key={t.id} onClick={() => switchTab(t.id)} style={{
@@ -2136,7 +2143,7 @@ export default function AdminPanel() {
         {tab === 'quotes'    && <QuotesTab initialFilters={tabFilters} />}
         {tab === 'leads'     && <LeadsTab />}
         {tab === 'units'       && <UnitsTab />}
-        {tab === 'discounts'   && <PriceDeviationTab />}
+        {tab === 'discounts'   && <DiscountApprovalTab />}
         {tab === 'commissions' && <CommissionTab />}
         {tab === 'reports'     && <ReportsTab />}
         {tab === 'settings'    && <SettingsTab />}

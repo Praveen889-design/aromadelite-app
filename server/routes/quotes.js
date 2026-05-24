@@ -46,6 +46,32 @@ const computeTotals = (items) => {
   };
 };
 
+// ── Discount approval helpers ────────────────────────────────────────────────
+
+// Returns the max discount % across all items in a quote (0 if no system_price)
+const maxItemDiscount = (items) => {
+  let max = 0;
+  for (const it of items) {
+    const sys    = Number(it.system_price) || 0;
+    const quoted = Number(it.unit_price)   || 0;
+    if (sys > 0 && quoted < sys) {
+      const pct = ((sys - quoted) / sys) * 100;
+      if (pct > max) max = pct;
+    }
+  }
+  return +max.toFixed(1);
+};
+
+// Fetch the discount threshold from app_settings (default 10%)
+const getDiscountThreshold = async () => {
+  try {
+    const { rows } = await pool.query(
+      "SELECT value FROM app_settings WHERE key = 'discount_approval_threshold_pct'"
+    );
+    return rows[0] ? Number(rows[0].value) : 10;
+  } catch { return 10; }
+};
+
 // POST /api/quotes
 router.post('/', async (req, res) => {
   const client = await pool.connect();
@@ -69,6 +95,12 @@ router.post('/', async (req, res) => {
     const nextFollowUp    = b.next_follow_up_date || null;
     const expectedOrder   = b.expected_order_date || null;
 
+    // Discount approval check
+    const threshold    = await getDiscountThreshold();
+    const maxDisc      = maxItemDiscount(b.items);
+    const needsApproval = maxDisc > threshold;
+    const approvalStatus = needsApproval ? 'pending' : null;
+
     await client.query('BEGIN');
 
     const qRes = await client.query(`
@@ -76,8 +108,9 @@ router.post('/', async (req, res) => {
         (quote_number, employee_id, client_name, client_business_name, client_type,
          client_phone, client_email, client_city, requirement_type, items,
          subtotal, gst_amount, total_amount, validity_days, notes,
-         next_follow_up_date, expected_order_date, gst_mode, status)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,'draft')
+         next_follow_up_date, expected_order_date, gst_mode, status,
+         discount_approval_status, max_discount_pct)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,'draft',$19,$20)
       RETURNING id
     `, [
       quote_number, req.user.id, b.client_name, b.client_business_name || null, b.client_type,
@@ -85,6 +118,7 @@ router.post('/', async (req, res) => {
       b.requirement_type, JSON.stringify(b.items),
       totals.subtotal, totals.gst_amount, totals.total_amount, validity_days, b.notes || null,
       nextFollowUp, expectedOrder, gst_mode,
+      approvalStatus, maxDisc,
     ]);
     const quote_id = qRes.rows[0].id;
 
@@ -193,6 +227,85 @@ router.get('/aging', async (req, res) => {
   }
 });
 
+// GET /api/quotes/pending-discount-approval — admin: quotes awaiting discount approval
+router.get('/pending-discount-approval', async (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
+  try {
+    const { rows } = await pool.query(`
+      SELECT q.*, e.name AS employee_name, e.employee_id AS employee_code, e.region
+      FROM quotes q JOIN employees e ON e.id = q.employee_id
+      WHERE q.discount_approval_status = 'pending'
+      ORDER BY q.created_at DESC
+    `);
+    res.json({ quotes: rows.map(hydrate) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/quotes/:id/discount-approval — admin approves or rejects
+router.post('/:id/discount-approval', async (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
+  try {
+    const { action, note } = req.body || {};
+    if (!['approve', 'reject'].includes(action)) {
+      return res.status(400).json({ error: 'action must be "approve" or "reject"' });
+    }
+    const { rows } = await pool.query('SELECT * FROM quotes WHERE id = $1', [req.params.id]);
+    if (!rows[0]) return res.status(404).json({ error: 'Quote not found' });
+    if (rows[0].discount_approval_status !== 'pending') {
+      return res.status(400).json({ error: 'Quote is not pending discount approval' });
+    }
+    const newStatus = action === 'approve' ? 'approved' : 'rejected';
+    await pool.query(`
+      UPDATE quotes
+      SET discount_approval_status = $1,
+          discount_approval_note   = $2,
+          discount_approval_by     = $3,
+          discount_approval_at     = NOW(),
+          updated_at               = NOW()
+      WHERE id = $4
+    `, [newStatus, note || null, req.user.id, req.params.id]);
+    const { rows: updated } = await pool.query(`
+      SELECT q.*, e.name AS employee_name FROM quotes q
+      JOIN employees e ON e.id = q.employee_id WHERE q.id = $1
+    `, [req.params.id]);
+    res.json({ quote: hydrate(updated[0]) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/quotes/discount-settings — get threshold
+router.get('/discount-settings', async (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
+  try {
+    const threshold = await getDiscountThreshold();
+    res.json({ threshold_pct: threshold });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PATCH /api/quotes/discount-settings — update threshold
+router.patch('/discount-settings', async (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
+  try {
+    const pct = Number(req.body?.threshold_pct);
+    if (isNaN(pct) || pct < 0 || pct > 100) {
+      return res.status(400).json({ error: 'threshold_pct must be 0–100' });
+    }
+    await pool.query(`
+      INSERT INTO app_settings (key, value, updated_at)
+      VALUES ('discount_approval_threshold_pct', $1, NOW())
+      ON CONFLICT (key) DO UPDATE SET value = $1, updated_at = NOW()
+    `, [String(pct)]);
+    res.json({ threshold_pct: pct });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /api/quotes/:id/repeat — clone an existing quote as a new draft
 router.post('/:id/repeat', async (req, res) => {
   const pgClient = await pool.connect();
@@ -291,6 +404,13 @@ router.patch('/:id/status', async (req, res) => {
     if (!rows[0]) return res.status(404).json({ error: 'Quote not found' });
     if (req.user.role !== 'admin' && rows[0].employee_id !== req.user.id) {
       return res.status(403).json({ error: 'Forbidden' });
+    }
+    // Block sending if discount approval is still pending
+    if (status === 'sent' && rows[0].discount_approval_status === 'pending') {
+      return res.status(400).json({
+        error: 'This quote has a discount above the approval threshold. Wait for admin approval before sending.',
+        discount_approval_required: true,
+      });
     }
 
     await client.query('BEGIN');

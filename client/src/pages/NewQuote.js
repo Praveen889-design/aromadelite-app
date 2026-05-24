@@ -383,6 +383,17 @@ export default function NewQuote() {
               {formatINR(totals.total_amount)}
             </span>
           </div>
+          {/* Discount warning */}
+          {items.some(it => {
+            const sys = Number(it.system_price) || 0;
+            const qp  = Number(it.unit_price)   || 0;
+            return sys > 0 && qp < sys && ((sys - qp) / sys * 100) > 10;
+          }) && (
+            <div className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-1 flex items-center gap-2">
+              <span>⚠️</span>
+              <span><strong>Discount &gt;10%</strong> — admin approval required before sending.</span>
+            </div>
+          )}
           <button
             type="button"
             disabled={items.length === 0}
