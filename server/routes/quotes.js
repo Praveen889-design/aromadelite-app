@@ -193,6 +193,76 @@ router.get('/aging', async (req, res) => {
   }
 });
 
+// POST /api/quotes/:id/repeat — clone an existing quote as a new draft
+router.post('/:id/repeat', async (req, res) => {
+  const pgClient = await pool.connect();
+  try {
+    const { rows } = await pool.query('SELECT * FROM quotes WHERE id = $1', [req.params.id]);
+    if (!rows[0]) return res.status(404).json({ error: 'Quote not found' });
+    const src = hydrate(rows[0]);
+
+    if (req.user.role !== 'admin' && src.employee_id !== req.user.id) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const quote_number = await nextQuoteNumber();
+    const gst_mode     = src.gst_mode || 'with_gst';
+    const totals       = computeTotals(src.items);
+    const validity_days = Number(src.validity_days) || 7;
+    const estMonthly = src.requirement_type === 'Monthly Contract'
+      ? totals.total_amount
+      : +(totals.total_amount / 3).toFixed(2);
+
+    await pgClient.query('BEGIN');
+
+    const qRes = await pgClient.query(`
+      INSERT INTO quotes
+        (quote_number, employee_id, client_name, client_business_name, client_type,
+         client_phone, client_email, client_city, requirement_type, items,
+         subtotal, gst_amount, total_amount, validity_days, gst_mode, status)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,'draft')
+      RETURNING id
+    `, [
+      quote_number, req.user.id,
+      src.client_name, src.client_business_name || null, src.client_type,
+      src.client_phone || null, src.client_email || null, src.client_city || null,
+      src.requirement_type, JSON.stringify(src.items),
+      totals.subtotal, totals.gst_amount, totals.total_amount,
+      validity_days, gst_mode,
+    ]);
+    const quote_id = qRes.rows[0].id;
+
+    const lRes = await pgClient.query(`
+      INSERT INTO leads
+        (quote_id, employee_id, client_name, client_business_name, client_type,
+         client_phone, client_email, client_city, requirement_type,
+         estimated_monthly_value, status)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'new')
+      RETURNING id
+    `, [
+      quote_id, req.user.id,
+      src.client_name, src.client_business_name || null, src.client_type,
+      src.client_phone || null, src.client_email || null, src.client_city || null,
+      src.requirement_type, estMonthly,
+    ]);
+
+    await pgClient.query('COMMIT');
+
+    const { rows: newRows } = await pool.query(`
+      SELECT q.*, e.name AS employee_name, e.employee_id AS employee_code, e.region
+      FROM quotes q JOIN employees e ON e.id = q.employee_id
+      WHERE q.id = $1
+    `, [quote_id]);
+
+    res.status(201).json({ quote: hydrate(newRows[0]), lead_id: lRes.rows[0].id });
+  } catch (err) {
+    await pgClient.query('ROLLBACK');
+    res.status(500).json({ error: err.message });
+  } finally {
+    pgClient.release();
+  }
+});
+
 router.get('/:id', async (req, res) => {
   try {
     const { rows } = await pool.query(`

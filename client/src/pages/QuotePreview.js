@@ -142,6 +142,7 @@ export default function QuotePreview() {
   const [reviewingMod, setReviewingMod] = useState(false);
   const [rejectNote, setRejectNote] = useState('');
   const [showRejectInput, setShowRejectInput] = useState(false);
+  const [repeating, setRepeating] = useState(false);
   const docRef    = useRef(null);
   const headerRef = useRef(null);
 
@@ -544,6 +545,19 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
     unchanged:  { bg: '#ffffff', border: '#f1f5f9', tag: '#94a3b8', tagBg: '#f8fafc', label: ''              },
   };
 
+  const onRepeatOrder = async () => {
+    setRepeating(true);
+    try {
+      const { data } = await api.post(`/api/quotes/${id}/repeat`);
+      toast('🔁 Repeat order created as new draft!', { kind: 'success' });
+      navigate(`/quotes/${data.quote.id}`);
+    } catch (e) {
+      toast(e?.response?.data?.error || 'Failed to repeat order', { kind: 'error' });
+    } finally {
+      setRepeating(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
 
@@ -925,6 +939,17 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
               <span>✏️ Re-edit &amp; Resubmit</span>
             </button>
           )}
+
+          {/* 🔁 Repeat Order */}
+          <button
+            type="button"
+            onClick={onRepeatOrder}
+            disabled={repeating}
+            className="inline-flex items-center gap-2 text-sm font-semibold rounded-xl px-4 py-2.5 shadow-sm disabled:opacity-60"
+            style={{ minHeight: 44, background: '#f0fdf4', color: '#15803d', border: '1.5px solid #86efac' }}
+          >
+            <span>{repeating ? 'Creating…' : '🔁 Repeat Order'}</span>
+          </button>
 
           <Link
             to="/quotes/new"

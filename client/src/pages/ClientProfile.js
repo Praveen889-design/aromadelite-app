@@ -58,7 +58,21 @@ export default function ClientProfile() {
   const [notes, setNotes]     = useState('');
   const [editNotes, setEditNotes] = useState(false);
   const [savingNotes, setSavingNotes] = useState(false);
+  const [repeating, setRepeating] = useState(null); // quote id being repeated
   const [error, setError]     = useState('');
+
+  const onRepeatOrder = async (quoteId) => {
+    setRepeating(quoteId);
+    try {
+      const { data } = await api.post(`/api/quotes/${quoteId}/repeat`);
+      toast('🔁 Repeat order created!', { kind: 'success' });
+      navigate(`/quotes/${data.quote.id}`);
+    } catch (e) {
+      toast(e?.response?.data?.error || 'Failed to repeat order', { kind: 'error' });
+    } finally {
+      setRepeating(null);
+    }
+  };
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -311,32 +325,39 @@ export default function ClientProfile() {
             {history.quotes.length === 0 ? (
               <div className="p-8 text-center text-slate-400 text-sm">No quotes yet.</div>
             ) : history.quotes.map((q) => (
-              <Link
-                key={q.id}
-                to={`/quotes/${q.id}`}
-                style={{ textDecoration: 'none' }}
-                className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors"
-              >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-sm font-semibold text-slate-800 font-mono">{q.quote_number}</span>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full capitalize ${QUOTE_STATUS_PILL[q.status] || 'bg-slate-100 text-slate-600'}`}>
-                      {q.status}
-                    </span>
+              <div key={q.id} className="flex items-center gap-2 px-4 py-3 hover:bg-slate-50 transition-colors">
+                <Link
+                  to={`/quotes/${q.id}`}
+                  style={{ textDecoration: 'none' }}
+                  className="flex items-center gap-3 flex-1 min-w-0"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-semibold text-slate-800 font-mono">{q.quote_number}</span>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full capitalize ${QUOTE_STATUS_PILL[q.status] || 'bg-slate-100 text-slate-600'}`}>
+                        {q.status}
+                      </span>
+                    </div>
+                    <div className="text-xs text-slate-500 mt-0.5 flex gap-3 flex-wrap">
+                      <span>📅 {fmtDate(q.created_at)}</span>
+                      {q.employee_name && <span>👤 {q.employee_name}</span>}
+                    </div>
                   </div>
-                  <div className="text-xs text-slate-500 mt-0.5 flex gap-3 flex-wrap">
-                    <span>📅 {fmtDate(q.created_at)}</span>
-                    {q.employee_name && <span>👤 {q.employee_name}</span>}
+                  <div className="text-right flex-shrink-0 mr-1">
+                    <div className="text-sm font-bold text-slate-800">{fmtINR(q.total_amount)}</div>
+                    <div className="text-[10px] text-slate-400">total</div>
                   </div>
-                </div>
-                <div className="text-right flex-shrink-0">
-                  <div className="text-sm font-bold text-slate-800">{fmtINR(q.total_amount)}</div>
-                  <div className="text-[10px] text-slate-400">total</div>
-                </div>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M9 18l6-6-6-6"/>
-                </svg>
-              </Link>
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => onRepeatOrder(q.id)}
+                  disabled={repeating === q.id}
+                  className="flex-shrink-0 text-[11px] font-bold px-2.5 py-1.5 rounded-lg disabled:opacity-50"
+                  style={{ background: '#f0fdf4', color: '#15803d', border: '1px solid #86efac', whiteSpace: 'nowrap' }}
+                >
+                  {repeating === q.id ? '…' : '🔁 Repeat'}
+                </button>
+              </div>
             ))}
           </div>
         )}

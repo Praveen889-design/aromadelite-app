@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import api from '../utils/api';
@@ -86,6 +86,7 @@ const TD = ({ children, style }) => (
 
 export default function BillPreview() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const { toast } = useToast();
   const docRef    = useRef(null);
   const headerRef = useRef(null);
@@ -103,6 +104,7 @@ export default function BillPreview() {
   const [payForm, setPayForm]                 = useState({ amount: '', method: 'cash', date: new Date().toISOString().slice(0,10), notes: '' });
   const [savingPay, setSavingPay]             = useState(false);
   const [deletingPay, setDeletingPay]         = useState(null);
+  const [repeating, setRepeating]             = useState(false);
 
   const fetchBill = async () => {
     try {
@@ -339,6 +341,21 @@ export default function BillPreview() {
     }
   };
 
+  const onRepeatOrder = async () => {
+    const quoteId = data?.bill?.quote_id;
+    if (!quoteId) { toast('No linked quote to repeat.', { kind: 'error' }); return; }
+    setRepeating(true);
+    try {
+      const { data: res } = await api.post(`/api/quotes/${quoteId}/repeat`);
+      toast('🔁 Repeat order created as new draft!', { kind: 'success' });
+      navigate(`/quotes/${res.quote.id}`);
+    } catch (e) {
+      toast(e?.response?.data?.error || 'Failed to repeat order', { kind: 'error' });
+    } finally {
+      setRepeating(false);
+    }
+  };
+
   /* ═══════════ RENDER ═══════════ */
   return (
     <div className="space-y-4">
@@ -404,6 +421,19 @@ export default function BillPreview() {
               className="inline-flex items-center gap-2 bg-[#1F6BC7] hover:bg-[#155DA6] text-white text-sm font-semibold rounded-xl px-4 py-2.5 shadow-sm disabled:opacity-60"
               style={{ minHeight: 44 }}>
               <span>{updatingStatus ? 'Updating…' : '✓ Mark as Issued'}</span>
+            </button>
+          )}
+
+          {/* 🔁 Repeat Order */}
+          {data?.bill?.quote_id && (
+            <button
+              type="button"
+              onClick={onRepeatOrder}
+              disabled={repeating}
+              className="inline-flex items-center gap-2 text-sm font-semibold rounded-xl px-4 py-2.5 shadow-sm disabled:opacity-60"
+              style={{ minHeight: 44, background: '#f0fdf4', color: '#15803d', border: '1.5px solid #86efac' }}
+            >
+              <span>{repeating ? 'Creating…' : '🔁 Repeat Order'}</span>
             </button>
           )}
 
