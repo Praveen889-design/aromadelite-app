@@ -261,6 +261,76 @@ router.patch('/:id/status', async (req, res) => {
   }
 });
 
+// PATCH /api/quotes/:id/modification  — Associate submits modified items for admin approval
+router.patch('/:id/modification', async (req, res) => {
+  try {
+    const { rows } = await pool.query('SELECT * FROM quotes WHERE id = $1', [req.params.id]);
+    if (!rows[0]) return res.status(404).json({ error: 'Quote not found' });
+    const q = rows[0];
+
+    // Only the owning associate (or admin) can submit modifications
+    if (req.user.role !== 'admin' && q.employee_id !== req.user.id) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    // Can only modify when status is modifications_required
+    if (q.status !== 'modifications_required') {
+      return res.status(400).json({ error: 'Quote must be in "modifications_required" status to submit modifications' });
+    }
+
+    const { items, modification_note } = req.body || {};
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: 'items must be a non-empty array' });
+    }
+
+    // Recompute totals from modified items
+    const totals = computeTotals(items);
+
+    await pool.query(`
+      UPDATE quotes
+      SET modified_items      = $1,
+          modification_status = 'pending_approval',
+          modification_note   = $2,
+          modified_at         = NOW()
+      WHERE id = $3
+    `, [JSON.stringify(items), modification_note || null, req.params.id]);
+
+    const updated = await pool.query('SELECT * FROM quotes WHERE id = $1', [req.params.id]);
+    res.json({ quote: hydrate(updated.rows[0]), modified_totals: totals });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PATCH /api/quotes/:id/modification/review  — Admin approves or rejects modification
+router.patch('/:id/modification/review', async (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
+  try {
+    const { decision, admin_note } = req.body || {};
+    if (!['approved', 'rejected'].includes(decision)) {
+      return res.status(400).json({ error: 'decision must be "approved" or "rejected"' });
+    }
+
+    const { rows } = await pool.query('SELECT * FROM quotes WHERE id = $1', [req.params.id]);
+    if (!rows[0]) return res.status(404).json({ error: 'Quote not found' });
+    if (rows[0].modification_status !== 'pending_approval') {
+      return res.status(400).json({ error: 'No pending modification to review' });
+    }
+
+    await pool.query(`
+      UPDATE quotes
+      SET modification_status = $1,
+          admin_note          = $2,
+          modified_at         = NOW()
+      WHERE id = $3
+    `, [decision, admin_note || null, req.params.id]);
+
+    const updated = await pool.query('SELECT * FROM quotes WHERE id = $1', [req.params.id]);
+    res.json({ quote: hydrate(updated.rows[0]) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // PATCH /api/quotes/:id/dates  — update follow-up & expected-order dates
 router.patch('/:id/dates', async (req, res) => {
   try {
@@ -320,6 +390,45 @@ router.get('/:id/pdf-data', async (req, res) => {
     const validUntil = new Date(created.getTime() + (q.validity_days || 7) * 86400_000);
     const gst_mode = q.gst_mode || 'with_gst';
 
+    // For approved/pending modifications, expose modified_items so BillBuilder can use them
+    const modification_status = q.modification_status || null;
+    const rawModItems = parseJSON(q.modified_items, null);
+
+    const mapItems = (arr) => arr.map((it) => {
+      const cat = productCatMap[it.product_id] || {};
+      const qty = Number(it.quantity) || 0;
+      const price = Number(it.unit_price) || 0;
+      const gst = Number(it.gst_percent) || 0;
+      return {
+        product_id: it.product_id,
+        product_name: it.product_name || it.name,
+        hsn_code: it.hsn_code || cat.hsn_code || null,
+        unit: it.unit || cat.unit || 'Nos',
+        category_name: cat.category_name || it.category_name || 'Items',
+        category_icon: cat.category_icon || it.category_icon || null,
+        variant: it.variant || null,
+        pack_size: it.pack_size || it.size || null,
+        quantity: qty,
+        unit_price: price,
+        system_price: it.system_price ?? price,
+        gst_percent: gst,
+        line_total: +(qty * price * (1 + gst / 100)).toFixed(2),
+      };
+    });
+
+    const originalItems = mapItems(items);
+    const modifiedItemsMapped = rawModItems ? mapItems(rawModItems) : null;
+
+    const computeTotalsForItems = (arr) => {
+      let sub = 0, gstAmt = 0;
+      for (const it of arr) {
+        const line = it.quantity * it.unit_price;
+        sub += line;
+        gstAmt += (line * it.gst_percent) / 100;
+      }
+      return { subtotal: +sub.toFixed(2), gst_amount: +gstAmt.toFixed(2), total_amount: +(sub + gstAmt).toFixed(2) };
+    };
+
     res.json({
       pdf: {
         company: {
@@ -339,6 +448,10 @@ router.get('/:id/pdf-data', async (req, res) => {
           validity_days: q.validity_days, notes: q.notes,
           next_follow_up_date: q.next_follow_up_date ? String(q.next_follow_up_date).slice(0, 10) : null,
           expected_order_date: q.expected_order_date ? String(q.expected_order_date).slice(0, 10) : null,
+          modification_status,
+          modification_note: q.modification_note || null,
+          admin_note: q.admin_note || null,
+          modified_at: q.modified_at ? new Date(q.modified_at).toISOString() : null,
         },
         client: {
           name: q.client_name, business_name: q.client_business_name, type: q.client_type,
@@ -349,30 +462,12 @@ router.get('/:id/pdf-data', async (req, res) => {
           employee_id: q.employee_code, name: q.employee_name,
           phone: q.employee_phone, email: q.employee_email, region: q.region,
         },
-        items: items.map((it) => {
-          const cat = productCatMap[it.product_id] || {};
-          const qty = Number(it.quantity) || 0;
-          const price = Number(it.unit_price) || 0;
-          const gst = Number(it.gst_percent) || 0;
-          // line_total is always GST-inclusive (base × qty × (1 + gst%)).
-          // For without_gst the document hides the breakdown but the total is the same.
-          return {
-            product_id: it.product_id,
-            product_name: it.product_name || it.name,
-            hsn_code: it.hsn_code || cat.hsn_code || null,
-            unit: it.unit || cat.unit || 'Nos',
-            category_name: cat.category_name || 'Items',
-            category_icon: cat.category_icon || null,
-            variant: it.variant || null,
-            pack_size: it.pack_size || it.size || null,
-            quantity: qty,
-            unit_price: price,
-            system_price: it.system_price ?? price,
-            gst_percent: gst,
-            line_total: +(qty * price * (1 + gst / 100)).toFixed(2),
-          };
-        }),
+        // Original items — always the original quote items
+        items: originalItems,
         totals: { subtotal: q.subtotal, gst_amount: q.gst_amount, total_amount: q.total_amount },
+        // Modified items — set when modification is pending or approved
+        modified_items: modifiedItemsMapped,
+        modified_totals: modifiedItemsMapped ? computeTotalsForItems(modifiedItemsMapped) : null,
       },
     });
   } catch (err) {

@@ -6,6 +6,7 @@ import MyQuotes from './pages/MyQuotes';
 import Products from './pages/Products';
 import NewQuote from './pages/NewQuote';
 import QuotePreview from './pages/QuotePreview';
+import QuoteModificationEditor from './pages/QuoteModificationEditor';
 import BillBuilder from './pages/BillBuilder';
 import BillPreview from './pages/BillPreview';
 import Leads from './pages/Leads';
@@ -32,6 +33,7 @@ export default function App() {
         >
           <Route index element={<Dashboard />} />
           <Route path="quotes/new" element={<NewQuote />} />
+          <Route path="quotes/:id/modify" element={<QuoteModificationEditor />} />
           <Route path="quotes/:id" element={<QuotePreview />} />
           <Route path="quotes"     element={<MyQuotes />} />
           <Route path="bills/new/:quoteId" element={<BillBuilder />} />

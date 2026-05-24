@@ -1832,6 +1832,17 @@ export default function AdminPanel() {
   const { user } = useAuth();
   const [tab, setTab] = useState('overview');
   const [tabFilters, setTabFilters] = useState({});
+  const [pendingModCount, setPendingModCount] = useState(0);
+
+  // Fetch pending modification count for notification badge
+  useEffect(() => {
+    api.get('/api/quotes')
+      .then(({ data }) => {
+        const count = (data.quotes || []).filter((q) => q.modification_status === 'pending_approval').length;
+        setPendingModCount(count);
+      })
+      .catch(() => {});
+  }, [tab]); // re-check when switching tabs
 
   const switchTab = (id, filters = {}) => { setTab(id); setTabFilters(filters); };
 
@@ -1890,6 +1901,7 @@ export default function AdminPanel() {
         <div style={{ display: 'flex', minWidth: 'max-content', padding: '0 4px' }}>
           {TABS.map((t) => {
             const active = tab === t.id;
+            const showBadge = t.id === 'quotes' && pendingModCount > 0;
             return (
               <button key={t.id} onClick={() => switchTab(t.id)} style={{
                 display: 'inline-flex', alignItems: 'center', gap: 6,
@@ -1903,6 +1915,17 @@ export default function AdminPanel() {
               }}>
                 <span style={{ fontSize: 12, opacity: active ? 1 : 0.6 }}>{TAB_ICONS[t.id]}</span>
                 {t.label.replace(/[🏭💸💰⚙️]/g, '').trim()}
+                {showBadge && (
+                  <span style={{
+                    background: '#ea580c', color: '#fff',
+                    fontSize: 9, fontWeight: 900,
+                    borderRadius: '50%', minWidth: 16, height: 16,
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    padding: '0 3px', lineHeight: 1,
+                  }}>
+                    {pendingModCount}
+                  </span>
+                )}
               </button>
             );
           })}

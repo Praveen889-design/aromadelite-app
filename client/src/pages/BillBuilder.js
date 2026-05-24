@@ -62,7 +62,12 @@ export default function BillBuilder() {
         const res = await api.get(`/api/quotes/${quoteId}/pdf-data`);
         const pdf = res.data.pdf;
         setQuote(pdf);
-        setItems((pdf.items || []).map((it) => ({
+        // If admin approved a modification, bill should use modified items
+        const sourceItems =
+          pdf.quote.modification_status === 'approved' && pdf.modified_items?.length
+            ? pdf.modified_items
+            : pdf.items || [];
+        setItems(sourceItems.map((it) => ({
           ...it,
           base_price: it.unit_price,
         })));

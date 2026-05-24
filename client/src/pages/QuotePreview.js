@@ -4,6 +4,7 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import api from '../utils/api';
 import { useToast } from '../components/Toast';
+import { useAuth } from '../context/AuthContext';
 import { amountInWords } from '../utils/amountInWords';
 
 /* ─── Platform helpers ──────────────────────────────────────── */
@@ -126,6 +127,8 @@ const TD = ({ children, style }) => (
 export default function QuotePreview() {
   const { id } = useParams();
   const { toast } = useToast();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
   const navigate = useNavigate();
@@ -137,6 +140,9 @@ export default function QuotePreview() {
   const [datesForm, setDatesForm] = useState({ next_follow_up_date: '', expected_order_date: '' });
   const [savingDates, setSavingDates] = useState(false);
   const [sharingPdf, setSharingPdf] = useState(false);
+  const [reviewingMod, setReviewingMod] = useState(false);
+  const [rejectNote, setRejectNote] = useState('');
+  const [showRejectInput, setShowRejectInput] = useState(false);
   const docRef = useRef(null);
 
   const fetchQuote = async () => {
@@ -375,6 +381,34 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
     }
   };
 
+  /* ── Admin: review modification (approve / reject) ── */
+  const onReviewModification = async (decision) => {
+    if (decision === 'rejected' && !rejectNote.trim()) {
+      setShowRejectInput(true);
+      return;
+    }
+    setReviewingMod(true);
+    try {
+      await api.patch(`/api/quotes/${id}/modification/review`, {
+        decision,
+        admin_note: decision === 'rejected' ? rejectNote.trim() : null,
+      });
+      toast(
+        decision === 'approved'
+          ? '✅ Modification approved! Associate can now generate the bill.'
+          : '❌ Modification rejected. Associate will be notified.',
+        { kind: decision === 'approved' ? 'success' : 'info' }
+      );
+      setShowRejectInput(false);
+      setRejectNote('');
+      await fetchQuote();
+    } catch (e) {
+      toast(e?.response?.data?.error || 'Failed to review modification', { kind: 'error' });
+    } finally {
+      setReviewingMod(false);
+    }
+  };
+
   const onMarkSent = async () => {
     setMarking(true);
     try {
@@ -587,8 +621,8 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
             </div>
           )}
 
-          {/* Generate Bill — shown only when accepted */}
-          {quote.status === 'accepted' && (
+          {/* Generate Bill — shown when accepted OR modification approved */}
+          {(quote.status === 'accepted' || quote.modification_status === 'approved') && (
             <button
               type="button"
               onClick={() => navigate(`/bills/new/${id}`)}
@@ -596,6 +630,32 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
               style={{ minHeight: 44, background: 'linear-gradient(135deg, #059669, #047857)', fontFamily: 'Manrope, sans-serif' }}
             >
               <span>📄 Generate Bill</span>
+            </button>
+          )}
+
+          {/* ✏️ Edit & Resubmit — associate sees this when modifications_required + no pending approval */}
+          {quote.status === 'modifications_required' &&
+            !quote.modification_status && (
+            <button
+              type="button"
+              onClick={() => navigate(`/quotes/${id}/modify`)}
+              className="inline-flex items-center gap-2 text-white text-sm font-bold rounded-xl px-5 py-2.5 shadow-sm"
+              style={{ minHeight: 44, background: 'linear-gradient(135deg, #d97706, #b45309)' }}
+            >
+              <span>✏️ Edit &amp; Resubmit</span>
+            </button>
+          )}
+
+          {/* Re-edit after rejection */}
+          {quote.status === 'modifications_required' &&
+            quote.modification_status === 'rejected' && (
+            <button
+              type="button"
+              onClick={() => navigate(`/quotes/${id}/modify`)}
+              className="inline-flex items-center gap-2 text-white text-sm font-bold rounded-xl px-5 py-2.5 shadow-sm"
+              style={{ minHeight: 44, background: 'linear-gradient(135deg, #dc2626, #b91c1c)' }}
+            >
+              <span>✏️ Re-edit &amp; Resubmit</span>
             </button>
           )}
 
@@ -693,6 +753,239 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
           )}
         </div>
       </div>
+
+      {/* ══ Modification Workflow Banners ════════════════════════════ */}
+
+      {/* ⏳ Pending approval — seen by associate */}
+      {quote.modification_status === 'pending_approval' && !isAdmin && (
+        <div style={{
+          background: '#fffbeb', border: '1.5px solid #fcd34d', borderRadius: 12,
+          padding: '12px 16px', display: 'flex', alignItems: 'flex-start', gap: 12,
+        }}>
+          <span style={{ fontSize: 22, lineHeight: 1 }}>⏳</span>
+          <div>
+            <div style={{ fontWeight: 800, fontSize: 14, color: '#92400e' }}>Awaiting Admin Approval</div>
+            <div style={{ fontSize: 12, color: '#78350f', marginTop: 3 }}>
+              Your modified quote has been submitted. The admin will review and approve or reject it.
+            </div>
+            {quote.modification_note && (
+              <div style={{ fontSize: 12, color: '#78350f', marginTop: 6, fontStyle: 'italic' }}>
+                Your note: "{quote.modification_note}"
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ✅ Approved — seen by associate */}
+      {quote.modification_status === 'approved' && !isAdmin && (
+        <div style={{
+          background: '#f0fdf4', border: '1.5px solid #6ee7b7', borderRadius: 12,
+          padding: '12px 16px', display: 'flex', alignItems: 'flex-start', gap: 12,
+        }}>
+          <span style={{ fontSize: 22, lineHeight: 1 }}>✅</span>
+          <div>
+            <div style={{ fontWeight: 800, fontSize: 14, color: '#065f46' }}>Modification Approved!</div>
+            <div style={{ fontSize: 12, color: '#047857', marginTop: 3 }}>
+              Admin has approved your updated quote. Click "📄 Generate Bill" above to create the bill.
+            </div>
+            {quote.admin_note && (
+              <div style={{ fontSize: 12, color: '#047857', marginTop: 4, fontStyle: 'italic' }}>
+                Admin note: "{quote.admin_note}"
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ❌ Rejected — seen by associate */}
+      {quote.modification_status === 'rejected' && !isAdmin && (
+        <div style={{
+          background: '#fef2f2', border: '1.5px solid #fecaca', borderRadius: 12,
+          padding: '12px 16px', display: 'flex', alignItems: 'flex-start', gap: 12,
+        }}>
+          <span style={{ fontSize: 22, lineHeight: 1 }}>❌</span>
+          <div>
+            <div style={{ fontWeight: 800, fontSize: 14, color: '#991b1b' }}>Modification Rejected</div>
+            <div style={{ fontSize: 12, color: '#7f1d1d', marginTop: 3 }}>
+              Admin has rejected your modification request. Click "✏️ Re-edit &amp; Resubmit" to make changes.
+            </div>
+            {quote.admin_note && (
+              <div style={{ fontSize: 12, color: '#7f1d1d', marginTop: 4, fontWeight: 600 }}>
+                Reason: "{quote.admin_note}"
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 🔔 Admin review panel — pending approval */}
+      {quote.modification_status === 'pending_approval' && isAdmin && (
+        <div style={{
+          background: '#fff7ed', border: '2px solid #fb923c', borderRadius: 12,
+          padding: '14px 16px',
+        }}>
+          <div style={{ fontWeight: 800, fontSize: 14, color: '#9a3412', marginBottom: 6 }}>
+            🔔 Modification Pending Your Approval
+          </div>
+          <div style={{ fontSize: 12, color: '#7c2d12', marginBottom: 10 }}>
+            The associate has submitted updated items and pricing. Review the modified quote below, then approve or reject.
+          </div>
+          {quote.modification_note && (
+            <div style={{
+              background: '#fff', border: '1px solid #fed7aa', borderRadius: 8,
+              padding: '8px 12px', fontSize: 12, color: '#7c2d12', marginBottom: 12,
+              fontStyle: 'italic',
+            }}>
+              Associate note: "{quote.modification_note}"
+            </div>
+          )}
+          {/* Show comparison totals */}
+          {data.modified_totals && (
+            <div style={{ display: 'flex', gap: 20, marginBottom: 12, flexWrap: 'wrap' }}>
+              <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, padding: '8px 14px', fontSize: 12 }}>
+                <div style={{ color: '#64748b', fontWeight: 600 }}>Original Total</div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: '#64748b' }}>
+                  ₹{new Intl.NumberFormat('en-IN').format(data.totals.total_amount)}
+                </div>
+              </div>
+              <div style={{ color: '#94a3b8', alignSelf: 'center', fontSize: 20 }}>→</div>
+              <div style={{ background: '#fff', border: '1.5px solid #fb923c', borderRadius: 8, padding: '8px 14px', fontSize: 12 }}>
+                <div style={{ color: '#9a3412', fontWeight: 600 }}>Modified Total</div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: '#9a3412' }}>
+                  ₹{new Intl.NumberFormat('en-IN').format(data.modified_totals.total_amount)}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Reject input */}
+          {showRejectInput && (
+            <div style={{ marginBottom: 10 }}>
+              <label style={{ fontSize: 12, fontWeight: 700, color: '#7c2d12', display: 'block', marginBottom: 4 }}>
+                Reason for rejection (required)
+              </label>
+              <textarea
+                value={rejectNote}
+                onChange={(e) => setRejectNote(e.target.value)}
+                rows={2}
+                placeholder="e.g. Price too low, margin not acceptable…"
+                style={{
+                  width: '100%', border: '1.5px solid #fca5a5', borderRadius: 8,
+                  padding: '7px 10px', fontSize: 13, resize: 'vertical',
+                  fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box',
+                  color: '#7f1d1d',
+                }}
+              />
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button
+              type="button"
+              onClick={() => onReviewModification('approved')}
+              disabled={reviewingMod}
+              style={{
+                padding: '9px 20px', borderRadius: 9, border: 'none', cursor: reviewingMod ? 'not-allowed' : 'pointer',
+                background: reviewingMod ? '#86efac' : 'linear-gradient(135deg, #16a34a, #15803d)',
+                color: '#fff', fontSize: 13, fontWeight: 800,
+              }}
+            >
+              ✅ Approve
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (!showRejectInput) { setShowRejectInput(true); return; }
+                onReviewModification('rejected');
+              }}
+              disabled={reviewingMod}
+              style={{
+                padding: '9px 20px', borderRadius: 9, border: '1.5px solid #fca5a5',
+                cursor: reviewingMod ? 'not-allowed' : 'pointer',
+                background: '#fff', color: '#dc2626', fontSize: 13, fontWeight: 800,
+              }}
+            >
+              ❌ {showRejectInput ? 'Confirm Reject' : 'Reject'}
+            </button>
+            {showRejectInput && (
+              <button
+                type="button"
+                onClick={() => { setShowRejectInput(false); setRejectNote(''); }}
+                style={{ padding: '9px 14px', borderRadius: 9, border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', fontSize: 13, cursor: 'pointer' }}
+              >
+                Cancel
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ✅ Admin: approved view */}
+      {quote.modification_status === 'approved' && isAdmin && (
+        <div style={{
+          background: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: 12,
+          padding: '10px 16px', fontSize: 13, color: '#065f46',
+        }}>
+          ✅ <strong>You approved</strong> this modification.{quote.admin_note ? ` Note: "${quote.admin_note}"` : ''}
+        </div>
+      )}
+
+      {/* ❌ Admin: rejected view */}
+      {quote.modification_status === 'rejected' && isAdmin && (
+        <div style={{
+          background: '#fef2f2', border: '1.5px solid #fecaca', borderRadius: 12,
+          padding: '10px 16px', fontSize: 13, color: '#991b1b',
+        }}>
+          ❌ <strong>You rejected</strong> this modification.{quote.admin_note ? ` Reason: "${quote.admin_note}"` : ''} Associate will re-edit.
+        </div>
+      )}
+
+      {/* Modified items preview — shown to admin when pending */}
+      {quote.modification_status === 'pending_approval' && isAdmin && data.modified_items && data.modified_items.length > 0 && (
+        <div style={{
+          background: '#fff', border: '1.5px solid #fb923c', borderRadius: 12,
+          overflow: 'hidden',
+        }}>
+          <div style={{ background: '#fff7ed', padding: '8px 14px', fontWeight: 800, fontSize: 13, color: '#9a3412', borderBottom: '1px solid #fed7aa' }}>
+            📋 Modified Items (submitted by associate)
+          </div>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+            <thead>
+              <tr style={{ background: '#fff7ed' }}>
+                {['#', 'Product', 'Qty', 'Client Price', 'Line Total'].map((h) => (
+                  <th key={h} style={{ padding: '6px 10px', textAlign: h === '#' ? 'center' : 'left', fontWeight: 700, borderBottom: '1px solid #fed7aa', color: '#9a3412' }}>
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {data.modified_items.map((it, i) => (
+                <tr key={i} style={{ borderBottom: '1px solid #fff7ed', background: i % 2 === 0 ? '#fff' : '#fffbeb' }}>
+                  <td style={{ padding: '5px 10px', textAlign: 'center', color: '#94a3b8' }}>{i + 1}</td>
+                  <td style={{ padding: '5px 10px', fontWeight: 600 }}>
+                    {it.product_name}
+                    {(it.variant || it.pack_size) && (
+                      <span style={{ color: '#64748b', fontWeight: 400 }}> ({[it.variant, it.pack_size].filter(Boolean).join(', ')})</span>
+                    )}
+                  </td>
+                  <td style={{ padding: '5px 10px' }}>{it.quantity}</td>
+                  <td style={{ padding: '5px 10px' }}>
+                    {it.system_price && it.system_price > it.unit_price ? (
+                      <span>
+                        <span style={{ textDecoration: 'line-through', color: '#9ca3af', marginRight: 4 }}>₹{it.system_price}</span>
+                        <span style={{ color: '#059669', fontWeight: 700 }}>₹{it.unit_price}</span>
+                      </span>
+                    ) : `₹${it.unit_price}`}
+                  </td>
+                  <td style={{ padding: '5px 10px', fontWeight: 700 }}>₹{new Intl.NumberFormat('en-IN').format(it.line_total)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {/* PDF-capturable document */}
       <div style={{ background: '#f3f3f3', padding: '24px', borderRadius: 12 }}>

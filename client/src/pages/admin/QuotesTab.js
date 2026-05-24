@@ -21,6 +21,7 @@ export default function QuotesTab({ initialFilters }) {
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({
     status: '', client_type: '', employee_code: initialFilters?.employee_code || '', from: '', to: '', q: '',
+    modification_pending: false,
   });
 
   const load = useCallback(async () => {
@@ -34,6 +35,7 @@ export default function QuotesTab({ initialFilters }) {
 
   const visible = useMemo(() => {
     return quotes.filter((q) => {
+      if (filters.modification_pending && q.modification_status !== 'pending_approval') return false;
       if (filters.status && q.status !== filters.status) return false;
       if (filters.client_type && q.client_type !== filters.client_type) return false;
       if (filters.employee_code && q.employee_code !== filters.employee_code) return false;
@@ -85,8 +87,53 @@ export default function QuotesTab({ initialFilters }) {
     return [...s.entries()];
   }, [quotes]);
 
+  const pendingModCount = useMemo(
+    () => quotes.filter((q) => q.modification_status === 'pending_approval').length,
+    [quotes]
+  );
+
   return (
     <div className="space-y-3">
+
+      {/* 🔔 Pending modification approval banner */}
+      {pendingModCount > 0 && (
+        <div style={{
+          background: 'linear-gradient(135deg, #fff7ed, #ffedd5)',
+          border: '2px solid #fb923c', borderRadius: 12,
+          padding: '12px 16px',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+          flexWrap: 'wrap',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{
+              background: '#ea580c', color: '#fff', fontWeight: 900, fontSize: 14,
+              borderRadius: '50%', width: 32, height: 32,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              {pendingModCount}
+            </div>
+            <div>
+              <div style={{ fontWeight: 800, fontSize: 14, color: '#9a3412' }}>
+                🔔 Quote Modification{pendingModCount > 1 ? 's' : ''} Awaiting Approval
+              </div>
+              <div style={{ fontSize: 12, color: '#7c2d12' }}>
+                Associate{pendingModCount > 1 ? 's have' : ' has'} submitted updated pricing for your review.
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={() => setFilters((f) => ({ ...f, modification_pending: true }))}
+            style={{
+              background: '#ea580c', color: '#fff', border: 'none', borderRadius: 8,
+              padding: '7px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            Review Now →
+          </button>
+        </div>
+      )}
+
       <div className="bg-white rounded-xl border border-slate-200 p-3 grid grid-cols-1 md:grid-cols-6 gap-2">
         <select value={filters.status} onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value }))}
                 className="border border-slate-300 rounded-lg px-2 py-2 text-sm">
@@ -116,7 +163,17 @@ export default function QuotesTab({ initialFilters }) {
       </div>
 
       <div className="flex items-center justify-between">
-        <div className="text-sm text-slate-600">{visible.length} of {quotes.length} quotes</div>
+        <div className="flex items-center gap-2">
+          <div className="text-sm text-slate-600">{visible.length} of {quotes.length} quotes</div>
+          {filters.modification_pending && (
+            <button
+              onClick={() => setFilters((f) => ({ ...f, modification_pending: false }))}
+              className="text-xs bg-orange-100 text-orange-700 border border-orange-200 rounded-full px-2 py-0.5 font-semibold"
+            >
+              🔔 Pending Approval × Clear
+            </button>
+          )}
+        </div>
         <button onClick={exportCSV}
                 className="text-sm rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-3 py-2">
           Export CSV
@@ -157,13 +214,30 @@ export default function QuotesTab({ initialFilters }) {
                   </td>
                   <td className="px-3 py-2 text-right font-medium">{formatINR(q.total_amount)}</td>
                   <td className="px-3 py-2">
-                    <select value={q.status} onChange={(e) => updateStatus(q, e.target.value)}
-                            className={`text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-1 border-0 focus:outline-none focus:ring-1 focus:ring-cyan-600 ${STATUS_BG[q.status]}`}>
-                      <option value="draft">Draft</option>
-                      <option value="sent">Sent</option>
-                      <option value="accepted">Accepted</option>
-                      <option value="rejected">Rejected</option>
-                    </select>
+                    <div className="flex flex-col gap-1">
+                      <select value={q.status} onChange={(e) => updateStatus(q, e.target.value)}
+                              className={`text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-1 border-0 focus:outline-none focus:ring-1 focus:ring-cyan-600 ${STATUS_BG[q.status]}`}>
+                        <option value="draft">Draft</option>
+                        <option value="sent">Sent</option>
+                        <option value="accepted">Accepted</option>
+                        <option value="rejected">Rejected</option>
+                      </select>
+                      {q.modification_status === 'pending_approval' && (
+                        <span className="text-[10px] font-bold bg-orange-100 text-orange-700 rounded-full px-2 py-0.5 whitespace-nowrap">
+                          🔔 Mod. Pending
+                        </span>
+                      )}
+                      {q.modification_status === 'approved' && (
+                        <span className="text-[10px] font-bold bg-emerald-100 text-emerald-700 rounded-full px-2 py-0.5 whitespace-nowrap">
+                          ✅ Mod. Approved
+                        </span>
+                      )}
+                      {q.modification_status === 'rejected' && (
+                        <span className="text-[10px] font-bold bg-rose-100 text-rose-700 rounded-full px-2 py-0.5 whitespace-nowrap">
+                          ❌ Mod. Rejected
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-3 py-2 text-xs text-slate-600">{q.created_at?.slice(0,10)}</td>
                   <td className="px-3 py-2 text-xs">
