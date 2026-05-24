@@ -5,8 +5,8 @@ import html2canvas from 'html2canvas';
 import api from '../utils/api';
 import { useToast } from '../components/Toast';
 import { amountInWords } from '../utils/amountInWords';
+import { isNative, downloadPdf, sharePdf } from '../utils/pdfNative';
 
-const isCapacitor = () => typeof window !== 'undefined' && !!(window.Capacitor?.isNativePlatform?.());
 const canNativeShare = () => typeof navigator !== 'undefined' && typeof navigator.share === 'function';
 const canShareFiles = () =>
   canNativeShare() &&
@@ -134,7 +134,7 @@ export default function BillPreview() {
   const roundOff     = +(Math.round(subTotal) - subTotal).toFixed(2);
   const grandTotal   = +(subTotal + roundOff).toFixed(2);
   const fileName     = `Aromadelite_Bill_${bill.number}.pdf`;
-  const onMobile     = isCapacitor() || (typeof window !== 'undefined' && window.innerWidth < 640);
+  const onMobile     = isNative() || (typeof window !== 'undefined' && window.innerWidth < 640);
 
   const statusPill = {
     draft: 'bg-slate-100 text-slate-700',
@@ -208,7 +208,11 @@ export default function BillPreview() {
   const onDownloadPdf = async () => {
     if (!docRef.current) return;
     setDownloading(true);
-    try { const pdf = await buildPdf(); pdf.save(fileName); toast('PDF downloaded.', { kind: 'success' }); }
+    try {
+      const pdf = await buildPdf();
+      await downloadPdf(pdf, fileName);
+      toast(isNative() ? 'PDF saved to Documents.' : 'PDF downloaded.', { kind: 'success' });
+    }
     catch { toast('PDF export failed.', { kind: 'error' }); }
     finally { setDownloading(false); }
   };
@@ -218,30 +222,38 @@ export default function BillPreview() {
     setSharingPdf(true);
     try {
       const pdf = await buildPdf();
-      if (canShareFiles()) {
-        const blob = pdf.output('blob');
-        const file = new File([blob], fileName, { type: 'application/pdf' });
-        try { await navigator.share({ title: `Bill ${bill.number}`, files: [file] }); toast('PDF shared.', { kind: 'success' }); return; }
-        catch (e) { if (e.name === 'AbortError') return; }
-      }
-      pdf.save(fileName);
-      toast('PDF downloaded.', { kind: 'success' });
-    } catch { toast('PDF export failed.', { kind: 'error' }); }
+      await sharePdf(pdf, fileName, `Bill ${bill.number} – Aromadelite`);
+      toast('PDF shared.', { kind: 'success' });
+    }
+    catch (e) { if (e?.message !== 'Share canceled') toast('PDF export failed.', { kind: 'error' }); }
     finally { setSharingPdf(false); }
   };
 
-  /* ── WhatsApp message ── */
-  const onShareWhatsApp = () => {
-    const greeting = client.business_name ? `Dear *${client.business_name}*,` : `Dear *${client.name}*,`;
-    const itemLines = items.map((it, i) =>
-      `${i + 1}. *${it.product_name}* · Qty ${it.quantity} ${it.unit || ''} × ₹${fmtNum(it.unit_price)} = *₹${fmtNum(it.line_total)}*`
-    );
-    const gstNote = isWithoutGst ? '_(Prices inclusive of GST)_\n' : `GST: ₹${fmtNum(totals.gst_amount)}\n`;
-    const msg = `🌿 *AROMADELITE — TAX INVOICE*\n_Sri Vemuri Sai Enterprises_\n\n${greeting}\n\n*Bill No:* ${bill.number}\n*Date:* ${formatDate(bill.created_at)}\n\n${itemLines.join('\n')}\n\n━━━━━━━━━━━━\n${gstNote}*TOTAL: ₹${fmtNum(grandTotal)}*\n━━━━━━━━━━━━\n\n📞 6304382947 · contact@aromadelite.in`;
-    const phone = (client.phone || '').replace(/\D/g, '');
-    window.open(phone
-      ? `https://wa.me/${phone.length === 10 ? '91' + phone : phone}?text=${encodeURIComponent(msg)}`
-      : `https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank', 'noopener,noreferrer');
+  /* ── WhatsApp: PDF file on native, text link on web ── */
+  const onShareWhatsApp = async () => {
+    if (isNative() && docRef.current) {
+      setSharingPdf(true);
+      try {
+        const pdf = await buildPdf();
+        await sharePdf(pdf, fileName, `Bill ${bill.number} – Aromadelite`);
+        toast('PDF shared.', { kind: 'success' });
+      } catch (e) {
+        if (e?.message !== 'Share canceled') toast('Share failed.', { kind: 'error' });
+      } finally {
+        setSharingPdf(false);
+      }
+    } else {
+      const greeting = client.business_name ? `Dear *${client.business_name}*,` : `Dear *${client.name}*,`;
+      const itemLines = items.map((it, i) =>
+        `${i + 1}. *${it.product_name}* · Qty ${it.quantity} ${it.unit || ''} × ₹${fmtNum(it.unit_price)} = *₹${fmtNum(it.line_total)}*`
+      );
+      const gstNote = isWithoutGst ? '_(Prices inclusive of GST)_\n' : `GST: ₹${fmtNum(totals.gst_amount)}\n`;
+      const msg = `🌿 *AROMADELITE — TAX INVOICE*\n_Sri Vemuri Sai Enterprises_\n\n${greeting}\n\n*Bill No:* ${bill.number}\n*Date:* ${formatDate(bill.created_at)}\n\n${itemLines.join('\n')}\n\n━━━━━━━━━━━━\n${gstNote}*TOTAL: ₹${fmtNum(grandTotal)}*\n━━━━━━━━━━━━\n\n📞 6304382947 · contact@aromadelite.in`;
+      const phone = (client.phone || '').replace(/\D/g, '');
+      window.open(phone
+        ? `https://wa.me/${phone.length === 10 ? '91' + phone : phone}?text=${encodeURIComponent(msg)}`
+        : `https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank', 'noopener,noreferrer');
+    }
   };
 
   /* ═══════════ RENDER ═══════════ */

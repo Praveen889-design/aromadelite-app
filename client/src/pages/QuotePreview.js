@@ -6,10 +6,9 @@ import api from '../utils/api';
 import { useToast } from '../components/Toast';
 import { useAuth } from '../context/AuthContext';
 import { amountInWords } from '../utils/amountInWords';
+import { isNative, downloadPdf, sharePdf } from '../utils/pdfNative';
 
 /* ─── Platform helpers ──────────────────────────────────────── */
-const isCapacitor = () =>
-  typeof window !== 'undefined' && !!(window.Capacitor?.isNativePlatform?.());
 const canNativeShare = () =>
   typeof navigator !== 'undefined' && typeof navigator.share === 'function';
 const canShareFiles = () =>
@@ -303,8 +302,8 @@ export default function QuotePreview() {
     setDownloading(true);
     try {
       const pdf = await buildPdf();
-      pdf.save(fileName);
-      toast('PDF downloaded.', { kind: 'success' });
+      await downloadPdf(pdf, fileName);
+      toast(isNative() ? 'PDF saved to Documents.' : 'PDF downloaded.', { kind: 'success' });
     } catch (e) {
       toast('PDF export failed.', { kind: 'error' });
     } finally {
@@ -382,17 +381,33 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
   };
 
   /* ── WhatsApp direct ────────────────────────────────────────── */
-  const onShareWhatsApp = () => {
-    const msg   = buildWhatsAppMessage();
-    const phone = (client.phone || '').replace(/\D/g, '');
-    const url   = phone
-      ? `https://wa.me/${phone.length === 10 ? '91' + phone : phone}?text=${encodeURIComponent(msg)}`
-      : `https://wa.me/?text=${encodeURIComponent(msg)}`;
-    // On Capacitor/mobile, window.open launches the correct Intent
-    window.open(url, '_blank', 'noopener,noreferrer');
+  /* ── WhatsApp: on native share PDF file, on web send text link ── */
+  const onShareWhatsApp = async () => {
+    if (isNative() && docRef.current) {
+      // Native APK → share the PDF file so receiver gets the actual document
+      setSharingPdf(true);
+      try {
+        const pdf  = await buildPdf();
+        const name = `Aromadelite_Quote_${quote.number}.pdf`;
+        await sharePdf(pdf, name, `Quote ${quote.number} – Aromadelite`);
+        toast('PDF shared.', { kind: 'success' });
+      } catch (e) {
+        if (e?.message !== 'Share canceled') toast('Share failed.', { kind: 'error' });
+      } finally {
+        setSharingPdf(false);
+      }
+    } else {
+      // Web → open WhatsApp with the pre-filled text message
+      const msg   = buildWhatsAppMessage();
+      const phone = (client.phone || '').replace(/\D/g, '');
+      const url   = phone
+        ? `https://wa.me/${phone.length === 10 ? '91' + phone : phone}?text=${encodeURIComponent(msg)}`
+        : `https://wa.me/?text=${encodeURIComponent(msg)}`;
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
   };
 
-  /* ── Native share sheet (text) ─────────────────────────────── */
+  /* ── Native share sheet (text fallback for web) ────────────── */
   const onNativeShare = async () => {
     const msg = buildWhatsAppMessage();
     if (canNativeShare()) {
@@ -400,44 +415,23 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
         await navigator.share({ title: `Quote ${quote.number} – Aromadelite`, text: msg });
         return;
       } catch (e) {
-        if (e.name === 'AbortError') return; // user dismissed — not an error
+        if (e.name === 'AbortError') return;
       }
     }
-    // Fallback → WhatsApp link
     onShareWhatsApp();
   };
 
-  /* ── Share as PDF file ─────────────────────────────────────── */
+  /* ── Share / Download PDF ──────────────────────────────────── */
   const onSharePdf = async () => {
     if (!docRef.current) return;
     setSharingPdf(true);
     try {
-      const pdf = await buildPdf();
-      const pdfName = `Aromadelite_Quote_${quote.number}.pdf`;
-
-      // Try native file share (works in Capacitor & modern mobile browsers)
-      if (canShareFiles()) {
-        const blob = pdf.output('blob');
-        const file = new File([blob], pdfName, { type: 'application/pdf' });
-        try {
-          await navigator.share({
-            title: `Quote ${quote.number} – Aromadelite`,
-            text: `Please find the quotation attached.`,
-            files: [file],
-          });
-          toast('PDF shared.', { kind: 'success' });
-          return;
-        } catch (e) {
-          if (e.name === 'AbortError') return;
-          // fall through to download
-        }
-      }
-
-      // Fallback: download
-      pdf.save(pdfName);
-      toast('PDF downloaded.', { kind: 'success' });
+      const pdf  = await buildPdf();
+      const name = `Aromadelite_Quote_${quote.number}.pdf`;
+      await sharePdf(pdf, name, `Quote ${quote.number} – Aromadelite`);
+      toast('PDF shared.', { kind: 'success' });
     } catch (e) {
-      toast('PDF export failed.', { kind: 'error' });
+      if (e?.message !== 'Share canceled') toast('PDF export failed.', { kind: 'error' });
     } finally {
       setSharingPdf(false);
     }
@@ -531,7 +525,7 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
   ];
 
   /* ── derive onMobile for label tweaks ── */
-  const onMobile = isCapacitor() || (typeof window !== 'undefined' && window.innerWidth < 640);
+  const onMobile = isNative() || (typeof window !== 'undefined' && window.innerWidth < 640);
 
   const fmtN = (n) => new Intl.NumberFormat('en-IN', { maximumFractionDigits: 2 }).format(n || 0);
   const TAG_CFG = {
