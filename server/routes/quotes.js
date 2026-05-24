@@ -262,8 +262,7 @@ router.post('/:id/discount-approval', async (req, res) => {
       SET discount_approval_status = $1,
           discount_approval_note   = $2,
           discount_approval_by     = $3,
-          discount_approval_at     = NOW(),
-          updated_at               = NOW()
+          discount_approval_at     = NOW()
       WHERE id = $4
     `, [newStatus, note || null, req.user.id, req.params.id]);
     const { rows: updated } = await pool.query(`
