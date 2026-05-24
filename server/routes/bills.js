@@ -140,6 +140,32 @@ router.get('/', async (req, res) => {
   }
 });
 
+// GET /api/bills/payment-pending  — all bills with pending payment (admin sees all, associate sees own)
+// NOTE: must be declared BEFORE /:id to avoid "payment-pending" being parsed as an integer id
+router.get('/payment-pending', async (req, res) => {
+  try {
+    const isAdmin = req.user.role === 'admin';
+    const { rows } = isAdmin
+      ? await pool.query(`
+          SELECT b.*, e.name AS employee_name, e.employee_id AS employee_code, e.region
+          FROM bills b JOIN employees e ON e.id = b.employee_id
+          WHERE b.payment_status = 'pending' AND b.status != 'cancelled'
+          ORDER BY b.created_at DESC
+        `)
+      : await pool.query(`
+          SELECT b.*, e.name AS employee_name, e.employee_id AS employee_code, e.region
+          FROM bills b JOIN employees e ON e.id = b.employee_id
+          WHERE b.payment_status = 'pending' AND b.status != 'cancelled'
+            AND b.employee_id = $1
+          ORDER BY b.created_at DESC
+        `, [req.user.id]);
+
+    res.json({ bills: rows.map(hydrate) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/bills/:id
 router.get('/:id', async (req, res) => {
   try {
@@ -249,31 +275,6 @@ router.patch('/:id/payment', async (req, res) => {
     res.status(500).json({ error: err.message });
   } finally {
     client.release();
-  }
-});
-
-// GET /api/bills/payment-pending  — all bills with pending payment (admin sees all, associate sees own)
-router.get('/payment-pending', async (req, res) => {
-  try {
-    const isAdmin = req.user.role === 'admin';
-    const { rows } = isAdmin
-      ? await pool.query(`
-          SELECT b.*, e.name AS employee_name, e.employee_id AS employee_code, e.region
-          FROM bills b JOIN employees e ON e.id = b.employee_id
-          WHERE b.payment_status = 'pending' AND b.status != 'cancelled'
-          ORDER BY b.created_at DESC
-        `)
-      : await pool.query(`
-          SELECT b.*, e.name AS employee_name, e.employee_id AS employee_code, e.region
-          FROM bills b JOIN employees e ON e.id = b.employee_id
-          WHERE b.payment_status = 'pending' AND b.status != 'cancelled'
-            AND b.employee_id = $1
-          ORDER BY b.created_at DESC
-        `, [req.user.id]);
-
-    res.json({ bills: rows.map(hydrate) });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
   }
 });
 
