@@ -905,7 +905,6 @@ const PnlDashboard = ({ pnl }) => {
   const [expandedCat, setExpandedCat] = React.useState(null);
 
   const cats      = pnl.by_category  || [];
-  const products  = pnl.by_product   || [];
   const associates = pnl.by_associate || [];
   const cities    = pnl.by_city       || [];
 
@@ -916,13 +915,13 @@ const PnlDashboard = ({ pnl }) => {
 
   const productsByCategory = React.useMemo(() => {
     const map = {};
-    products.forEach((p) => {
+    (pnl.by_product || []).forEach((p) => {
       const key = p.category || 'Uncategorized';
       if (!map[key]) map[key] = [];
       map[key].push(p);
     });
     return map;
-  }, [products]);
+  }, [pnl.by_product]);
 
   const kpis = [
     { label: 'Total Revenue', value: fmtINR(totalRev), icon: '💰', color: '#1e40af', bg: '#eff6ff', border: '#bfdbfe' },
