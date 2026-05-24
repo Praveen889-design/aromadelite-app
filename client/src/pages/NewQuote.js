@@ -371,12 +371,16 @@ export default function NewQuote() {
               )}
             </>
           ) : (
-            <SummaryRow label="Total (GST inclusive)" value={formatINR(totals.subtotal)} />
+            <SummaryRow
+              label="GST absorbed in price"
+              value={`+${formatINR(totals.gst_amount)}`}
+              muted
+            />
           )}
           <div className="flex items-baseline justify-between pt-2 border-t border-slate-200">
             <span className="text-sm font-medium text-slate-700">Grand Total</span>
             <span className="text-2xl font-bold text-slate-900">
-              {formatINR(gstMode === 'with_gst' ? totals.total_amount : totals.subtotal)}
+              {formatINR(totals.total_amount)}
             </span>
           </div>
           <button

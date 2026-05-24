@@ -28,18 +28,11 @@ const nextQuoteNumber = async () => {
   return `${prefix}${String(next).padStart(4, '0')}`;
 };
 
-const computeTotals = (items, gst_mode) => {
+// Both modes compute the same totals (base + GST = final amount).
+// 'without_gst' only affects display: GST is absorbed into the quoted price,
+// not shown as a separate line to the client — but the seller still files GST.
+const computeTotals = (items) => {
   let subtotal = 0, gst_amount = 0;
-  if (gst_mode === 'without_gst') {
-    for (const it of items) {
-      subtotal += (Number(it.quantity) || 0) * (Number(it.unit_price) || 0);
-    }
-    return {
-      subtotal: +subtotal.toFixed(2),
-      gst_amount: 0,
-      total_amount: +subtotal.toFixed(2),
-    };
-  }
   for (const it of items) {
     const line = (Number(it.quantity) || 0) * (Number(it.unit_price) || 0);
     subtotal += line;
@@ -65,7 +58,7 @@ router.post('/', async (req, res) => {
     }
 
     const gst_mode = ['with_gst', 'without_gst'].includes(b.gst_mode) ? b.gst_mode : 'with_gst';
-    const totals = computeTotals(b.items, gst_mode);
+    const totals = computeTotals(b.items);
     const quote_number = await nextQuoteNumber();
     const validity_days = Number(b.validity_days) || 7;
     const estMonthly = b.requirement_type === 'Monthly Contract'
@@ -360,7 +353,9 @@ router.get('/:id/pdf-data', async (req, res) => {
           const cat = productCatMap[it.product_id] || {};
           const qty = Number(it.quantity) || 0;
           const price = Number(it.unit_price) || 0;
-          const gst = gst_mode === 'without_gst' ? 0 : (Number(it.gst_percent) || 0);
+          const gst = Number(it.gst_percent) || 0;
+          // line_total is always GST-inclusive (base × qty × (1 + gst%)).
+          // For without_gst the document hides the breakdown but the total is the same.
           return {
             product_id: it.product_id,
             product_name: it.product_name || it.name,
@@ -374,9 +369,7 @@ router.get('/:id/pdf-data', async (req, res) => {
             unit_price: price,
             system_price: it.system_price ?? price,
             gst_percent: gst,
-            line_total: gst_mode === 'without_gst'
-              ? +(qty * price).toFixed(2)
-              : +(qty * price * (1 + gst / 100)).toFixed(2),
+            line_total: +(qty * price * (1 + gst / 100)).toFixed(2),
           };
         }),
         totals: { subtotal: q.subtotal, gst_amount: q.gst_amount, total_amount: q.total_amount },

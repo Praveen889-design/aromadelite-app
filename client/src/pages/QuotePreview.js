@@ -926,28 +926,25 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
             </div>
           )}
 
-          {/* ══ WITHOUT GST — simple totals ══ */}
+          {/* ══ WITHOUT GST — total only (GST absorbed by seller, not shown to client) ══ */}
           {isWithoutGst && (
             <div style={{ marginTop: 12, display: 'flex', justifyContent: 'flex-end' }}>
-              <div style={{ border: '1px solid #ccc', minWidth: 260 }}>
+              <div style={{ border: '1px solid #ccc', minWidth: 280 }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <tbody>
-                    <tr style={{ borderBottom: '1px solid #e0e0e0' }}>
-                      <td style={{ padding: '6px 14px', fontSize: 11, fontWeight: 600 }}>Sub Total</td>
-                      <td style={{ padding: '6px 4px', fontSize: 11 }}>:</td>
-                      <td style={{ padding: '6px 14px', fontSize: 11, textAlign: 'right', fontWeight: 600 }}>{formatINR(subTotal)}</td>
-                    </tr>
                     {roundOff !== 0 && (
                       <tr style={{ borderBottom: '1px solid #e0e0e0' }}>
                         <td style={{ padding: '6px 14px', fontSize: 11 }}>Round Off</td>
                         <td style={{ padding: '6px 4px', fontSize: 11 }}>:</td>
-                        <td style={{ padding: '6px 14px', fontSize: 11, textAlign: 'right' }}>{roundOff > 0 ? '+' : ''}{formatINR(roundOff)}</td>
+                        <td style={{ padding: '6px 14px', fontSize: 11, textAlign: 'right', color: roundOff > 0 ? '#059669' : '#dc2626' }}>
+                          {roundOff > 0 ? '+' : ''}{formatINR(roundOff)}
+                        </td>
                       </tr>
                     )}
-                    <tr>
-                      <td style={{ padding: '8px 14px', fontSize: 13, fontWeight: 900, color: '#1a2b5e' }}>Total</td>
-                      <td style={{ padding: '8px 4px', fontSize: 13, fontWeight: 900 }}>:</td>
-                      <td style={{ padding: '8px 14px', fontSize: 13, fontWeight: 900, textAlign: 'right', color: '#1a2b5e' }}>{formatINR(grandTotal)}</td>
+                    <tr style={{ background: '#f5f5f5' }}>
+                      <td style={{ padding: '9px 14px', fontSize: 14, fontWeight: 900, color: '#1a2b5e' }}>Total</td>
+                      <td style={{ padding: '9px 4px', fontSize: 14, fontWeight: 900 }}>:</td>
+                      <td style={{ padding: '9px 14px', fontSize: 14, fontWeight: 900, textAlign: 'right', color: '#1a2b5e' }}>{formatINR(grandTotal)}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -955,9 +952,6 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
                   <div style={{ fontSize: 10, fontWeight: 800, marginBottom: 3 }}>Amount in Words:</div>
                   <div style={{ fontSize: 10, color: '#333', fontStyle: 'italic', lineHeight: 1.5 }}>
                     {amountInWords(grandTotal)} Only
-                  </div>
-                  <div style={{ fontSize: 9, color: '#888', marginTop: 4, fontStyle: 'italic' }}>
-                    (All prices inclusive of applicable GST)
                   </div>
                 </div>
               </div>
