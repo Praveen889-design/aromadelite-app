@@ -941,51 +941,246 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
         </div>
       )}
 
-      {/* Modified items preview — shown to admin when pending */}
-      {quote.modification_status === 'pending_approval' && isAdmin && data.modified_items && data.modified_items.length > 0 && (
-        <div style={{
-          background: '#fff', border: '1.5px solid #fb923c', borderRadius: 12,
-          overflow: 'hidden',
-        }}>
-          <div style={{ background: '#fff7ed', padding: '8px 14px', fontWeight: 800, fontSize: 13, color: '#9a3412', borderBottom: '1px solid #fed7aa' }}>
-            📋 Modified Items (submitted by associate)
+      {/* ══ Price Diff Table — shown to admin when pending ══ */}
+      {quote.modification_status === 'pending_approval' && isAdmin && data.modified_items && data.modified_items.length > 0 && (() => {
+        const fmtN = (n) => new Intl.NumberFormat('en-IN', { maximumFractionDigits: 2 }).format(n || 0);
+
+        // Build lookup: original items by product_id+variant+pack_size key
+        const origMap = {};
+        (data.items || []).forEach((it) => {
+          const k = `${it.product_id}|${it.variant || ''}|${it.pack_size || ''}`;
+          origMap[k] = it;
+        });
+        const origKeys = new Set(Object.keys(origMap));
+
+        // Build lookup: modified items
+        const modMap = {};
+        data.modified_items.forEach((it) => {
+          const k = `${it.product_id}|${it.variant || ''}|${it.pack_size || ''}`;
+          modMap[k] = it;
+        });
+        const modKeys = new Set(Object.keys(modMap));
+
+        // Rows: all modified items (CHANGED / NEW) + removed items
+        const rows = [];
+
+        data.modified_items.forEach((mod, i) => {
+          const k = `${mod.product_id}|${mod.variant || ''}|${mod.pack_size || ''}`;
+          const orig = origMap[k];
+          const origPrice = orig ? Number(orig.unit_price) : null;
+          const modPrice  = Number(mod.unit_price);
+          const origQty   = orig ? Number(orig.quantity) : null;
+          const modQty    = Number(mod.quantity);
+          const origTotal = orig ? +(origQty * origPrice * (1 + (Number(orig.gst_percent) || 0) / 100)).toFixed(2) : null;
+          const modTotal  = mod.line_total || +(modQty * modPrice * (1 + (Number(mod.gst_percent) || 0) / 100)).toFixed(2);
+
+          let priceDiff = null, priceDiffPct = null, rowTag = 'unchanged';
+          if (orig === undefined) {
+            rowTag = 'new';
+          } else {
+            priceDiff    = +(modPrice - origPrice).toFixed(2);
+            priceDiffPct = origPrice > 0 ? +((priceDiff / origPrice) * 100).toFixed(1) : 0;
+            const qtyChanged = modQty !== origQty;
+            if (priceDiff !== 0 || qtyChanged) rowTag = priceDiff < 0 ? 'discount' : priceDiff > 0 ? 'increase' : 'qty_change';
+          }
+
+          rows.push({ mod, orig, origPrice, modPrice, origQty, modQty, origTotal, modTotal, priceDiff, priceDiffPct, rowTag, serial: i + 1 });
+        });
+
+        // Removed items (in original but not in modified)
+        [...origKeys].filter((k) => !modKeys.has(k)).forEach((k) => {
+          const orig = origMap[k];
+          const origTotal = +(Number(orig.quantity) * Number(orig.unit_price) * (1 + (Number(orig.gst_percent) || 0) / 100)).toFixed(2);
+          rows.push({ mod: null, orig, origPrice: Number(orig.unit_price), modPrice: null, origQty: Number(orig.quantity), modQty: null, origTotal, modTotal: null, priceDiff: null, priceDiffPct: null, rowTag: 'removed', serial: null });
+        });
+
+        const totalSavings = rows.reduce((s, r) => {
+          if (r.origTotal != null && r.modTotal != null) return s + (r.origTotal - r.modTotal);
+          if (r.origTotal != null && r.modTotal == null) return s + r.origTotal; // removed
+          return s;
+        }, 0);
+
+        const ROW_COLORS = {
+          discount:   { bg: '#f0fdf4', border: '#bbf7d0', tag: '#065f46', tagBg: '#dcfce7', label: '▼ Discount'  },
+          increase:   { bg: '#fff7ed', border: '#fed7aa', tag: '#9a3412', tagBg: '#ffedd5', label: '▲ Increase'  },
+          new:        { bg: '#eff6ff', border: '#bfdbfe', tag: '#1e40af', tagBg: '#dbeafe', label: '✦ New'        },
+          removed:    { bg: '#fef2f2', border: '#fecaca', tag: '#991b1b', tagBg: '#fee2e2', label: '✕ Removed'   },
+          qty_change: { bg: '#fafaf9', border: '#e7e5e4', tag: '#44403c', tagBg: '#f5f5f4', label: '⇄ Qty Changed'},
+          unchanged:  { bg: '#ffffff', border: '#f1f5f9', tag: '#64748b', tagBg: '#f8fafc', label: ''            },
+        };
+
+        return (
+          <div style={{ background: '#fff', border: '2px solid #fb923c', borderRadius: 14, overflow: 'hidden' }}>
+            {/* Header */}
+            <div style={{
+              background: 'linear-gradient(135deg, #fff7ed, #ffedd5)',
+              padding: '10px 16px',
+              borderBottom: '1.5px solid #fed7aa',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8,
+            }}>
+              <div style={{ fontWeight: 800, fontSize: 13, color: '#9a3412' }}>
+                📊 Price Comparison — Original vs Modified
+              </div>
+              {/* Summary chips */}
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {rows.filter(r => r.rowTag === 'discount').length > 0 && (
+                  <span style={{ fontSize: 11, fontWeight: 700, background: '#dcfce7', color: '#065f46', padding: '3px 9px', borderRadius: 99 }}>
+                    {rows.filter(r => r.rowTag === 'discount').length} price ↓
+                  </span>
+                )}
+                {rows.filter(r => r.rowTag === 'increase').length > 0 && (
+                  <span style={{ fontSize: 11, fontWeight: 700, background: '#ffedd5', color: '#9a3412', padding: '3px 9px', borderRadius: 99 }}>
+                    {rows.filter(r => r.rowTag === 'increase').length} price ↑
+                  </span>
+                )}
+                {rows.filter(r => r.rowTag === 'new').length > 0 && (
+                  <span style={{ fontSize: 11, fontWeight: 700, background: '#dbeafe', color: '#1e40af', padding: '3px 9px', borderRadius: 99 }}>
+                    {rows.filter(r => r.rowTag === 'new').length} added
+                  </span>
+                )}
+                {rows.filter(r => r.rowTag === 'removed').length > 0 && (
+                  <span style={{ fontSize: 11, fontWeight: 700, background: '#fee2e2', color: '#991b1b', padding: '3px 9px', borderRadius: 99 }}>
+                    {rows.filter(r => r.rowTag === 'removed').length} removed
+                  </span>
+                )}
+                <span style={{ fontSize: 11, fontWeight: 700, background: totalSavings > 0 ? '#dcfce7' : '#ffedd5', color: totalSavings > 0 ? '#065f46' : '#9a3412', padding: '3px 9px', borderRadius: 99 }}>
+                  {totalSavings > 0 ? '↓' : '↑'} ₹{fmtN(Math.abs(totalSavings))} {totalSavings > 0 ? 'less' : 'more'}
+                </span>
+              </div>
+            </div>
+
+            {/* Table */}
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                <thead>
+                  <tr style={{ background: '#fff7ed' }}>
+                    <th style={{ padding: '7px 10px', textAlign: 'center', fontWeight: 700, color: '#78350f', borderBottom: '1px solid #fed7aa', width: 30 }}>#</th>
+                    <th style={{ padding: '7px 10px', textAlign: 'left',   fontWeight: 700, color: '#78350f', borderBottom: '1px solid #fed7aa' }}>Product</th>
+                    <th style={{ padding: '7px 10px', textAlign: 'right',  fontWeight: 700, color: '#78350f', borderBottom: '1px solid #fed7aa', whiteSpace: 'nowrap' }}>Orig. Qty</th>
+                    <th style={{ padding: '7px 10px', textAlign: 'right',  fontWeight: 700, color: '#78350f', borderBottom: '1px solid #fed7aa', whiteSpace: 'nowrap' }}>Mod. Qty</th>
+                    <th style={{ padding: '7px 10px', textAlign: 'right',  fontWeight: 700, color: '#78350f', borderBottom: '1px solid #fed7aa', whiteSpace: 'nowrap' }}>Orig. Price</th>
+                    <th style={{ padding: '7px 10px', textAlign: 'right',  fontWeight: 700, color: '#78350f', borderBottom: '1px solid #fed7aa', whiteSpace: 'nowrap' }}>Client Price</th>
+                    <th style={{ padding: '7px 10px', textAlign: 'right',  fontWeight: 700, color: '#78350f', borderBottom: '1px solid #fed7aa', whiteSpace: 'nowrap' }}>Diff</th>
+                    <th style={{ padding: '7px 10px', textAlign: 'right',  fontWeight: 700, color: '#78350f', borderBottom: '1px solid #fed7aa', whiteSpace: 'nowrap' }}>Orig. Total</th>
+                    <th style={{ padding: '7px 10px', textAlign: 'right',  fontWeight: 700, color: '#78350f', borderBottom: '1px solid #fed7aa', whiteSpace: 'nowrap' }}>Mod. Total</th>
+                    <th style={{ padding: '7px 10px', textAlign: 'center', fontWeight: 700, color: '#78350f', borderBottom: '1px solid #fed7aa' }}>Change</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((r, i) => {
+                    const C = ROW_COLORS[r.rowTag];
+                    const itemName = r.mod ? r.mod.product_name : r.orig.product_name;
+                    const variant  = r.mod ? (r.mod.variant || r.mod.pack_size) : (r.orig.variant || r.orig.pack_size);
+                    const totalDiff = r.origTotal != null && r.modTotal != null ? +(r.modTotal - r.origTotal).toFixed(2) : null;
+                    return (
+                      <tr key={i} style={{ background: C.bg, borderBottom: `1px solid ${C.border}` }}>
+                        <td style={{ padding: '6px 10px', textAlign: 'center', color: '#94a3b8' }}>
+                          {r.serial != null ? r.serial : '—'}
+                        </td>
+                        <td style={{ padding: '6px 10px' }}>
+                          <div style={{ fontWeight: 700, color: r.rowTag === 'removed' ? '#991b1b' : '#0f172a', textDecoration: r.rowTag === 'removed' ? 'line-through' : 'none' }}>
+                            {itemName}
+                          </div>
+                          {variant && <div style={{ fontSize: 10, color: '#64748b' }}>{variant}</div>}
+                        </td>
+                        {/* Orig Qty */}
+                        <td style={{ padding: '6px 10px', textAlign: 'right', color: '#64748b' }}>
+                          {r.origQty != null ? r.origQty : '—'}
+                        </td>
+                        {/* Mod Qty */}
+                        <td style={{ padding: '6px 10px', textAlign: 'right' }}>
+                          {r.modQty != null ? (
+                            <span style={{ fontWeight: 700, color: r.modQty !== r.origQty ? '#1d4ed8' : '#374151' }}>
+                              {r.modQty}
+                              {r.origQty != null && r.modQty !== r.origQty && (
+                                <span style={{ fontSize: 10, color: r.modQty > r.origQty ? '#16a34a' : '#dc2626', marginLeft: 3 }}>
+                                  ({r.modQty > r.origQty ? '+' : ''}{r.modQty - r.origQty})
+                                </span>
+                              )}
+                            </span>
+                          ) : '—'}
+                        </td>
+                        {/* Orig Price */}
+                        <td style={{ padding: '6px 10px', textAlign: 'right', color: '#64748b' }}>
+                          {r.origPrice != null ? `₹ ${fmtN(r.origPrice)}` : '—'}
+                        </td>
+                        {/* Modified Price */}
+                        <td style={{ padding: '6px 10px', textAlign: 'right' }}>
+                          {r.modPrice != null ? (
+                            <span style={{ fontWeight: 800, color: r.rowTag === 'discount' ? '#16a34a' : r.rowTag === 'increase' ? '#dc2626' : '#0f172a' }}>
+                              ₹ {fmtN(r.modPrice)}
+                            </span>
+                          ) : '—'}
+                        </td>
+                        {/* Price Diff */}
+                        <td style={{ padding: '6px 10px', textAlign: 'right' }}>
+                          {r.priceDiff != null && r.priceDiff !== 0 ? (
+                            <div>
+                              <div style={{ fontWeight: 800, color: r.priceDiff < 0 ? '#16a34a' : '#dc2626', fontSize: 12 }}>
+                                {r.priceDiff > 0 ? '+' : ''}₹ {fmtN(r.priceDiff)}
+                              </div>
+                              <div style={{ fontSize: 10, color: r.priceDiff < 0 ? '#16a34a' : '#dc2626' }}>
+                                ({r.priceDiffPct > 0 ? '+' : ''}{r.priceDiffPct}%)
+                              </div>
+                            </div>
+                          ) : r.rowTag === 'new' || r.rowTag === 'removed' ? '—' : (
+                            <span style={{ color: '#94a3b8', fontSize: 11 }}>no change</span>
+                          )}
+                        </td>
+                        {/* Orig Total */}
+                        <td style={{ padding: '6px 10px', textAlign: 'right', color: '#64748b' }}>
+                          {r.origTotal != null ? `₹ ${fmtN(r.origTotal)}` : '—'}
+                        </td>
+                        {/* Mod Total */}
+                        <td style={{ padding: '6px 10px', textAlign: 'right' }}>
+                          {r.modTotal != null ? (
+                            <span style={{ fontWeight: 700, color: totalDiff != null && totalDiff < 0 ? '#16a34a' : totalDiff != null && totalDiff > 0 ? '#dc2626' : '#0f172a' }}>
+                              ₹ {fmtN(r.modTotal)}
+                            </span>
+                          ) : <span style={{ color: '#dc2626', fontWeight: 700 }}>—</span>}
+                        </td>
+                        {/* Change tag */}
+                        <td style={{ padding: '6px 10px', textAlign: 'center' }}>
+                          {C.label && (
+                            <span style={{ fontSize: 10, fontWeight: 800, background: C.tagBg, color: C.tag, padding: '2px 8px', borderRadius: 99, whiteSpace: 'nowrap' }}>
+                              {C.label}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                {/* Totals footer */}
+                <tfoot>
+                  <tr style={{ background: '#fff7ed', borderTop: '2px solid #fb923c' }}>
+                    <td colSpan={7} style={{ padding: '8px 10px', fontSize: 12, fontWeight: 800, color: '#9a3412' }}>Grand Total</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'right', fontSize: 13, fontWeight: 800, color: '#64748b' }}>
+                      ₹ {fmtN(data.totals.total_amount)}
+                    </td>
+                    <td style={{ padding: '8px 10px', textAlign: 'right', fontSize: 13, fontWeight: 900, color: '#9a3412' }}>
+                      ₹ {fmtN(data.modified_totals ? data.modified_totals.total_amount : 0)}
+                    </td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center' }}>
+                      {data.modified_totals && (
+                        <span style={{
+                          fontSize: 11, fontWeight: 900,
+                          background: data.modified_totals.total_amount < data.totals.total_amount ? '#dcfce7' : '#ffedd5',
+                          color: data.modified_totals.total_amount < data.totals.total_amount ? '#065f46' : '#9a3412',
+                          padding: '3px 10px', borderRadius: 99,
+                        }}>
+                          {data.modified_totals.total_amount < data.totals.total_amount ? '▼ ' : '▲ '}
+                          ₹ {fmtN(Math.abs(data.modified_totals.total_amount - data.totals.total_amount))}
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
           </div>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-            <thead>
-              <tr style={{ background: '#fff7ed' }}>
-                {['#', 'Product', 'Qty', 'Client Price', 'Line Total'].map((h) => (
-                  <th key={h} style={{ padding: '6px 10px', textAlign: h === '#' ? 'center' : 'left', fontWeight: 700, borderBottom: '1px solid #fed7aa', color: '#9a3412' }}>
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {data.modified_items.map((it, i) => (
-                <tr key={i} style={{ borderBottom: '1px solid #fff7ed', background: i % 2 === 0 ? '#fff' : '#fffbeb' }}>
-                  <td style={{ padding: '5px 10px', textAlign: 'center', color: '#94a3b8' }}>{i + 1}</td>
-                  <td style={{ padding: '5px 10px', fontWeight: 600 }}>
-                    {it.product_name}
-                    {(it.variant || it.pack_size) && (
-                      <span style={{ color: '#64748b', fontWeight: 400 }}> ({[it.variant, it.pack_size].filter(Boolean).join(', ')})</span>
-                    )}
-                  </td>
-                  <td style={{ padding: '5px 10px' }}>{it.quantity}</td>
-                  <td style={{ padding: '5px 10px' }}>
-                    {it.system_price && it.system_price > it.unit_price ? (
-                      <span>
-                        <span style={{ textDecoration: 'line-through', color: '#9ca3af', marginRight: 4 }}>₹{it.system_price}</span>
-                        <span style={{ color: '#059669', fontWeight: 700 }}>₹{it.unit_price}</span>
-                      </span>
-                    ) : `₹${it.unit_price}`}
-                  </td>
-                  <td style={{ padding: '5px 10px', fontWeight: 700 }}>₹{new Intl.NumberFormat('en-IN').format(it.line_total)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+        );
+      })()}
 
       {/* PDF-capturable document */}
       <div style={{ background: '#f3f3f3', padding: '24px', borderRadius: 12 }}>
