@@ -295,31 +295,14 @@ export default function BillPreview() {
 
             {/* ── Company Header ── */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '12px 16px', borderBottom: '1.5px solid #000' }}>
-              {/* Logo box */}
+              {/* Logo */}
               <div style={{ width: 110, height: 72, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                border: '1px solid #cbd5e1', borderRadius: 6, background: '#fff', flexShrink: 0, padding: 4 }}>
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 280" width="100" height="64" aria-label="Aromadelite">
-                  <path d="M0,140 Q500,-30 1000,140 Q500,310 0,140 Z" fill="#1F6BC7"/>
-                  <g transform="translate(500 120)">
-                    <ellipse cx="-6" cy="3" rx="118" ry="4" fill="#143A6E" opacity="0.35"/>
-                    <g transform="translate(-88 0)">
-                      <rect x="-3.5" y="-8" width="7" height="12" rx="1.5" fill="#6A4527"/>
-                      <path d="M0 -82 C 24 -82 32 -58 32 -36 C 32 -14 18 -6 0 -6 C -18 -6 -32 -14 -32 -36 C -32 -58 -24 -82 0 -82 Z" fill="#3D9354"/>
-                      <path d="M-2 -74 C 12 -74 20 -56 20 -40 C 20 -28 10 -22 -2 -22 C -14 -22 -20 -32 -20 -46 C -20 -60 -16 -74 -2 -74 Z" fill="#2F7B43" opacity="0.55"/>
-                    </g>
-                    <g transform="translate(20 0)">
-                      <ellipse cx="0" cy="-30" rx="28" ry="44" fill="#D4A017"/>
-                      <ellipse cx="0" cy="-28" rx="16" ry="28" fill="#E8B830"/>
-                      <ellipse cx="-2" cy="-14" rx="6" ry="10" fill="#F5D26A" opacity="0.7"/>
-                    </g>
-                    <g transform="translate(66 0)">
-                      <rect x="-3.5" y="-8" width="7" height="12" rx="1.5" fill="#6A4527"/>
-                      <path d="M0 -82 C 24 -82 32 -58 32 -36 C 32 -14 18 -6 0 -6 C -18 -6 -32 -14 -32 -36 C -32 -58 -24 -82 0 -82 Z" fill="#3D9354"/>
-                      <path d="M-2 -74 C 12 -74 20 -56 20 -40 C 20 -28 10 -22 -2 -22 C -14 -22 -20 -32 -20 -46 C -20 -60 -16 -74 -2 -74 Z" fill="#2F7B43" opacity="0.55"/>
-                    </g>
-                    <text x="0" y="40" textAnchor="middle" fontFamily="Arial,sans-serif" fontWeight="700" fontSize="28" letterSpacing="6" fill="#ffffff">AROMADELITE</text>
-                  </g>
-                </svg>
+                flexShrink: 0 }}>
+                <img
+                  src="/aromadelite-logo.png"
+                  alt="Aromadelite"
+                  style={{ width: 110, height: 'auto', maxHeight: 72, objectFit: 'contain' }}
+                />
               </div>
               {/* Company details */}
               <div style={{ flex: 1 }}>
