@@ -193,6 +193,46 @@ export default function QuotePreview() {
     );
   }, [taxSummary]);
 
+  /* ── Modification diff rows — computed before render ── */
+  const diffRows = useMemo(() => {
+    if (!data?.modified_items?.length) return [];
+    const fmtKey = (it) => `${it.product_id}|${it.variant || ''}|${it.pack_size || ''}`;
+    const origMap = {};
+    (data.items || []).forEach((it) => { origMap[fmtKey(it)] = it; });
+    const modMap  = {};
+    (data.modified_items || []).forEach((it) => { modMap[fmtKey(it)] = it; });
+
+    const rows = [];
+    // Modified / new / unchanged items
+    data.modified_items.forEach((mod, i) => {
+      const orig       = origMap[fmtKey(mod)];
+      const origPrice  = orig ? Number(orig.unit_price) : null;
+      const modPrice   = Number(mod.unit_price);
+      const origQty    = orig ? Number(orig.quantity) : null;
+      const modQty     = Number(mod.quantity);
+      const gst        = Number(mod.gst_percent) || 0;
+      const origTotal  = orig != null ? +(origQty * origPrice * (1 + gst / 100)).toFixed(2) : null;
+      const modTotal   = +(modQty * modPrice * (1 + gst / 100)).toFixed(2);
+      const priceDiff  = orig != null ? +(modPrice - origPrice).toFixed(2) : null;
+      const diffPct    = (orig != null && origPrice > 0) ? +((priceDiff / origPrice) * 100).toFixed(1) : null;
+      const tag = orig == null ? 'new'
+        : priceDiff < 0 ? 'discount'
+        : priceDiff > 0 ? 'increase'
+        : modQty !== origQty ? 'qty_change'
+        : 'unchanged';
+      rows.push({ mod, orig, origPrice, modPrice, origQty, modQty, origTotal, modTotal, priceDiff, diffPct, tag, serial: i + 1 });
+    });
+    // Removed items (in original but not in modified)
+    (data.items || []).forEach((orig) => {
+      if (!modMap[fmtKey(orig)]) {
+        const gst = Number(orig.gst_percent) || 0;
+        const origTotal = +(Number(orig.quantity) * Number(orig.unit_price) * (1 + gst / 100)).toFixed(2);
+        rows.push({ mod: null, orig, origPrice: Number(orig.unit_price), modPrice: null, origQty: Number(orig.quantity), modQty: null, origTotal, modTotal: null, priceDiff: null, diffPct: null, tag: 'removed', serial: null });
+      }
+    });
+    return rows;
+  }, [data]);
+
   if (error) return <div className="bg-rose-50 text-rose-700 border border-rose-200 rounded-xl p-4 text-sm">{error}</div>;
   if (!data) return <div className="text-sm text-slate-500">Loading quote…</div>;
 
@@ -471,8 +511,212 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
   /* ── derive onMobile for label tweaks ── */
   const onMobile = isCapacitor() || (typeof window !== 'undefined' && window.innerWidth < 640);
 
+  const fmtN = (n) => new Intl.NumberFormat('en-IN', { maximumFractionDigits: 2 }).format(n || 0);
+  const TAG_CFG = {
+    discount:   { bg: '#f0fdf4', border: '#86efac', tag: '#065f46', tagBg: '#dcfce7', label: '▼ Discount'   },
+    increase:   { bg: '#fff7ed', border: '#fbbf24', tag: '#9a3412', tagBg: '#ffedd5', label: '▲ Increase'   },
+    new:        { bg: '#eff6ff', border: '#93c5fd', tag: '#1e40af', tagBg: '#dbeafe', label: '✦ New'         },
+    removed:    { bg: '#fef2f2', border: '#fca5a5', tag: '#991b1b', tagBg: '#fee2e2', label: '✕ Removed'    },
+    qty_change: { bg: '#fafaf9', border: '#d6d3d1', tag: '#44403c', tagBg: '#f5f5f4', label: '⇄ Qty Changed' },
+    unchanged:  { bg: '#ffffff', border: '#f1f5f9', tag: '#94a3b8', tagBg: '#f8fafc', label: ''              },
+  };
+
   return (
     <div className="space-y-4">
+
+      {/* ══ ADMIN MODIFICATION REVIEW PANEL — pinned at top ══ */}
+      {isAdmin && quote.modification_status === 'pending_approval' && (
+        <div style={{ border: '2px solid #fb923c', borderRadius: 14, background: '#fff', overflow: 'hidden' }}>
+
+          {/* Banner header */}
+          <div style={{ background: 'linear-gradient(135deg, #fff7ed, #ffedd5)', padding: '12px 16px', borderBottom: '1.5px solid #fed7aa', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+            <div>
+              <div style={{ fontWeight: 900, fontSize: 15, color: '#9a3412' }}>🔔 Modification Pending Your Approval</div>
+              <div style={{ fontSize: 12, color: '#7c2d12', marginTop: 2 }}>
+                {quote.employee_name || 'Associate'} submitted updated pricing. Review changes below then approve or reject.
+              </div>
+              {quote.modification_note && (
+                <div style={{ marginTop: 6, background: '#fff', border: '1px solid #fed7aa', borderRadius: 7, padding: '6px 10px', fontSize: 12, color: '#7c2d12', fontStyle: 'italic' }}>
+                  Note: "{quote.modification_note}"
+                </div>
+              )}
+            </div>
+            {/* Totals comparison */}
+            {data.modified_totals && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                <div style={{ textAlign: 'center', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 9, padding: '8px 14px' }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Original</div>
+                  <div style={{ fontSize: 18, fontWeight: 900, color: '#64748b' }}>₹{fmtN(totals.total_amount)}</div>
+                </div>
+                <div style={{ fontSize: 20, color: '#94a3b8' }}>→</div>
+                <div style={{ textAlign: 'center', background: '#fff7ed', border: '2px solid #fb923c', borderRadius: 9, padding: '8px 14px' }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: '#9a3412', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Modified</div>
+                  <div style={{ fontSize: 18, fontWeight: 900, color: '#9a3412' }}>₹{fmtN(data.modified_totals.total_amount)}</div>
+                </div>
+                <div style={{
+                  fontSize: 13, fontWeight: 900, padding: '6px 14px', borderRadius: 99,
+                  background: data.modified_totals.total_amount < totals.total_amount ? '#dcfce7' : '#ffedd5',
+                  color:      data.modified_totals.total_amount < totals.total_amount ? '#065f46' : '#9a3412',
+                }}>
+                  {data.modified_totals.total_amount < totals.total_amount ? '▼' : '▲'} ₹{fmtN(Math.abs(data.modified_totals.total_amount - totals.total_amount))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Diff table */}
+          {diffRows.length > 0 ? (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, minWidth: 640 }}>
+                <thead>
+                  <tr style={{ background: '#fff7ed' }}>
+                    {['#','Product','Orig Qty','Mod Qty','Orig Price','Client Price','Price Diff','Orig Total','Mod Total','Change'].map((h) => (
+                      <th key={h} style={{ padding: '7px 10px', fontWeight: 700, color: '#78350f', borderBottom: '1px solid #fed7aa', textAlign: ['#','Orig Qty','Mod Qty'].includes(h) ? 'center' : h === 'Change' ? 'center' : 'right', whiteSpace: 'nowrap' }}>
+                        {h === 'Product' ? <span style={{ textAlign: 'left', display: 'block' }}>{h}</span> : h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {diffRows.map((r, i) => {
+                    const C = TAG_CFG[r.tag] || TAG_CFG.unchanged;
+                    const name    = r.mod ? r.mod.product_name : r.orig.product_name;
+                    const variant = r.mod ? ([r.mod.variant, r.mod.pack_size].filter(Boolean).join(' · ')) : ([r.orig.variant, r.orig.pack_size].filter(Boolean).join(' · '));
+                    const lineChange = r.origTotal != null && r.modTotal != null ? +(r.modTotal - r.origTotal).toFixed(2) : null;
+                    return (
+                      <tr key={i} style={{ background: C.bg, borderBottom: `1px solid ${C.border}` }}>
+                        <td style={{ padding: '6px 10px', textAlign: 'center', color: '#94a3b8', fontWeight: 600 }}>{r.serial ?? '—'}</td>
+                        <td style={{ padding: '6px 10px' }}>
+                          <div style={{ fontWeight: 700, color: r.tag === 'removed' ? '#991b1b' : '#0f172a', textDecoration: r.tag === 'removed' ? 'line-through' : 'none' }}>{name}</div>
+                          {variant && <div style={{ fontSize: 10, color: '#94a3b8' }}>{variant}</div>}
+                        </td>
+                        <td style={{ padding: '6px 10px', textAlign: 'center', color: '#64748b' }}>{r.origQty ?? '—'}</td>
+                        <td style={{ padding: '6px 10px', textAlign: 'center' }}>
+                          {r.modQty != null ? (
+                            <span style={{ fontWeight: 700, color: r.origQty != null && r.modQty !== r.origQty ? '#1d4ed8' : '#374151' }}>
+                              {r.modQty}
+                              {r.origQty != null && r.modQty !== r.origQty && (
+                                <span style={{ fontSize: 10, marginLeft: 3, color: r.modQty > r.origQty ? '#16a34a' : '#dc2626' }}>
+                                  ({r.modQty > r.origQty ? '+' : ''}{r.modQty - r.origQty})
+                                </span>
+                              )}
+                            </span>
+                          ) : '—'}
+                        </td>
+                        <td style={{ padding: '6px 10px', textAlign: 'right', color: '#64748b' }}>{r.origPrice != null ? `₹ ${fmtN(r.origPrice)}` : '—'}</td>
+                        <td style={{ padding: '6px 10px', textAlign: 'right' }}>
+                          {r.modPrice != null ? (
+                            <span style={{ fontWeight: 800, color: r.tag === 'discount' ? '#16a34a' : r.tag === 'increase' ? '#dc2626' : '#0f172a' }}>
+                              ₹ {fmtN(r.modPrice)}
+                            </span>
+                          ) : '—'}
+                        </td>
+                        <td style={{ padding: '6px 10px', textAlign: 'right' }}>
+                          {r.priceDiff != null && r.priceDiff !== 0 ? (
+                            <div>
+                              <div style={{ fontWeight: 800, fontSize: 12, color: r.priceDiff < 0 ? '#16a34a' : '#dc2626' }}>
+                                {r.priceDiff > 0 ? '+' : ''}₹ {fmtN(r.priceDiff)}
+                              </div>
+                              <div style={{ fontSize: 10, color: r.priceDiff < 0 ? '#16a34a' : '#dc2626' }}>
+                                ({r.diffPct > 0 ? '+' : ''}{r.diffPct}%)
+                              </div>
+                            </div>
+                          ) : r.tag === 'new' || r.tag === 'removed' ? (
+                            <span style={{ color: '#94a3b8', fontSize: 11 }}>—</span>
+                          ) : (
+                            <span style={{ color: '#94a3b8', fontSize: 11 }}>no change</span>
+                          )}
+                        </td>
+                        <td style={{ padding: '6px 10px', textAlign: 'right', color: '#64748b' }}>{r.origTotal != null ? `₹ ${fmtN(r.origTotal)}` : '—'}</td>
+                        <td style={{ padding: '6px 10px', textAlign: 'right' }}>
+                          {r.modTotal != null ? (
+                            <span style={{ fontWeight: 700, color: lineChange != null && lineChange < 0 ? '#16a34a' : lineChange != null && lineChange > 0 ? '#dc2626' : '#374151' }}>
+                              ₹ {fmtN(r.modTotal)}
+                            </span>
+                          ) : <span style={{ color: '#dc2626', fontWeight: 700 }}>—</span>}
+                        </td>
+                        <td style={{ padding: '6px 10px', textAlign: 'center' }}>
+                          {C.label && (
+                            <span style={{ fontSize: 10, fontWeight: 800, background: C.tagBg, color: C.tag, padding: '3px 8px', borderRadius: 99, whiteSpace: 'nowrap' }}>
+                              {C.label}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                <tfoot>
+                  <tr style={{ background: '#fff7ed', borderTop: '2px solid #fb923c' }}>
+                    <td colSpan={7} style={{ padding: '8px 12px', fontWeight: 800, color: '#9a3412', fontSize: 13 }}>Grand Total</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 800, color: '#64748b', fontSize: 13 }}>₹ {fmtN(totals.total_amount)}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 900, color: '#9a3412', fontSize: 14 }}>
+                      {data.modified_totals ? `₹ ${fmtN(data.modified_totals.total_amount)}` : '—'}
+                    </td>
+                    <td style={{ padding: '8px 10px', textAlign: 'center' }}>
+                      {data.modified_totals && (
+                        <span style={{
+                          fontSize: 11, fontWeight: 900, padding: '3px 10px', borderRadius: 99,
+                          background: data.modified_totals.total_amount < totals.total_amount ? '#dcfce7' : '#ffedd5',
+                          color:      data.modified_totals.total_amount < totals.total_amount ? '#065f46' : '#9a3412',
+                        }}>
+                          {data.modified_totals.total_amount < totals.total_amount ? '▼ ' : '▲ '}
+                          ₹ {fmtN(Math.abs(data.modified_totals.total_amount - totals.total_amount))}
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          ) : (
+            <div style={{ padding: '16px', fontSize: 13, color: '#94a3b8', textAlign: 'center' }}>
+              No modified items data yet.
+            </div>
+          )}
+
+          {/* Approve / Reject buttons */}
+          <div style={{ padding: '12px 16px', borderTop: '1px solid #fed7aa', background: '#fffbeb', display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'flex-start' }}>
+            {showRejectInput && (
+              <div style={{ width: '100%' }}>
+                <label style={{ fontSize: 12, fontWeight: 700, color: '#7c2d12', display: 'block', marginBottom: 4 }}>
+                  Reason for rejection (required before confirming)
+                </label>
+                <textarea
+                  value={rejectNote}
+                  onChange={(e) => setRejectNote(e.target.value)}
+                  rows={2}
+                  placeholder="e.g. Margin too low — minimum price for Floor Cleaner is ₹38…"
+                  style={{ width: '100%', border: '1.5px solid #fca5a5', borderRadius: 8, padding: '7px 10px', fontSize: 13, resize: 'vertical', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box', color: '#7f1d1d' }}
+                />
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => onReviewModification('approved')}
+              disabled={reviewingMod}
+              style={{ padding: '10px 22px', borderRadius: 9, border: 'none', cursor: reviewingMod ? 'not-allowed' : 'pointer', background: reviewingMod ? '#86efac' : 'linear-gradient(135deg, #16a34a, #15803d)', color: '#fff', fontSize: 13, fontWeight: 800 }}
+            >
+              {reviewingMod ? 'Processing…' : '✅ Approve Modification'}
+            </button>
+            <button
+              type="button"
+              onClick={() => { if (!showRejectInput) { setShowRejectInput(true); return; } onReviewModification('rejected'); }}
+              disabled={reviewingMod}
+              style={{ padding: '10px 22px', borderRadius: 9, border: '1.5px solid #fca5a5', cursor: reviewingMod ? 'not-allowed' : 'pointer', background: '#fff', color: '#dc2626', fontSize: 13, fontWeight: 800 }}
+            >
+              ❌ {showRejectInput ? 'Confirm Reject' : 'Reject'}
+            </button>
+            {showRejectInput && (
+              <button type="button" onClick={() => { setShowRejectInput(false); setRejectNote(''); }}
+                style={{ padding: '10px 16px', borderRadius: 9, border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', fontSize: 13, cursor: 'pointer' }}>
+                Cancel
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* ── Action bar — not part of PDF ── */}
       <div className="bg-white rounded-xl border border-slate-200 p-3 space-y-2">
 
@@ -819,368 +1063,17 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
         </div>
       )}
 
-      {/* 🔔 Admin review panel — pending approval */}
-      {quote.modification_status === 'pending_approval' && isAdmin && (
-        <div style={{
-          background: '#fff7ed', border: '2px solid #fb923c', borderRadius: 12,
-          padding: '14px 16px',
-        }}>
-          <div style={{ fontWeight: 800, fontSize: 14, color: '#9a3412', marginBottom: 6 }}>
-            🔔 Modification Pending Your Approval
-          </div>
-          <div style={{ fontSize: 12, color: '#7c2d12', marginBottom: 10 }}>
-            The associate has submitted updated items and pricing. Review the modified quote below, then approve or reject.
-          </div>
-          {quote.modification_note && (
-            <div style={{
-              background: '#fff', border: '1px solid #fed7aa', borderRadius: 8,
-              padding: '8px 12px', fontSize: 12, color: '#7c2d12', marginBottom: 12,
-              fontStyle: 'italic',
-            }}>
-              Associate note: "{quote.modification_note}"
-            </div>
-          )}
-          {/* Show comparison totals */}
-          {data.modified_totals && (
-            <div style={{ display: 'flex', gap: 20, marginBottom: 12, flexWrap: 'wrap' }}>
-              <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, padding: '8px 14px', fontSize: 12 }}>
-                <div style={{ color: '#64748b', fontWeight: 600 }}>Original Total</div>
-                <div style={{ fontSize: 16, fontWeight: 800, color: '#64748b' }}>
-                  ₹{new Intl.NumberFormat('en-IN').format(data.totals.total_amount)}
-                </div>
-              </div>
-              <div style={{ color: '#94a3b8', alignSelf: 'center', fontSize: 20 }}>→</div>
-              <div style={{ background: '#fff', border: '1.5px solid #fb923c', borderRadius: 8, padding: '8px 14px', fontSize: 12 }}>
-                <div style={{ color: '#9a3412', fontWeight: 600 }}>Modified Total</div>
-                <div style={{ fontSize: 16, fontWeight: 800, color: '#9a3412' }}>
-                  ₹{new Intl.NumberFormat('en-IN').format(data.modified_totals.total_amount)}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Reject input */}
-          {showRejectInput && (
-            <div style={{ marginBottom: 10 }}>
-              <label style={{ fontSize: 12, fontWeight: 700, color: '#7c2d12', display: 'block', marginBottom: 4 }}>
-                Reason for rejection (required)
-              </label>
-              <textarea
-                value={rejectNote}
-                onChange={(e) => setRejectNote(e.target.value)}
-                rows={2}
-                placeholder="e.g. Price too low, margin not acceptable…"
-                style={{
-                  width: '100%', border: '1.5px solid #fca5a5', borderRadius: 8,
-                  padding: '7px 10px', fontSize: 13, resize: 'vertical',
-                  fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box',
-                  color: '#7f1d1d',
-                }}
-              />
-            </div>
-          )}
-
-          <div style={{ display: 'flex', gap: 10 }}>
-            <button
-              type="button"
-              onClick={() => onReviewModification('approved')}
-              disabled={reviewingMod}
-              style={{
-                padding: '9px 20px', borderRadius: 9, border: 'none', cursor: reviewingMod ? 'not-allowed' : 'pointer',
-                background: reviewingMod ? '#86efac' : 'linear-gradient(135deg, #16a34a, #15803d)',
-                color: '#fff', fontSize: 13, fontWeight: 800,
-              }}
-            >
-              ✅ Approve
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                if (!showRejectInput) { setShowRejectInput(true); return; }
-                onReviewModification('rejected');
-              }}
-              disabled={reviewingMod}
-              style={{
-                padding: '9px 20px', borderRadius: 9, border: '1.5px solid #fca5a5',
-                cursor: reviewingMod ? 'not-allowed' : 'pointer',
-                background: '#fff', color: '#dc2626', fontSize: 13, fontWeight: 800,
-              }}
-            >
-              ❌ {showRejectInput ? 'Confirm Reject' : 'Reject'}
-            </button>
-            {showRejectInput && (
-              <button
-                type="button"
-                onClick={() => { setShowRejectInput(false); setRejectNote(''); }}
-                style={{ padding: '9px 14px', borderRadius: 9, border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', fontSize: 13, cursor: 'pointer' }}
-              >
-                Cancel
-              </button>
-            )}
-          </div>
+      {/* ── Admin: approved / rejected compact pills ── */}
+      {isAdmin && quote.modification_status === 'approved' && (
+        <div style={{ background: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: 10, padding: '10px 16px', fontSize: 13, color: '#065f46' }}>
+          ✅ <strong>You approved</strong> this modification.{quote.admin_note ? ` Note: "${quote.admin_note}"` : ''} Associate can now generate the bill.
         </div>
       )}
-
-      {/* ✅ Admin: approved view */}
-      {quote.modification_status === 'approved' && isAdmin && (
-        <div style={{
-          background: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: 12,
-          padding: '10px 16px', fontSize: 13, color: '#065f46',
-        }}>
-          ✅ <strong>You approved</strong> this modification.{quote.admin_note ? ` Note: "${quote.admin_note}"` : ''}
+      {isAdmin && quote.modification_status === 'rejected' && (
+        <div style={{ background: '#fef2f2', border: '1.5px solid #fecaca', borderRadius: 10, padding: '10px 16px', fontSize: 13, color: '#991b1b' }}>
+          ❌ <strong>You rejected</strong> this modification.{quote.admin_note ? ` Reason: "${quote.admin_note}"` : ''} Associate will re-edit and resubmit.
         </div>
       )}
-
-      {/* ❌ Admin: rejected view */}
-      {quote.modification_status === 'rejected' && isAdmin && (
-        <div style={{
-          background: '#fef2f2', border: '1.5px solid #fecaca', borderRadius: 12,
-          padding: '10px 16px', fontSize: 13, color: '#991b1b',
-        }}>
-          ❌ <strong>You rejected</strong> this modification.{quote.admin_note ? ` Reason: "${quote.admin_note}"` : ''} Associate will re-edit.
-        </div>
-      )}
-
-      {/* ══ Price Diff Table — shown to admin when pending ══ */}
-      {quote.modification_status === 'pending_approval' && isAdmin && data.modified_items && data.modified_items.length > 0 && (() => {
-        const fmtN = (n) => new Intl.NumberFormat('en-IN', { maximumFractionDigits: 2 }).format(n || 0);
-
-        // Build lookup: original items by product_id+variant+pack_size key
-        const origMap = {};
-        (data.items || []).forEach((it) => {
-          const k = `${it.product_id}|${it.variant || ''}|${it.pack_size || ''}`;
-          origMap[k] = it;
-        });
-        const origKeys = new Set(Object.keys(origMap));
-
-        // Build lookup: modified items
-        const modMap = {};
-        data.modified_items.forEach((it) => {
-          const k = `${it.product_id}|${it.variant || ''}|${it.pack_size || ''}`;
-          modMap[k] = it;
-        });
-        const modKeys = new Set(Object.keys(modMap));
-
-        // Rows: all modified items (CHANGED / NEW) + removed items
-        const rows = [];
-
-        data.modified_items.forEach((mod, i) => {
-          const k = `${mod.product_id}|${mod.variant || ''}|${mod.pack_size || ''}`;
-          const orig = origMap[k];
-          const origPrice = orig ? Number(orig.unit_price) : null;
-          const modPrice  = Number(mod.unit_price);
-          const origQty   = orig ? Number(orig.quantity) : null;
-          const modQty    = Number(mod.quantity);
-          const origTotal = orig ? +(origQty * origPrice * (1 + (Number(orig.gst_percent) || 0) / 100)).toFixed(2) : null;
-          const modTotal  = mod.line_total || +(modQty * modPrice * (1 + (Number(mod.gst_percent) || 0) / 100)).toFixed(2);
-
-          let priceDiff = null, priceDiffPct = null, rowTag = 'unchanged';
-          if (orig === undefined) {
-            rowTag = 'new';
-          } else {
-            priceDiff    = +(modPrice - origPrice).toFixed(2);
-            priceDiffPct = origPrice > 0 ? +((priceDiff / origPrice) * 100).toFixed(1) : 0;
-            const qtyChanged = modQty !== origQty;
-            if (priceDiff !== 0 || qtyChanged) rowTag = priceDiff < 0 ? 'discount' : priceDiff > 0 ? 'increase' : 'qty_change';
-          }
-
-          rows.push({ mod, orig, origPrice, modPrice, origQty, modQty, origTotal, modTotal, priceDiff, priceDiffPct, rowTag, serial: i + 1 });
-        });
-
-        // Removed items (in original but not in modified)
-        [...origKeys].filter((k) => !modKeys.has(k)).forEach((k) => {
-          const orig = origMap[k];
-          const origTotal = +(Number(orig.quantity) * Number(orig.unit_price) * (1 + (Number(orig.gst_percent) || 0) / 100)).toFixed(2);
-          rows.push({ mod: null, orig, origPrice: Number(orig.unit_price), modPrice: null, origQty: Number(orig.quantity), modQty: null, origTotal, modTotal: null, priceDiff: null, priceDiffPct: null, rowTag: 'removed', serial: null });
-        });
-
-        const totalSavings = rows.reduce((s, r) => {
-          if (r.origTotal != null && r.modTotal != null) return s + (r.origTotal - r.modTotal);
-          if (r.origTotal != null && r.modTotal == null) return s + r.origTotal; // removed
-          return s;
-        }, 0);
-
-        const ROW_COLORS = {
-          discount:   { bg: '#f0fdf4', border: '#bbf7d0', tag: '#065f46', tagBg: '#dcfce7', label: '▼ Discount'  },
-          increase:   { bg: '#fff7ed', border: '#fed7aa', tag: '#9a3412', tagBg: '#ffedd5', label: '▲ Increase'  },
-          new:        { bg: '#eff6ff', border: '#bfdbfe', tag: '#1e40af', tagBg: '#dbeafe', label: '✦ New'        },
-          removed:    { bg: '#fef2f2', border: '#fecaca', tag: '#991b1b', tagBg: '#fee2e2', label: '✕ Removed'   },
-          qty_change: { bg: '#fafaf9', border: '#e7e5e4', tag: '#44403c', tagBg: '#f5f5f4', label: '⇄ Qty Changed'},
-          unchanged:  { bg: '#ffffff', border: '#f1f5f9', tag: '#64748b', tagBg: '#f8fafc', label: ''            },
-        };
-
-        return (
-          <div style={{ background: '#fff', border: '2px solid #fb923c', borderRadius: 14, overflow: 'hidden' }}>
-            {/* Header */}
-            <div style={{
-              background: 'linear-gradient(135deg, #fff7ed, #ffedd5)',
-              padding: '10px 16px',
-              borderBottom: '1.5px solid #fed7aa',
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8,
-            }}>
-              <div style={{ fontWeight: 800, fontSize: 13, color: '#9a3412' }}>
-                📊 Price Comparison — Original vs Modified
-              </div>
-              {/* Summary chips */}
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {rows.filter(r => r.rowTag === 'discount').length > 0 && (
-                  <span style={{ fontSize: 11, fontWeight: 700, background: '#dcfce7', color: '#065f46', padding: '3px 9px', borderRadius: 99 }}>
-                    {rows.filter(r => r.rowTag === 'discount').length} price ↓
-                  </span>
-                )}
-                {rows.filter(r => r.rowTag === 'increase').length > 0 && (
-                  <span style={{ fontSize: 11, fontWeight: 700, background: '#ffedd5', color: '#9a3412', padding: '3px 9px', borderRadius: 99 }}>
-                    {rows.filter(r => r.rowTag === 'increase').length} price ↑
-                  </span>
-                )}
-                {rows.filter(r => r.rowTag === 'new').length > 0 && (
-                  <span style={{ fontSize: 11, fontWeight: 700, background: '#dbeafe', color: '#1e40af', padding: '3px 9px', borderRadius: 99 }}>
-                    {rows.filter(r => r.rowTag === 'new').length} added
-                  </span>
-                )}
-                {rows.filter(r => r.rowTag === 'removed').length > 0 && (
-                  <span style={{ fontSize: 11, fontWeight: 700, background: '#fee2e2', color: '#991b1b', padding: '3px 9px', borderRadius: 99 }}>
-                    {rows.filter(r => r.rowTag === 'removed').length} removed
-                  </span>
-                )}
-                <span style={{ fontSize: 11, fontWeight: 700, background: totalSavings > 0 ? '#dcfce7' : '#ffedd5', color: totalSavings > 0 ? '#065f46' : '#9a3412', padding: '3px 9px', borderRadius: 99 }}>
-                  {totalSavings > 0 ? '↓' : '↑'} ₹{fmtN(Math.abs(totalSavings))} {totalSavings > 0 ? 'less' : 'more'}
-                </span>
-              </div>
-            </div>
-
-            {/* Table */}
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-                <thead>
-                  <tr style={{ background: '#fff7ed' }}>
-                    <th style={{ padding: '7px 10px', textAlign: 'center', fontWeight: 700, color: '#78350f', borderBottom: '1px solid #fed7aa', width: 30 }}>#</th>
-                    <th style={{ padding: '7px 10px', textAlign: 'left',   fontWeight: 700, color: '#78350f', borderBottom: '1px solid #fed7aa' }}>Product</th>
-                    <th style={{ padding: '7px 10px', textAlign: 'right',  fontWeight: 700, color: '#78350f', borderBottom: '1px solid #fed7aa', whiteSpace: 'nowrap' }}>Orig. Qty</th>
-                    <th style={{ padding: '7px 10px', textAlign: 'right',  fontWeight: 700, color: '#78350f', borderBottom: '1px solid #fed7aa', whiteSpace: 'nowrap' }}>Mod. Qty</th>
-                    <th style={{ padding: '7px 10px', textAlign: 'right',  fontWeight: 700, color: '#78350f', borderBottom: '1px solid #fed7aa', whiteSpace: 'nowrap' }}>Orig. Price</th>
-                    <th style={{ padding: '7px 10px', textAlign: 'right',  fontWeight: 700, color: '#78350f', borderBottom: '1px solid #fed7aa', whiteSpace: 'nowrap' }}>Client Price</th>
-                    <th style={{ padding: '7px 10px', textAlign: 'right',  fontWeight: 700, color: '#78350f', borderBottom: '1px solid #fed7aa', whiteSpace: 'nowrap' }}>Diff</th>
-                    <th style={{ padding: '7px 10px', textAlign: 'right',  fontWeight: 700, color: '#78350f', borderBottom: '1px solid #fed7aa', whiteSpace: 'nowrap' }}>Orig. Total</th>
-                    <th style={{ padding: '7px 10px', textAlign: 'right',  fontWeight: 700, color: '#78350f', borderBottom: '1px solid #fed7aa', whiteSpace: 'nowrap' }}>Mod. Total</th>
-                    <th style={{ padding: '7px 10px', textAlign: 'center', fontWeight: 700, color: '#78350f', borderBottom: '1px solid #fed7aa' }}>Change</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((r, i) => {
-                    const C = ROW_COLORS[r.rowTag];
-                    const itemName = r.mod ? r.mod.product_name : r.orig.product_name;
-                    const variant  = r.mod ? (r.mod.variant || r.mod.pack_size) : (r.orig.variant || r.orig.pack_size);
-                    const totalDiff = r.origTotal != null && r.modTotal != null ? +(r.modTotal - r.origTotal).toFixed(2) : null;
-                    return (
-                      <tr key={i} style={{ background: C.bg, borderBottom: `1px solid ${C.border}` }}>
-                        <td style={{ padding: '6px 10px', textAlign: 'center', color: '#94a3b8' }}>
-                          {r.serial != null ? r.serial : '—'}
-                        </td>
-                        <td style={{ padding: '6px 10px' }}>
-                          <div style={{ fontWeight: 700, color: r.rowTag === 'removed' ? '#991b1b' : '#0f172a', textDecoration: r.rowTag === 'removed' ? 'line-through' : 'none' }}>
-                            {itemName}
-                          </div>
-                          {variant && <div style={{ fontSize: 10, color: '#64748b' }}>{variant}</div>}
-                        </td>
-                        {/* Orig Qty */}
-                        <td style={{ padding: '6px 10px', textAlign: 'right', color: '#64748b' }}>
-                          {r.origQty != null ? r.origQty : '—'}
-                        </td>
-                        {/* Mod Qty */}
-                        <td style={{ padding: '6px 10px', textAlign: 'right' }}>
-                          {r.modQty != null ? (
-                            <span style={{ fontWeight: 700, color: r.modQty !== r.origQty ? '#1d4ed8' : '#374151' }}>
-                              {r.modQty}
-                              {r.origQty != null && r.modQty !== r.origQty && (
-                                <span style={{ fontSize: 10, color: r.modQty > r.origQty ? '#16a34a' : '#dc2626', marginLeft: 3 }}>
-                                  ({r.modQty > r.origQty ? '+' : ''}{r.modQty - r.origQty})
-                                </span>
-                              )}
-                            </span>
-                          ) : '—'}
-                        </td>
-                        {/* Orig Price */}
-                        <td style={{ padding: '6px 10px', textAlign: 'right', color: '#64748b' }}>
-                          {r.origPrice != null ? `₹ ${fmtN(r.origPrice)}` : '—'}
-                        </td>
-                        {/* Modified Price */}
-                        <td style={{ padding: '6px 10px', textAlign: 'right' }}>
-                          {r.modPrice != null ? (
-                            <span style={{ fontWeight: 800, color: r.rowTag === 'discount' ? '#16a34a' : r.rowTag === 'increase' ? '#dc2626' : '#0f172a' }}>
-                              ₹ {fmtN(r.modPrice)}
-                            </span>
-                          ) : '—'}
-                        </td>
-                        {/* Price Diff */}
-                        <td style={{ padding: '6px 10px', textAlign: 'right' }}>
-                          {r.priceDiff != null && r.priceDiff !== 0 ? (
-                            <div>
-                              <div style={{ fontWeight: 800, color: r.priceDiff < 0 ? '#16a34a' : '#dc2626', fontSize: 12 }}>
-                                {r.priceDiff > 0 ? '+' : ''}₹ {fmtN(r.priceDiff)}
-                              </div>
-                              <div style={{ fontSize: 10, color: r.priceDiff < 0 ? '#16a34a' : '#dc2626' }}>
-                                ({r.priceDiffPct > 0 ? '+' : ''}{r.priceDiffPct}%)
-                              </div>
-                            </div>
-                          ) : r.rowTag === 'new' || r.rowTag === 'removed' ? '—' : (
-                            <span style={{ color: '#94a3b8', fontSize: 11 }}>no change</span>
-                          )}
-                        </td>
-                        {/* Orig Total */}
-                        <td style={{ padding: '6px 10px', textAlign: 'right', color: '#64748b' }}>
-                          {r.origTotal != null ? `₹ ${fmtN(r.origTotal)}` : '—'}
-                        </td>
-                        {/* Mod Total */}
-                        <td style={{ padding: '6px 10px', textAlign: 'right' }}>
-                          {r.modTotal != null ? (
-                            <span style={{ fontWeight: 700, color: totalDiff != null && totalDiff < 0 ? '#16a34a' : totalDiff != null && totalDiff > 0 ? '#dc2626' : '#0f172a' }}>
-                              ₹ {fmtN(r.modTotal)}
-                            </span>
-                          ) : <span style={{ color: '#dc2626', fontWeight: 700 }}>—</span>}
-                        </td>
-                        {/* Change tag */}
-                        <td style={{ padding: '6px 10px', textAlign: 'center' }}>
-                          {C.label && (
-                            <span style={{ fontSize: 10, fontWeight: 800, background: C.tagBg, color: C.tag, padding: '2px 8px', borderRadius: 99, whiteSpace: 'nowrap' }}>
-                              {C.label}
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-                {/* Totals footer */}
-                <tfoot>
-                  <tr style={{ background: '#fff7ed', borderTop: '2px solid #fb923c' }}>
-                    <td colSpan={7} style={{ padding: '8px 10px', fontSize: 12, fontWeight: 800, color: '#9a3412' }}>Grand Total</td>
-                    <td style={{ padding: '8px 10px', textAlign: 'right', fontSize: 13, fontWeight: 800, color: '#64748b' }}>
-                      ₹ {fmtN(data.totals.total_amount)}
-                    </td>
-                    <td style={{ padding: '8px 10px', textAlign: 'right', fontSize: 13, fontWeight: 900, color: '#9a3412' }}>
-                      ₹ {fmtN(data.modified_totals ? data.modified_totals.total_amount : 0)}
-                    </td>
-                    <td style={{ padding: '8px 10px', textAlign: 'center' }}>
-                      {data.modified_totals && (
-                        <span style={{
-                          fontSize: 11, fontWeight: 900,
-                          background: data.modified_totals.total_amount < data.totals.total_amount ? '#dcfce7' : '#ffedd5',
-                          color: data.modified_totals.total_amount < data.totals.total_amount ? '#065f46' : '#9a3412',
-                          padding: '3px 10px', borderRadius: 99,
-                        }}>
-                          {data.modified_totals.total_amount < data.totals.total_amount ? '▼ ' : '▲ '}
-                          ₹ {fmtN(Math.abs(data.modified_totals.total_amount - data.totals.total_amount))}
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-          </div>
-        );
-      })()}
 
       {/* PDF-capturable document */}
       <div style={{ background: '#f3f3f3', padding: '24px', borderRadius: 12 }}>
