@@ -3,7 +3,7 @@ import { NavLink } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
   GridIcon, PlusCircleIcon, DocumentIcon, PackageIcon,
-  UsersIcon, ShieldIcon, LogoutIcon, XIcon,
+  UsersIcon, ShieldIcon, LogoutIcon, XIcon, BuildingIcon,
 } from './Icons';
 
 /* ─── Brand emblem (inline SVG, 36×36 rendered) ───────────── */
@@ -41,6 +41,7 @@ const navItems = [
   { to: '/quotes',     label: 'My Quotes',         icon: DocumentIcon },
   { to: '/products',   label: 'Products Catalog',  icon: PackageIcon },
   { to: '/leads',      label: 'Leads',             icon: UsersIcon },
+  { to: '/clients',    label: 'Clients',           icon: BuildingIcon },
   { to: '/admin',      label: 'Admin Panel',       icon: ShieldIcon, adminOnly: true },
 ];
 

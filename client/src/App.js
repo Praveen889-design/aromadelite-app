@@ -11,6 +11,8 @@ import BillBuilder from './pages/BillBuilder';
 import BillPreview from './pages/BillPreview';
 import Leads from './pages/Leads';
 import AdminPanel from './pages/AdminPanel';
+import Clients from './pages/Clients';
+import ClientProfile from './pages/ClientProfile';
 import Layout from './components/Layout';
 import RequireAuth from './components/RequireAuth';
 import { QuoteBuilderProvider } from './context/QuoteBuilderContext';
@@ -40,6 +42,8 @@ export default function App() {
           <Route path="bills/:id"          element={<BillPreview />} />
           <Route path="products"   element={<Products />} />
           <Route path="leads"      element={<Leads />} />
+          <Route path="clients/:id" element={<ClientProfile />} />
+          <Route path="clients"     element={<Clients />} />
           <Route
             path="admin"
             element={

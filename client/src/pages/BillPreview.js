@@ -407,6 +407,10 @@ export default function BillPreview() {
             </button>
           )}
 
+          <Link to="/clients" className="inline-flex items-center gap-1 border border-slate-300 text-slate-600 hover:bg-slate-50 text-sm font-medium rounded-xl px-4 py-2.5" style={{ minHeight: 44 }}>
+            🏢 Clients
+          </Link>
+
           <Link to="/quotes" className="inline-flex items-center gap-1 border border-slate-300 text-slate-600 hover:bg-slate-50 text-sm font-medium rounded-xl px-4 py-2.5" style={{ minHeight: 44 }}>
             ← My Quotes
           </Link>

@@ -90,3 +90,10 @@ export const XIcon = (p) => (
     <line x1="6" y1="6" x2="18" y2="18" />
   </svg>
 );
+
+export const BuildingIcon = (p) => (
+  <svg {...base} {...p}>
+    <rect x="3" y="3" width="18" height="18" rx="2"/>
+    <path d="M3 9h18M9 21V9M15 21V9"/>
+  </svg>
+);
