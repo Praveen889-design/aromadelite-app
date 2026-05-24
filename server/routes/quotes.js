@@ -28,8 +28,18 @@ const nextQuoteNumber = async () => {
   return `${prefix}${String(next).padStart(4, '0')}`;
 };
 
-const computeTotals = (items) => {
+const computeTotals = (items, gst_mode) => {
   let subtotal = 0, gst_amount = 0;
+  if (gst_mode === 'without_gst') {
+    for (const it of items) {
+      subtotal += (Number(it.quantity) || 0) * (Number(it.unit_price) || 0);
+    }
+    return {
+      subtotal: +subtotal.toFixed(2),
+      gst_amount: 0,
+      total_amount: +subtotal.toFixed(2),
+    };
+  }
   for (const it of items) {
     const line = (Number(it.quantity) || 0) * (Number(it.unit_price) || 0);
     subtotal += line;
@@ -54,7 +64,8 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'items must be a non-empty array' });
     }
 
-    const totals = computeTotals(b.items);
+    const gst_mode = ['with_gst', 'without_gst'].includes(b.gst_mode) ? b.gst_mode : 'with_gst';
+    const totals = computeTotals(b.items, gst_mode);
     const quote_number = await nextQuoteNumber();
     const validity_days = Number(b.validity_days) || 7;
     const estMonthly = b.requirement_type === 'Monthly Contract'
@@ -71,15 +82,15 @@ router.post('/', async (req, res) => {
         (quote_number, employee_id, client_name, client_business_name, client_type,
          client_phone, client_email, client_city, requirement_type, items,
          subtotal, gst_amount, total_amount, validity_days, notes,
-         next_follow_up_date, expected_order_date, status)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,'draft')
+         next_follow_up_date, expected_order_date, gst_mode, status)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,'draft')
       RETURNING id
     `, [
       quote_number, req.user.id, b.client_name, b.client_business_name || null, b.client_type,
       b.client_phone || null, b.client_email || null, b.client_city || null,
       b.requirement_type, JSON.stringify(b.items),
       totals.subtotal, totals.gst_amount, totals.total_amount, validity_days, b.notes || null,
-      nextFollowUp, expectedOrder,
+      nextFollowUp, expectedOrder, gst_mode,
     ]);
     const quote_id = qRes.rows[0].id;
 
@@ -314,6 +325,7 @@ router.get('/:id/pdf-data', async (req, res) => {
 
     const created = new Date(q.created_at);
     const validUntil = new Date(created.getTime() + (q.validity_days || 7) * 86400_000);
+    const gst_mode = q.gst_mode || 'with_gst';
 
     res.json({
       pdf: {
@@ -328,7 +340,7 @@ router.get('/:id/pdf-data', async (req, res) => {
           gstin: '36AQJPV7026L2Z5',
         },
         quote: {
-          number: q.quote_number, status: q.status,
+          number: q.quote_number, status: q.status, gst_mode,
           created_at: created.toISOString().slice(0, 10),
           valid_until: validUntil.toISOString().slice(0, 10),
           validity_days: q.validity_days, notes: q.notes,
@@ -348,6 +360,7 @@ router.get('/:id/pdf-data', async (req, res) => {
           const cat = productCatMap[it.product_id] || {};
           const qty = Number(it.quantity) || 0;
           const price = Number(it.unit_price) || 0;
+          const gst = gst_mode === 'without_gst' ? 0 : (Number(it.gst_percent) || 0);
           return {
             product_id: it.product_id,
             product_name: it.product_name || it.name,
@@ -360,8 +373,10 @@ router.get('/:id/pdf-data', async (req, res) => {
             quantity: qty,
             unit_price: price,
             system_price: it.system_price ?? price,
-            gst_percent: Number(it.gst_percent) || 0,
-            line_total: +(qty * price).toFixed(2),
+            gst_percent: gst,
+            line_total: gst_mode === 'without_gst'
+              ? +(qty * price).toFixed(2)
+              : +(qty * price * (1 + gst / 100)).toFixed(2),
           };
         }),
         totals: { subtotal: q.subtotal, gst_amount: q.gst_amount, total_amount: q.total_amount },

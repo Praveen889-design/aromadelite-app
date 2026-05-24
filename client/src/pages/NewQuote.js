@@ -23,6 +23,7 @@ export default function NewQuote() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
 
+  const [gstMode, setGstMode] = useState('with_gst');
   const [modalOpen, setModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false); // mobile cart bottom sheet
@@ -134,6 +135,7 @@ export default function NewQuote() {
         notes: clientPayload.notes || null,
         next_follow_up_date: clientPayload.next_follow_up_date || null,
         expected_order_date: clientPayload.expected_order_date || null,
+        gst_mode: gstMode,
         items: items.map((it) => ({
           product_id: it.product_id,
           product_name: it.product_name,
@@ -313,6 +315,30 @@ export default function NewQuote() {
           </div>
         </div>
 
+        {/* GST Mode Toggle */}
+        <div className="px-4 py-2.5 border-b border-slate-200 flex items-center gap-2">
+          <span className="text-[11px] font-semibold text-slate-600 shrink-0">GST Mode:</span>
+          <div className="flex rounded-lg border border-slate-300 overflow-hidden text-[11px] font-semibold">
+            <button
+              type="button"
+              onClick={() => setGstMode('with_gst')}
+              className={gstMode === 'with_gst'
+                ? 'px-3 py-1.5 bg-blue-600 text-white'
+                : 'px-3 py-1.5 bg-white text-slate-600 hover:bg-slate-50'}
+            >With GST</button>
+            <button
+              type="button"
+              onClick={() => setGstMode('without_gst')}
+              className={gstMode === 'without_gst'
+                ? 'px-3 py-1.5 bg-amber-500 text-white'
+                : 'px-3 py-1.5 bg-white text-slate-600 hover:bg-slate-50 border-l border-slate-300'}
+            >Without GST</button>
+          </div>
+          {gstMode === 'without_gst' && (
+            <span className="text-[10px] text-amber-600 italic">prices incl. tax</span>
+          )}
+        </div>
+
         <div className="flex-1 overflow-y-auto p-3 space-y-2">
           {items.length === 0 ? (
             <div className="text-center text-sm text-slate-500 py-12 px-4">
@@ -326,24 +352,32 @@ export default function NewQuote() {
         </div>
 
         <div className="border-t border-slate-200 p-4 space-y-2 bg-slate-50/50">
-          <SummaryRow label="Subtotal (excl. GST)" value={formatINR(totals.subtotal)} />
-          {gstBreakdown[12].base > 0 && (
-            <SummaryRow
-              label={`GST 12% on ${formatINR(gstBreakdown[12].base)}`}
-              value={formatINR(gstBreakdown[12].gst)}
-              muted
-            />
-          )}
-          {gstBreakdown[18].base > 0 && (
-            <SummaryRow
-              label={`GST 18% on ${formatINR(gstBreakdown[18].base)}`}
-              value={formatINR(gstBreakdown[18].gst)}
-              muted
-            />
+          {gstMode === 'with_gst' ? (
+            <>
+              <SummaryRow label="Subtotal (excl. GST)" value={formatINR(totals.subtotal)} />
+              {gstBreakdown[12].base > 0 && (
+                <SummaryRow
+                  label={`GST 12% on ${formatINR(gstBreakdown[12].base)}`}
+                  value={formatINR(gstBreakdown[12].gst)}
+                  muted
+                />
+              )}
+              {gstBreakdown[18].base > 0 && (
+                <SummaryRow
+                  label={`GST 18% on ${formatINR(gstBreakdown[18].base)}`}
+                  value={formatINR(gstBreakdown[18].gst)}
+                  muted
+                />
+              )}
+            </>
+          ) : (
+            <SummaryRow label="Total (GST inclusive)" value={formatINR(totals.subtotal)} />
           )}
           <div className="flex items-baseline justify-between pt-2 border-t border-slate-200">
             <span className="text-sm font-medium text-slate-700">Grand Total</span>
-            <span className="text-2xl font-bold text-slate-900">{formatINR(totals.total_amount)}</span>
+            <span className="text-2xl font-bold text-slate-900">
+              {formatINR(gstMode === 'with_gst' ? totals.total_amount : totals.subtotal)}
+            </span>
           </div>
           <button
             type="button"
