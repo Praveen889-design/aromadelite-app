@@ -304,7 +304,8 @@ router.get('/:id/pdf-data', async (req, res) => {
     if (productIds.length) {
       const placeholders = productIds.map((_, i) => `$${i + 1}`).join(',');
       const catRows = await pool.query(`
-        SELECT p.id, c.name AS category_name, c.icon_emoji AS category_icon
+        SELECT p.id, p.hsn_code, p.unit,
+               c.name AS category_name, c.icon_emoji AS category_icon
         FROM products p JOIN product_categories c ON c.id = p.category_id
         WHERE p.id IN (${placeholders})
       `, productIds);
@@ -318,9 +319,13 @@ router.get('/:id/pdf-data', async (req, res) => {
       pdf: {
         company: {
           name: 'Aromadelite',
+          legal: 'Sri Vemuri Sai Enterprises',
           tagline: 'B2B Cleaning Products & Hygiene Solutions',
-          address: 'Hyderabad, Telangana, India',
-          gstin: '36AAAAA0000A1Z5',
+          address: 'SAI NAGAR HNO 8-229/8, NVV NAGAR, CHINTAL, QUTHBULLAPUR, MALKAJGIRI – 500054',
+          state: 'Telangana, State Code: 36',
+          phone: '+91 63043 82947',
+          email: 'contact@aromadelite.in',
+          gstin: '36AQJPV7026L2Z5',
         },
         quote: {
           number: q.quote_number, status: q.status,
@@ -341,14 +346,22 @@ router.get('/:id/pdf-data', async (req, res) => {
         },
         items: items.map((it) => {
           const cat = productCatMap[it.product_id] || {};
+          const qty = Number(it.quantity) || 0;
+          const price = Number(it.unit_price) || 0;
           return {
-            product_id: it.product_id, product_name: it.product_name || it.name,
-            category_name: cat.category_name || 'Items', category_icon: cat.category_icon || null,
-            variant: it.variant || null, pack_size: it.pack_size || it.size || null,
-            quantity: it.quantity, unit_price: it.unit_price,
-            system_price: it.system_price ?? it.unit_price,
-            gst_percent: it.gst_percent,
-            line_total: +((Number(it.quantity) || 0) * (Number(it.unit_price) || 0)).toFixed(2),
+            product_id: it.product_id,
+            product_name: it.product_name || it.name,
+            hsn_code: it.hsn_code || cat.hsn_code || null,
+            unit: it.unit || cat.unit || 'Nos',
+            category_name: cat.category_name || 'Items',
+            category_icon: cat.category_icon || null,
+            variant: it.variant || null,
+            pack_size: it.pack_size || it.size || null,
+            quantity: qty,
+            unit_price: price,
+            system_price: it.system_price ?? price,
+            gst_percent: Number(it.gst_percent) || 0,
+            line_total: +(qty * price).toFixed(2),
           };
         }),
         totals: { subtotal: q.subtotal, gst_amount: q.gst_amount, total_amount: q.total_amount },

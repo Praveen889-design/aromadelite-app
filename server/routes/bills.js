@@ -82,8 +82,9 @@ router.post('/', async (req, res) => {
         (bill_number, quote_id, employee_id,
          client_name, client_business_name, client_type,
          client_phone, client_email, client_city, requirement_type,
+         client_gstin, client_state, place_of_supply,
          items, gst_mode, subtotal, gst_amount, total_amount, notes, status)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,'draft')
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,'draft')
       RETURNING *
     `, [
       bill_number,
@@ -96,6 +97,9 @@ router.post('/', async (req, res) => {
       b.client_email || null,
       b.client_city || null,
       b.requirement_type || null,
+      b.client_gstin || null,
+      b.client_state || '36-Telangana',
+      b.place_of_supply || '36-Telangana',
       JSON.stringify(b.items),
       gst_mode,
       totals.subtotal,
@@ -195,7 +199,8 @@ router.get('/:id/pdf-data', async (req, res) => {
     if (productIds.length) {
       const placeholders = productIds.map((_, i) => `$${i + 1}`).join(',');
       const catRows = await pool.query(`
-        SELECT p.id, c.name AS category_name, c.icon_emoji AS category_icon
+        SELECT p.id, p.hsn_code, p.unit,
+               c.name AS category_name, c.icon_emoji AS category_icon
         FROM products p JOIN product_categories c ON c.id = p.category_id
         WHERE p.id IN (${placeholders})
       `, productIds);
@@ -209,10 +214,11 @@ router.get('/:id/pdf-data', async (req, res) => {
       pdf: {
         company: {
           name: 'Aromadelite',
+          legal: 'Sri Vemuri Sai Enterprises',
           tagline: 'B2B Cleaning Products & Hygiene Solutions',
-          address: 'SAI NAGAR HNO 8-229/8, NVV NAGAR, CHINTAL, QUTHBULLAPUR, MALKAJGIRI – 500054',
+          address: 'SAI NAGAR H No 8-229/8, NVV NAGAR CHINTAL, QUTHBULLAPUR Hyderabad',
           state: 'Telangana, State Code: 36',
-          phone: '+91 63043 82947',
+          phone: '6304382947',
           email: 'contact@aromadelite.in',
           gstin: '36AQJPV7026L2Z5',
         },
@@ -223,6 +229,7 @@ router.get('/:id/pdf-data', async (req, res) => {
           created_at: created.toISOString().slice(0, 10),
           quote_id: b.quote_id,
           notes: b.notes,
+          place_of_supply: b.place_of_supply || '36-Telangana',
         },
         client: {
           name: b.client_name,
@@ -231,6 +238,8 @@ router.get('/:id/pdf-data', async (req, res) => {
           phone: b.client_phone,
           email: b.client_email,
           city: b.client_city,
+          gstin: b.client_gstin || null,
+          state: b.client_state || null,
           requirement_type: b.requirement_type,
         },
         employee: {
@@ -244,18 +253,22 @@ router.get('/:id/pdf-data', async (req, res) => {
           const cat = productCatMap[it.product_id] || {};
           const qty = Number(it.quantity) || 0;
           const price = Number(it.unit_price) || 0;
-          const line_total = +(qty * price).toFixed(2);
+          const gst = gst_mode === 'without_gst' ? 0 : (Number(it.gst_percent) || 0);
           return {
             product_id: it.product_id,
             product_name: it.product_name || it.name,
+            hsn_code: it.hsn_code || cat.hsn_code || null,
+            unit: it.unit || cat.unit || 'Nos',
             category_name: cat.category_name || 'Items',
-            category_icon: cat.category_icon || null,
             variant: it.variant || null,
             pack_size: it.pack_size || it.size || null,
             quantity: qty,
             unit_price: price,
-            gst_percent: gst_mode === 'without_gst' ? 0 : (Number(it.gst_percent) || 0),
-            line_total,
+            gst_percent: gst,
+            // line_total = GST-inclusive for with_gst; plain for without_gst
+            line_total: gst_mode === 'without_gst'
+              ? +(qty * price).toFixed(2)
+              : +(qty * price * (1 + gst / 100)).toFixed(2),
           };
         }),
         totals: {
