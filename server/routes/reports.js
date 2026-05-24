@@ -474,4 +474,138 @@ router.get('/top-clients', async (req, res) => {
   }
 });
 
+// ── GET /api/reports/performance?year=&month= ────────────────────────────────
+// Full associate performance for a given month: quotes, bills, leads, targets, trend
+router.get('/performance', async (req, res) => {
+  try {
+    const now   = new Date();
+    const year  = Number(req.query.year)  || now.getFullYear();
+    const month = Number(req.query.month) || (now.getMonth() + 1);
+
+    // 1. All active associates
+    const empRes = await pool.query(`
+      SELECT id, employee_id AS employee_code, name, region
+      FROM employees WHERE role = 'associate' AND is_active = 1
+      ORDER BY name
+    `);
+
+    // 2. Targets for month
+    const tRes = await pool.query(`
+      SELECT employee_id, revenue_target, leads_target, conversions_target
+      FROM associate_targets WHERE year = $1 AND month = $2
+    `, [year, month]);
+    const tMap = Object.fromEntries(tRes.rows.map(r => [r.employee_id, r]));
+
+    // 3. Quote stats for month
+    const qRes = await pool.query(`
+      SELECT employee_id,
+             COUNT(*)                                                         AS quote_count,
+             COALESCE(SUM(total_amount), 0)                                  AS total_quoted,
+             COUNT(CASE WHEN status IN ('accepted') THEN 1 END)              AS accepted_quotes,
+             COUNT(CASE WHEN status = 'draft' THEN 1 END)                    AS draft_quotes,
+             COUNT(CASE WHEN status = 'sent'  THEN 1 END)                    AS sent_quotes
+      FROM quotes
+      WHERE EXTRACT(YEAR FROM created_at) = $1 AND EXTRACT(MONTH FROM created_at) = $2
+      GROUP BY employee_id
+    `, [year, month]);
+    const qMap = Object.fromEntries(qRes.rows.map(r => [r.employee_id, r]));
+
+    // 4. Bill stats for month
+    const bRes = await pool.query(`
+      SELECT employee_id,
+             COUNT(*)                                                          AS bill_count,
+             COALESCE(SUM(total_amount), 0)                                   AS total_billed,
+             COALESCE(SUM(CASE WHEN payment_status = 'completed' THEN total_amount ELSE amount_paid END), 0) AS total_collected,
+             COUNT(CASE WHEN payment_status = 'completed' THEN 1 END)         AS paid_bills,
+             COUNT(CASE WHEN payment_status = 'partial'   THEN 1 END)         AS partial_bills,
+             COUNT(CASE WHEN payment_status = 'pending'   THEN 1 END)         AS pending_bills
+      FROM bills
+      WHERE EXTRACT(YEAR FROM created_at) = $1 AND EXTRACT(MONTH FROM created_at) = $2
+      GROUP BY employee_id
+    `, [year, month]);
+    const bMap = Object.fromEntries(bRes.rows.map(r => [r.employee_id, r]));
+
+    // 5. Lead stats for month
+    const lRes = await pool.query(`
+      SELECT employee_id,
+             COUNT(*)                                                           AS lead_count,
+             COUNT(CASE WHEN status = 'converted' THEN 1 END)                  AS conversions,
+             COUNT(CASE WHEN status IN ('new','contacted','interested') THEN 1 END) AS active_leads
+      FROM leads
+      WHERE EXTRACT(YEAR FROM created_at) = $1 AND EXTRACT(MONTH FROM created_at) = $2
+      GROUP BY employee_id
+    `, [year, month]);
+    const lMap = Object.fromEntries(lRes.rows.map(r => [r.employee_id, r]));
+
+    // 6. 6-month revenue trend per associate (for sparkline)
+    const trendRes = await pool.query(`
+      SELECT employee_id,
+             EXTRACT(YEAR  FROM created_at) AS yr,
+             EXTRACT(MONTH FROM created_at) AS mo,
+             COALESCE(SUM(total_amount), 0) AS revenue
+      FROM quotes
+      WHERE created_at >= NOW() - INTERVAL '6 months'
+      GROUP BY employee_id, yr, mo
+      ORDER BY yr, mo
+    `);
+    const trendMap = {};
+    for (const r of trendRes.rows) {
+      if (!trendMap[r.employee_id]) trendMap[r.employee_id] = [];
+      trendMap[r.employee_id].push({ yr: Number(r.yr), mo: Number(r.mo), revenue: Number(r.revenue) });
+    }
+
+    const associates = empRes.rows.map(e => {
+      const t = tMap[e.id] || {};
+      const q = qMap[e.id] || {};
+      const b = bMap[e.id] || {};
+      const l = lMap[e.id] || {};
+      const totalBilled    = Number(b.total_billed    || 0);
+      const totalCollected = Number(b.total_collected || 0);
+      const totalQuoted    = Number(q.total_quoted    || 0);
+      const quoteCount     = Number(q.quote_count     || 0);
+      return {
+        id:            e.id,
+        name:          e.name,
+        employee_code: e.employee_code,
+        region:        e.region,
+        // Targets
+        revenue_target:     Number(t.revenue_target     || 0),
+        leads_target:       Number(t.leads_target       || 0),
+        conversions_target: Number(t.conversions_target || 0),
+        // Quotes
+        quote_count:      quoteCount,
+        total_quoted:     totalQuoted,
+        accepted_quotes:  Number(q.accepted_quotes || 0),
+        draft_quotes:     Number(q.draft_quotes    || 0),
+        sent_quotes:      Number(q.sent_quotes     || 0),
+        avg_deal_size:    quoteCount > 0 ? +(totalQuoted / quoteCount).toFixed(2) : 0,
+        // Bills
+        bill_count:       Number(b.bill_count   || 0),
+        total_billed:     totalBilled,
+        total_collected:  totalCollected,
+        paid_bills:       Number(b.paid_bills   || 0),
+        partial_bills:    Number(b.partial_bills || 0),
+        pending_bills:    Number(b.pending_bills || 0),
+        collection_rate:  totalBilled > 0 ? +((totalCollected / totalBilled) * 100).toFixed(1) : 0,
+        // Leads
+        lead_count:   Number(l.lead_count   || 0),
+        conversions:  Number(l.conversions  || 0),
+        active_leads: Number(l.active_leads || 0),
+        conversion_rate: Number(l.lead_count || 0) > 0
+          ? +((Number(l.conversions || 0) / Number(l.lead_count || 0)) * 100).toFixed(1)
+          : 0,
+        // Trend
+        trend: trendMap[e.id] || [],
+      };
+    });
+
+    // Sort by total_billed desc (revenue generated)
+    associates.sort((a, b) => b.total_billed - a.total_billed);
+
+    res.json({ year, month, associates });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

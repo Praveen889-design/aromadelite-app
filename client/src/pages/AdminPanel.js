@@ -10,6 +10,7 @@ import UnitsTab from './admin/UnitsTab';
 import SettingsTab from './admin/SettingsTab';
 import PaymentPendingTab from './admin/PaymentPendingTab';
 import FollowUpsTab from './admin/FollowUpsTab';
+import AssociatePerformanceTab from './admin/AssociatePerformanceTab';
 import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
 import { useToast } from '../components/Toast';
@@ -1995,10 +1996,11 @@ function OverviewTab() {
 
 // ─── Main panel ──────────────────────────────────────────────
 const TABS = [
-  { id: 'overview',   label: 'Overview'   },
-  { id: 'payment',    label: '⏳ Payments' },
-  { id: 'followups',  label: '🔔 Follow-ups' },
-  { id: 'team',       label: 'Team'       },
+  { id: 'overview',     label: 'Overview'        },
+  { id: 'payment',     label: '⏳ Payments'     },
+  { id: 'followups',   label: '🔔 Follow-ups'   },
+  { id: 'performance', label: '🏆 Performance'  },
+  { id: 'team',        label: 'Team'            },
   { id: 'products',   label: 'Products'   },
   { id: 'quotes',     label: 'All Quotes' },
   { id: 'leads',      label: 'All Leads'  },
@@ -2127,8 +2129,9 @@ export default function AdminPanel() {
       <div style={{ padding: '20px 0', flex: 1 }}>
         {tab === 'overview'   && <OverviewTab />}
         {tab === 'payment'    && <PaymentPendingTab />}
-        {tab === 'followups'  && <FollowUpsTab />}
-        {tab === 'team'      && <TeamTab onSwitchTab={switchTab} />}
+        {tab === 'followups'   && <FollowUpsTab />}
+        {tab === 'performance' && <AssociatePerformanceTab />}
+        {tab === 'team'       && <TeamTab onSwitchTab={switchTab} />}
         {tab === 'products'  && <ProductsTab />}
         {tab === 'quotes'    && <QuotesTab initialFilters={tabFilters} />}
         {tab === 'leads'     && <LeadsTab />}
