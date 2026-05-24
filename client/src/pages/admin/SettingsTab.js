@@ -5,10 +5,19 @@ import { useToast } from '../../components/Toast';
 /* ─── Delete options ────────────────────────────────────────── */
 const RESET_OPTIONS = [
   {
-    target:  'quotes',
-    label:   'All Quotes',
+    target:  'bills',
+    label:   'All Bills',
     icon:    '🧾',
-    desc:    'Deletes every quote (draft, sent, accepted, rejected). Associated leads are reset to "new" status.',
+    desc:    'Deletes every generated bill/invoice. Quotes are kept intact.',
+    color:   '#f59e0b',
+    bg:      '#fffbeb',
+    border:  '#fcd34d',
+  },
+  {
+    target:  'quotes',
+    label:   'All Quotes & Bills',
+    icon:    '📋',
+    desc:    'Deletes every quote and its associated bills. Associated leads are reset to "new" status.',
     color:   '#f59e0b',
     bg:      '#fffbeb',
     border:  '#fcd34d',
@@ -53,7 +62,7 @@ const RESET_OPTIONS = [
     target:  'all',
     label:   'Everything (Full Reset)',
     icon:    '⚠️',
-    desc:    'Deletes ALL quotes, leads, units, products and associate accounts in one go. Admin accounts are kept.',
+    desc:    'Deletes ALL bills, quotes, leads, units, products and associate accounts in one go. Admin accounts are kept.',
     color:   '#dc2626',
     bg:      '#fef2f2',
     border:  '#f87171',

@@ -15,7 +15,7 @@ router.use(requireAuth, requireRole('admin'));
 router.post('/reset', async (req, res) => {
   const { target } = req.body || {};
 
-  const VALID = ['quotes', 'leads', 'units', 'products', 'employees', 'all'];
+  const VALID = ['bills', 'quotes', 'leads', 'units', 'products', 'employees', 'all'];
   if (!VALID.includes(target)) {
     return res.status(400).json({ error: `target must be one of: ${VALID.join(', ')}` });
   }
@@ -26,9 +26,18 @@ router.post('/reset', async (req, res) => {
 
     let deleted = {};
 
+    if (target === 'bills') {
+      // Delete only bills (leave quotes intact)
+      const b = await client.query('DELETE FROM bills');
+      deleted.bills = b.rowCount;
+    }
+
     if (target === 'quotes' || target === 'all') {
-      // Cascade: adjustments reference quotes, leads reference quotes
-      const r = await client.query('DELETE FROM unit_stock_adjustments WHERE quote_id IS NOT NULL');
+      // Must delete bills first — they hold a FK reference to quotes (bills_quote_id_fkey)
+      const b = await client.query('DELETE FROM bills');
+      deleted.bills = b.rowCount;
+      // Then clear adjustments and unlink leads before deleting quotes
+      await client.query('DELETE FROM unit_stock_adjustments WHERE quote_id IS NOT NULL');
       await client.query("UPDATE leads SET quote_id = NULL, status = 'new' WHERE quote_id IS NOT NULL");
       const q = await client.query('DELETE FROM quotes');
       deleted.quotes = q.rowCount;
