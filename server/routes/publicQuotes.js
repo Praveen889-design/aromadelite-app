@@ -5,7 +5,6 @@
 const express = require('express');
 const { randomUUID } = require('crypto');
 const pool = require('../database/db');
-const { deductStockForQuote } = require('./units');
 
 const router = express.Router();
 
@@ -97,9 +96,8 @@ router.get('/quote-approval/:token', async (req, res) => {
 
 // ── POST /api/public/quote-approval/:token/respond ───────────────────────────
 // Client submits their approval decision.
-// If approved: automatically marks quote as 'accepted', converts lead, deducts stock.
+// Only records the client's response — the associate manually marks the quote Accepted.
 router.post('/quote-approval/:token/respond', async (req, res) => {
-  const pgClient = await pool.connect();
   try {
     const { decision, note, client_name } = req.body || {};
     if (!['approved', 'changes_requested'].includes(decision)) {
@@ -107,7 +105,7 @@ router.post('/quote-approval/:token/respond', async (req, res) => {
     }
 
     const { rows } = await pool.query(
-      `SELECT id, status, employee_id, items, client_approval_status, quote_number, client_name
+      `SELECT id, status, client_approval_status, quote_number, client_name
        FROM quotes WHERE client_approval_token = $1`,
       [req.params.token]
     );
@@ -123,10 +121,7 @@ router.post('/quote-approval/:token/respond', async (req, res) => {
       });
     }
 
-    await pgClient.query('BEGIN');
-
-    // Save the client's response
-    await pgClient.query(
+    await pool.query(
       `UPDATE quotes
        SET client_approval_status  = $1,
            client_approval_note    = $2,
@@ -136,43 +131,13 @@ router.post('/quote-approval/:token/respond', async (req, res) => {
       [decision, note || null, client_name || q.client_name || null, q.id]
     );
 
-    // ── If approved: auto-accept the quote ──────────────────────────────
-    if (decision === 'approved') {
-      // Only move to accepted if not already in a terminal state
-      if (!['accepted', 'rejected'].includes(q.status)) {
-        await pgClient.query(
-          "UPDATE quotes SET status = 'accepted' WHERE id = $1",
-          [q.id]
-        );
-      }
-
-      // Convert the lead
-      await pgClient.query(
-        "UPDATE leads SET status = 'converted', updated_at = NOW() WHERE quote_id = $1",
-        [q.id]
-      );
-
-      // Deduct stock (best-effort — won't fail the transaction)
-      try {
-        const items = parseJSON(q.items, []);
-        await deductStockForQuote(pgClient, Number(q.id), q.employee_id, items);
-      } catch (stockErr) {
-        console.warn('[client-approval] stock deduction skipped:', stockErr.message);
-      }
-    }
-
-    await pgClient.query('COMMIT');
-
     res.json({
       ok: true,
       quote_number: q.quote_number,
       client_approval_status: decision,
     });
   } catch (err) {
-    await pgClient.query('ROLLBACK');
     res.status(500).json({ error: err.message });
-  } finally {
-    pgClient.release();
   }
 });
 

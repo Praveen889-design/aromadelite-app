@@ -891,14 +891,14 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
             <span style={{ fontSize: 20 }}>✅</span>
             <div>
               <div style={{ fontSize: 13, fontWeight: 800, color: '#065f46' }}>
-                Client Approved — Quote Auto-Accepted!
+                Client Approved This Quote!
               </div>
               <div style={{ fontSize: 11, color: '#047857', marginTop: 1 }}>
                 {quote.client_approved_by_name
                   ? `${quote.client_approved_by_name} approved on ${new Date(quote.client_approval_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}.`
                   : `Client approved on ${new Date(quote.client_approval_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}.`
                 }
-                {' '}The quote is now accepted — you can generate the bill directly.
+                {' '}Mark it Accepted above to generate the bill.
               </div>
             </div>
           </div>

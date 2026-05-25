@@ -117,7 +117,7 @@ export default function QuoteApproval() {
           </div>
           <div style={{ fontSize: 14, color: '#475569', lineHeight: 1.6, marginBottom: 16 }}>
             {wasApproved
-              ? <>Thank you! You've approved <strong>{quote.quote_number}</strong>. Your order is confirmed — the Aromadelite team will reach out shortly to arrange delivery.</>
+              ? <>Thank you! You've approved <strong>{quote.quote_number}</strong>. The Aromadelite team will be in touch shortly to confirm your order.</>
               : <>Your feedback on <strong>{quote.quote_number}</strong> has been sent. The team will review your notes and get back to you with a revised quote.</>
             }
           </div>
