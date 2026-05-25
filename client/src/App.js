@@ -13,6 +13,7 @@ import Leads from './pages/Leads';
 import AdminPanel from './pages/AdminPanel';
 import Clients from './pages/Clients';
 import ClientProfile from './pages/ClientProfile';
+import QuoteApproval from './pages/QuoteApproval';
 import Layout from './components/Layout';
 import RequireAuth from './components/RequireAuth';
 import { QuoteBuilderProvider } from './context/QuoteBuilderContext';
@@ -24,6 +25,8 @@ export default function App() {
     <ToastProvider>
       <Routes>
         <Route path="/login" element={<Login />} />
+        {/* Public — no auth required */}
+        <Route path="/q/:token" element={<QuoteApproval />} />
 
         <Route
           element={

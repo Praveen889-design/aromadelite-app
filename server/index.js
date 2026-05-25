@@ -29,6 +29,7 @@ const settingsRoutes    = require('./routes/settings');
 const billRoutes              = require('./routes/bills');
 const clientRoutes            = require('./routes/clients');
 const notificationRoutes      = require('./routes/notifications');
+const publicQuoteRoutes       = require('./routes/publicQuotes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -72,6 +73,7 @@ app.use('/api/settings',    settingsRoutes);
 app.use('/api/bills',         billRoutes);
 app.use('/api/clients',       clientRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/public',        publicQuoteRoutes);   // no auth — client-facing
 
 // In production, serve the built React app + SPA-fallback for client-side routes.
 const clientBuildPath = path.resolve(__dirname, '../client/build');

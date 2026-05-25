@@ -35,12 +35,14 @@ const timeAgo = (iso) => {
 
 // Colour config per notification type
 const TYPE_CFG = {
-  discount_approval:     { bg: '#fef3c7', border: '#fcd34d', dot: '#f59e0b', label: 'Discount' },
-  modification_review:   { bg: '#eff6ff', border: '#93c5fd', dot: '#3b82f6', label: 'Modification' },
-  discount_approved:     { bg: '#f0fdf4', border: '#86efac', dot: '#22c55e', label: 'Approved' },
-  discount_rejected:     { bg: '#fef2f2', border: '#fca5a5', dot: '#ef4444', label: 'Rejected' },
-  modification_approved: { bg: '#f0fdf4', border: '#86efac', dot: '#22c55e', label: 'Approved' },
-  modification_rejected: { bg: '#fef2f2', border: '#fca5a5', dot: '#ef4444', label: 'Rejected' },
+  discount_approval:        { bg: '#fef3c7', border: '#fcd34d', dot: '#f59e0b', label: 'Discount' },
+  modification_review:      { bg: '#eff6ff', border: '#93c5fd', dot: '#3b82f6', label: 'Modification' },
+  discount_approved:        { bg: '#f0fdf4', border: '#86efac', dot: '#22c55e', label: 'Approved' },
+  discount_rejected:        { bg: '#fef2f2', border: '#fca5a5', dot: '#ef4444', label: 'Rejected' },
+  modification_approved:    { bg: '#f0fdf4', border: '#86efac', dot: '#22c55e', label: 'Approved' },
+  modification_rejected:    { bg: '#fef2f2', border: '#fca5a5', dot: '#ef4444', label: 'Rejected' },
+  client_approved:          { bg: '#f0fdf4', border: '#6ee7b7', dot: '#059669', label: 'Client ✅' },
+  client_changes_requested: { bg: '#fefce8', border: '#fde047', dot: '#ca8a04', label: 'Client ✏️' },
 };
 
 export default function Header({ onOpenMenu }) {

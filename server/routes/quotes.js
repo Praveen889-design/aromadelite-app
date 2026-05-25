@@ -1,4 +1,5 @@
 const express = require('express');
+const { randomUUID } = require('crypto');
 const pool = require('../database/db');
 const { requireAuth } = require('../middleware/auth');
 const { deductStockForQuote } = require('./units');
@@ -300,6 +301,33 @@ router.patch('/discount-settings', async (req, res) => {
       ON CONFLICT (key) DO UPDATE SET value = $1, updated_at = NOW()
     `, [String(pct)]);
     res.json({ threshold_pct: pct });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/quotes/:id/approval-link — generate (or return existing) client approval link
+router.post('/:id/approval-link', async (req, res) => {
+  try {
+    const { rows } = await pool.query('SELECT * FROM quotes WHERE id = $1', [req.params.id]);
+    if (!rows[0]) return res.status(404).json({ error: 'Quote not found' });
+    const q = rows[0];
+    if (req.user.role !== 'admin' && q.employee_id !== req.user.id) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    // Return existing token if already generated
+    let token = q.client_approval_token;
+    if (!token) {
+      token = randomUUID();
+      await pool.query(
+        'UPDATE quotes SET client_approval_token = $1 WHERE id = $2',
+        [token, q.id]
+      );
+    }
+
+    const base = process.env.PUBLIC_APP_URL || req.protocol + '://' + req.get('host');
+    res.json({ token, url: `${base}/q/${token}` });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -647,6 +675,12 @@ router.get('/:id/pdf-data', async (req, res) => {
           max_discount_pct: q.max_discount_pct != null ? Number(q.max_discount_pct) : null,
           discount_approval_note: q.discount_approval_note || null,
           employee_name: q.employee_name || null,
+          // Client approval link fields
+          client_approval_token:  q.client_approval_token  || null,
+          client_approval_status: q.client_approval_status || null,
+          client_approval_at:     q.client_approval_at ? new Date(q.client_approval_at).toISOString() : null,
+          client_approval_note:   q.client_approval_note   || null,
+          client_approved_by_name: q.client_approved_by_name || null,
         },
         client: {
           name: q.client_name, business_name: q.client_business_name, type: q.client_type,

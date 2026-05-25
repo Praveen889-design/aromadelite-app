@@ -143,6 +143,9 @@ export default function QuotePreview() {
   const [rejectNote, setRejectNote] = useState('');
   const [showRejectInput, setShowRejectInput] = useState(false);
   const [repeating, setRepeating] = useState(false);
+  const [gettingLink, setGettingLink] = useState(false);
+  const [approvalLink, setApprovalLink] = useState('');
+  const [linkCopied, setLinkCopied]     = useState(false);
   const docRef    = useRef(null);
   const headerRef = useRef(null);
 
@@ -154,6 +157,11 @@ export default function QuotePreview() {
         next_follow_up_date:  res.data.pdf.quote.next_follow_up_date  || '',
         expected_order_date:  res.data.pdf.quote.expected_order_date  || '',
       });
+      // Pre-populate approval link if token already exists
+      if (res.data.pdf.quote.client_approval_token) {
+        const base = window.location.origin;
+        setApprovalLink(`${base}/q/${res.data.pdf.quote.client_approval_token}`);
+      }
     } catch (e) {
       setError(e?.response?.data?.error || 'Failed to load quote');
     }
@@ -558,6 +566,51 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
     }
   };
 
+  const onGetApprovalLink = async () => {
+    if (approvalLink) {
+      // Already generated — just copy again
+      navigator.clipboard?.writeText(approvalLink).catch(() => {});
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2500);
+      return;
+    }
+    setGettingLink(true);
+    try {
+      const { data: resp } = await api.post(`/api/quotes/${id}/approval-link`);
+      setApprovalLink(resp.url);
+      navigator.clipboard?.writeText(resp.url).catch(() => {});
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2500);
+      toast('📋 Approval link copied to clipboard!', { kind: 'success' });
+    } catch (e) {
+      toast(e?.response?.data?.error || 'Failed to generate link', { kind: 'error' });
+    } finally {
+      setGettingLink(false);
+    }
+  };
+
+  const onShareApprovalLink = async () => {
+    const url = approvalLink || (await (async () => {
+      setGettingLink(true);
+      try {
+        const { data: resp } = await api.post(`/api/quotes/${id}/approval-link`);
+        setApprovalLink(resp.url);
+        return resp.url;
+      } catch { return null; } finally { setGettingLink(false); }
+    })());
+    if (!url) return;
+    const msg = `Hi ${data?.client?.business_name || data?.client?.name || ''},\n\nPlease review and approve your Aromadelite quotation:\n\n${url}\n\nLet us know if you have any questions!\n🌿 Aromadelite Team`;
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      navigator.share({ title: `Quotation ${quote.number}`, text: msg, url }).catch(() => {});
+    } else {
+      const phone = (data?.client?.phone || '').replace(/\D/g, '');
+      const wa = phone
+        ? `https://wa.me/${phone.length === 10 ? '91' + phone : phone}?text=${encodeURIComponent(msg)}`
+        : `https://wa.me/?text=${encodeURIComponent(msg)}`;
+      window.open(wa, '_blank', 'noopener,noreferrer');
+    }
+  };
+
   // Block ALL client-facing actions (share/send) while discount approval is pending or rejected
   const discountBlocked = quote.discount_approval_status === 'pending' || quote.discount_approval_status === 'rejected';
   const blockTitle = quote.discount_approval_status === 'pending'
@@ -829,6 +882,49 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
           </div>
         )}
 
+        {/* Client approval response banners */}
+        {quote.client_approval_status === 'approved' && (
+          <div style={{
+            background: '#f0fdf4', border: '2px solid #6ee7b7', borderRadius: 10,
+            padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10,
+          }}>
+            <span style={{ fontSize: 20 }}>✅</span>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 800, color: '#065f46' }}>
+                Client Approved This Quote!
+              </div>
+              <div style={{ fontSize: 11, color: '#047857', marginTop: 1 }}>
+                {quote.client_approved_by_name
+                  ? `${quote.client_approved_by_name} approved on ${new Date(quote.client_approval_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}.`
+                  : `Client approved on ${new Date(quote.client_approval_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}.`
+                }
+                {' '}You can now mark it Accepted and generate the bill.
+              </div>
+            </div>
+          </div>
+        )}
+        {quote.client_approval_status === 'changes_requested' && (
+          <div style={{
+            background: '#fefce8', border: '1.5px solid #fde047', borderRadius: 10,
+            padding: '10px 14px', display: 'flex', alignItems: 'flex-start', gap: 10,
+          }}>
+            <span style={{ fontSize: 20 }}>✏️</span>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 800, color: '#92400e' }}>
+                Client Requested Changes
+              </div>
+              {quote.client_approval_note && (
+                <div style={{ fontSize: 11, color: '#78350f', marginTop: 3, fontStyle: 'italic' }}>
+                  "{quote.client_approval_note}"
+                </div>
+              )}
+              <div style={{ fontSize: 11, color: '#78350f', marginTop: 4 }}>
+                Review their feedback and create a revised quote or contact them directly.
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Row 2: action buttons — all share/send disabled when discount approval is pending/rejected */}
         <div className="flex flex-wrap gap-2">
 
@@ -1012,12 +1108,78 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
             <span>{repeating ? 'Creating…' : '🔁 Repeat Order'}</span>
           </button>
 
+          {/* 📋 Client Approval Link */}
+          <button
+            type="button"
+            onClick={onGetApprovalLink}
+            disabled={gettingLink || discountBlocked}
+            title={discountBlocked ? 'Resolve discount approval first' : approvalLink ? 'Copy link again' : 'Generate a link to share with client for approval'}
+            className="inline-flex items-center gap-2 text-sm font-semibold rounded-xl px-4 py-2.5 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{ minHeight: 44, background: '#eff6ff', color: '#1d4ed8', border: '1.5px solid #93c5fd' }}
+          >
+            <span>
+              {gettingLink ? 'Generating…'
+                : linkCopied ? '✅ Link Copied!'
+                : approvalLink ? '📋 Copy Approval Link'
+                : '📋 Get Client Approval Link'}
+            </span>
+          </button>
+
+          {/* WhatsApp share of approval link */}
+          {approvalLink && !discountBlocked && (
+            <button
+              type="button"
+              onClick={onShareApprovalLink}
+              className="inline-flex items-center gap-2 text-sm font-semibold rounded-xl px-4 py-2.5 shadow-sm"
+              style={{ minHeight: 44, background: '#f0fdf4', color: '#15803d', border: '1.5px solid #86efac' }}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M20.52 3.48A11.93 11.93 0 0 0 12.04 0C5.47 0 .14 5.33.14 11.9c0 2.1.55 4.15 1.6 5.96L0 24l6.32-1.66a11.9 11.9 0 0 0 5.72 1.46h.01c6.57 0 11.9-5.33 11.9-11.9 0-3.18-1.24-6.17-3.43-8.42z" />
+              </svg>
+              <span>Send to Client</span>
+            </button>
+          )}
+
           <Link
             to="/quotes/new"
             className="inline-flex items-center gap-1 border border-slate-300 text-slate-600 hover:bg-slate-50 text-sm font-medium rounded-xl px-4 py-2.5"
             style={{ minHeight: 44 }}
           >← Builder</Link>
         </div>
+
+        {/* ── Approval link display row ── */}
+        {approvalLink && !discountBlocked && (
+          <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: 10, marginTop: 4 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#374151', marginBottom: 5 }}>
+              🔗 Client Approval Link
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input
+                readOnly
+                value={approvalLink}
+                onFocus={(e) => e.target.select()}
+                style={{
+                  flex: 1, border: '1px solid #bfdbfe', borderRadius: 8,
+                  padding: '6px 10px', fontSize: 11, color: '#1e40af',
+                  background: '#eff6ff', outline: 'none', fontFamily: 'monospace',
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}
+              />
+              <button
+                type="button"
+                onClick={onGetApprovalLink}
+                style={{
+                  flexShrink: 0, padding: '6px 12px', borderRadius: 8,
+                  border: '1px solid #bfdbfe', background: linkCopied ? '#dcfce7' : '#eff6ff',
+                  color: linkCopied ? '#15803d' : '#1d4ed8', fontSize: 11, fontWeight: 700,
+                  cursor: 'pointer', whiteSpace: 'nowrap',
+                }}
+              >
+                {linkCopied ? '✅ Copied' : '📋 Copy'}
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* ── Follow-up / Expected Order date editor ── */}
         <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: 12, marginTop: 4 }}>

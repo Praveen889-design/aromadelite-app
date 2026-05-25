@@ -31,6 +31,18 @@ router.get('/', async (req, res) => {
         ORDER BY q.modified_at DESC NULLS LAST
       `);
 
+      // 3. Client approval responses (clients who approved or requested changes)
+      const { rows: clientRows } = await pool.query(`
+        SELECT q.id, q.quote_number, q.client_approval_status, q.client_approval_at,
+               q.client_approval_note, q.client_approved_by_name,
+               q.client_name, q.client_business_name,
+               e.name AS employee_name, e.employee_id AS employee_code
+        FROM quotes q JOIN employees e ON e.id = q.employee_id
+        WHERE q.client_approval_status IS NOT NULL
+          AND q.client_approval_at >= NOW() - INTERVAL '7 days'
+        ORDER BY q.client_approval_at DESC
+      `);
+
       const notifications = [
         ...discountRows.map((r) => ({
           id:             `discount_${r.id}`,
@@ -59,6 +71,25 @@ router.get('/', async (req, res) => {
           link:          `/quotes/${r.id}`,
           icon:          '✏️',
         })),
+        ...clientRows.map((r) => {
+          const clientDisplay = r.client_business_name || r.client_name;
+          const isApproved = r.client_approval_status === 'approved';
+          return {
+            id:           `client_resp_${r.id}`,
+            type:         isApproved ? 'client_approved' : 'client_changes_requested',
+            quote_id:     r.id,
+            quote_number: r.quote_number,
+            employee_name: r.employee_name,
+            employee_code: r.employee_code,
+            created_at:   r.client_approval_at,
+            title:        isApproved ? `Client Approved ✅` : `Client Requested Changes ✏️`,
+            message:      isApproved
+              ? `${clientDisplay} approved ${r.quote_number}${r.client_approved_by_name ? ` (${r.client_approved_by_name})` : ''}`
+              : `${clientDisplay} requested changes on ${r.quote_number}${r.client_approval_note ? `: "${r.client_approval_note}"` : ''}`,
+            link:         `/quotes/${r.id}`,
+            icon:         isApproved ? '✅' : '✏️',
+          };
+        }),
       ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
       return res.json({ notifications, count: notifications.length });
@@ -68,19 +99,25 @@ router.get('/', async (req, res) => {
     const { rows: decisionRows } = await pool.query(`
       SELECT q.id, q.quote_number, q.discount_approval_status, q.discount_approval_note,
              q.discount_approval_at, q.max_discount_pct,
-             q.modification_status, q.admin_note, q.modified_at
+             q.modification_status, q.admin_note, q.modified_at,
+             q.client_approval_status, q.client_approval_at,
+             q.client_approval_note, q.client_name, q.client_business_name,
+             q.client_approved_by_name
       FROM quotes q
       WHERE q.employee_id = $1
         AND (
           (q.discount_approval_status IN ('approved', 'rejected') AND q.discount_approval_at IS NOT NULL)
           OR
           (q.modification_status IN ('approved', 'rejected') AND q.modified_at IS NOT NULL)
+          OR
+          (q.client_approval_status IS NOT NULL AND q.client_approval_at >= NOW() - INTERVAL '14 days')
         )
       ORDER BY GREATEST(
         COALESCE(q.discount_approval_at, '1970-01-01'),
-        COALESCE(q.modified_at, '1970-01-01')
+        COALESCE(q.modified_at, '1970-01-01'),
+        COALESCE(q.client_approval_at, '1970-01-01')
       ) DESC
-      LIMIT 20
+      LIMIT 30
     `, [req.user.id]);
 
     const notifications = [];
@@ -139,6 +176,23 @@ router.get('/', async (req, res) => {
             : `Your modification for ${r.quote_number} was rejected. Re-edit and resubmit.`,
           link:         `/quotes/${r.id}`,
           icon:         '❌',
+        });
+      }
+      if (r.client_approval_status && r.client_approval_at) {
+        const clientDisplay = r.client_business_name || r.client_name;
+        const isApproved = r.client_approval_status === 'approved';
+        notifications.push({
+          id:           `client_resp_${r.id}`,
+          type:         isApproved ? 'client_approved' : 'client_changes_requested',
+          quote_id:     r.id,
+          quote_number: r.quote_number,
+          created_at:   r.client_approval_at,
+          title:        isApproved ? 'Client Approved ✅' : 'Client Requested Changes ✏️',
+          message:      isApproved
+            ? `${clientDisplay} approved ${r.quote_number}${r.client_approved_by_name ? ` (${r.client_approved_by_name})` : ''}`
+            : `${clientDisplay} requested changes on ${r.quote_number}${r.client_approval_note ? `: "${r.client_approval_note}"` : ''}`,
+          link:         `/quotes/${r.id}`,
+          icon:         isApproved ? '✅' : '✏️',
         });
       }
     }
