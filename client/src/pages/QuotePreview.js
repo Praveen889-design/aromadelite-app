@@ -146,9 +146,12 @@ export default function QuotePreview() {
   const [gettingLink, setGettingLink] = useState(false);
   const [approvalLink, setApprovalLink] = useState('');
   const [linkCopied, setLinkCopied]     = useState(false);
-  const [waEnabled,   setWaEnabled]     = useState(false);
-  const [sendingWA,   setSendingWA]     = useState(false);
-  const [waMessages,  setWaMessages]    = useState([]);
+  const [waEnabled,       setWaEnabled]       = useState(false);
+  const [sendingWA,       setSendingWA]       = useState(false);
+  const [waMessages,      setWaMessages]      = useState([]);
+  const [generatingFinal, setGeneratingFinal] = useState(false);
+  const [showFinalModal,  setShowFinalModal]  = useState(false);
+  const [updatingOrderStatus, setUpdatingOrderStatus] = useState(false);
   const docRef    = useRef(null);
   const headerRef = useRef(null);
 
@@ -532,22 +535,40 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
   };
 
   const statusPill = {
-    draft:                 'bg-slate-100 text-slate-700',
-    sent:                  'bg-blue-100 text-blue-800',
-    accepted:              'bg-emerald-100 text-emerald-800',
-    modifications_required:'bg-amber-100 text-amber-800',
-    hold:                  'bg-purple-100 text-purple-800',
-    rejected:              'bg-rose-100 text-rose-700',
+    draft:                  'bg-slate-100 text-slate-700',
+    sent:                   'bg-blue-100 text-blue-800',
+    accepted:               'bg-emerald-100 text-emerald-800',
+    modifications_required: 'bg-amber-100 text-amber-800',
+    hold:                   'bg-purple-100 text-purple-800',
+    rejected:               'bg-rose-100 text-rose-700',
+    final_quoted:           'bg-teal-100 text-teal-800',
+    order_placed:           'bg-indigo-100 text-indigo-800',
+    order_delivered:        'bg-cyan-100 text-cyan-800',
   }[quote.status] || 'bg-slate-100 text-slate-700';
 
   const statusLabel = {
-    draft:                 'Draft',
-    sent:                  'Sent',
-    accepted:              'Accepted',
-    modifications_required:'Modifications Required',
-    hold:                  'Hold',
-    rejected:              'Rejected',
+    draft:                  'Draft',
+    sent:                   'Sent',
+    accepted:               'Accepted',
+    modifications_required: 'Modifications Required',
+    hold:                   'Hold',
+    rejected:               'Rejected',
+    final_quoted:           'Final Quote Ready',
+    order_placed:           'Order Placed',
+    order_delivered:        'Order Delivered',
   }[quote.status] || quote.status;
+
+  /* Progress steps for the order pipeline */
+  const PIPELINE_STEPS = [
+    { key: 'draft',          label: 'Draft' },
+    { key: 'sent',           label: 'Sent' },
+    { key: 'accepted',       label: 'Accepted' },
+    { key: 'final_quoted',   label: 'Final Quote' },
+    { key: 'order_placed',   label: 'Order Placed' },
+    { key: 'order_delivered',label: 'Delivered' },
+  ];
+  const pipelineIdx = PIPELINE_STEPS.findIndex((s) => s.key === quote.status);
+  const showPipeline = pipelineIdx >= 2; // show from 'accepted' onwards
 
   /* Status options shown after quote is sent */
   const CLIENT_STATUSES = [
@@ -639,6 +660,41 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
       toast(e?.response?.data?.error || 'WhatsApp send failed', { kind: 'error' });
     } finally {
       setSendingWA(false);
+    }
+  };
+
+  /* ── Confirm Final Quote (status: accepted → final_quoted) ─── */
+  const onConfirmFinalQuote = async (flagDeviation = false) => {
+    setGeneratingFinal(true);
+    try {
+      if (flagDeviation) {
+        // Submit for deviation approval (reuse discount approval mechanism)
+        await api.post(`/api/quotes/${id}/flag-deviation`);
+        toast('⚠️ Deviation flagged — awaiting admin approval.', { kind: 'success' });
+      } else {
+        await api.patch(`/api/quotes/${id}/status`, { status: 'final_quoted' });
+        toast('📋 Final quote generated! Share it with the client.', { kind: 'success' });
+      }
+      setShowFinalModal(false);
+      await fetchQuote();
+    } catch (e) {
+      toast(e?.response?.data?.error || 'Failed', { kind: 'error' });
+    } finally {
+      setGeneratingFinal(false);
+    }
+  };
+
+  /* ── Generic order-flow status updater ─────────────────────── */
+  const onAdvanceOrderStatus = async (newStatus, successMsg) => {
+    setUpdatingOrderStatus(true);
+    try {
+      await api.patch(`/api/quotes/${id}/status`, { status: newStatus });
+      toast(successMsg, { kind: 'success' });
+      await fetchQuote();
+    } catch (e) {
+      toast(e?.response?.data?.error || 'Failed to update status', { kind: 'error' });
+    } finally {
+      setUpdatingOrderStatus(false);
     }
   };
 
@@ -956,6 +1012,44 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
           </div>
         )}
 
+        {/* Order pipeline progress bar — visible from 'accepted' onwards */}
+        {showPipeline && (
+          <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: 12, marginTop: 4 }}>
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              {PIPELINE_STEPS.slice(2).map((step, i) => {
+                const absIdx = i + 2;
+                const done   = pipelineIdx > absIdx;
+                const active = pipelineIdx === absIdx;
+                return (
+                  <React.Fragment key={step.key}>
+                    {i > 0 && (
+                      <div style={{ flex: 1, height: 3, borderRadius: 2, background: done ? '#059669' : active ? '#1F6BC7' : '#e2e8f0' }} />
+                    )}
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, minWidth: 64 }}>
+                      <div style={{
+                        width: 28, height: 28, borderRadius: '50%', display: 'flex',
+                        alignItems: 'center', justifyContent: 'center', fontSize: 11,
+                        fontWeight: 800, flexShrink: 0,
+                        background: done ? '#059669' : active ? '#1F6BC7' : '#e2e8f0',
+                        color: (done || active) ? '#fff' : '#94a3b8',
+                        boxShadow: active ? '0 0 0 3px #dbeafe' : 'none',
+                      }}>
+                        {done ? '✓' : i + 1}
+                      </div>
+                      <span style={{
+                        fontSize: 9, fontWeight: active ? 800 : 600, textAlign: 'center', lineHeight: 1.2,
+                        color: done ? '#059669' : active ? '#1F6BC7' : '#94a3b8',
+                      }}>
+                        {step.label}
+                      </span>
+                    </div>
+                  </React.Fragment>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Row 2: action buttons — all share/send disabled when discount approval is pending/rejected */}
         <div className="flex flex-wrap gap-2">
 
@@ -1090,15 +1184,53 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
             </div>
           )}
 
-          {/* Generate Bill — shown when accepted OR modification approved */}
-          {(quote.status === 'accepted' || quote.modification_status === 'approved') && (
+          {/* Generate Final Quote — shown when accepted (new order flow) */}
+          {quote.status === 'accepted' && (
+            <button
+              type="button"
+              onClick={() => setShowFinalModal(true)}
+              className="inline-flex items-center gap-2 text-white text-sm font-bold rounded-xl px-5 py-2.5 shadow-sm"
+              style={{ minHeight: 44, background: 'linear-gradient(135deg, #0d9488, #0f766e)' }}
+            >
+              <span>📋 Generate Final Quote</span>
+            </button>
+          )}
+
+          {/* Mark Order Placed — shown when final_quoted */}
+          {quote.status === 'final_quoted' && (
+            <button
+              type="button"
+              onClick={() => onAdvanceOrderStatus('order_placed', '📦 Order marked as placed!')}
+              disabled={updatingOrderStatus}
+              className="inline-flex items-center gap-2 text-white text-sm font-bold rounded-xl px-5 py-2.5 shadow-sm disabled:opacity-60"
+              style={{ minHeight: 44, background: 'linear-gradient(135deg, #4f46e5, #4338ca)' }}
+            >
+              <span>{updatingOrderStatus ? 'Updating…' : '📦 Mark Order Placed'}</span>
+            </button>
+          )}
+
+          {/* Mark Order Delivered — shown when order_placed */}
+          {quote.status === 'order_placed' && (
+            <button
+              type="button"
+              onClick={() => onAdvanceOrderStatus('order_delivered', '🚚 Order marked as delivered!')}
+              disabled={updatingOrderStatus}
+              className="inline-flex items-center gap-2 text-white text-sm font-bold rounded-xl px-5 py-2.5 shadow-sm disabled:opacity-60"
+              style={{ minHeight: 44, background: 'linear-gradient(135deg, #0284c7, #0369a1)' }}
+            >
+              <span>{updatingOrderStatus ? 'Updating…' : '🚚 Mark Order Delivered'}</span>
+            </button>
+          )}
+
+          {/* Generate Bill — shown when order_delivered OR modification flow approved (backward compat) */}
+          {(quote.status === 'order_delivered' || quote.modification_status === 'approved') && (
             <button
               type="button"
               onClick={() => navigate(`/bills/new/${id}`)}
               className="inline-flex items-center gap-2 text-white text-sm font-bold rounded-xl px-5 py-2.5 shadow-sm"
-              style={{ minHeight: 44, background: 'linear-gradient(135deg, #059669, #047857)', fontFamily: 'Manrope, sans-serif' }}
+              style={{ minHeight: 44, background: 'linear-gradient(135deg, #059669, #047857)' }}
             >
-              <span>📄 Generate Bill</span>
+              <span>🧾 Generate Bill</span>
             </button>
           )}
 
@@ -1354,6 +1486,151 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
         </div>
       </div>
 
+      {/* ══ ORDER FLOW BANNERS ════════════════════════════ */}
+
+      {/* accepted → generate final quote */}
+      {quote.status === 'accepted' && (
+        <div style={{
+          background: 'linear-gradient(135deg, #f0fdfa, #ccfbf1)',
+          border: '2px solid #6ee7b7', borderRadius: 14,
+          padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap',
+        }}>
+          <span style={{ fontSize: 26, lineHeight: 1 }}>✅</span>
+          <div style={{ flex: 1, minWidth: 200 }}>
+            <div style={{ fontWeight: 900, fontSize: 15, color: '#065f46' }}>
+              Quote Accepted — Next: Generate Final Quote
+            </div>
+            <div style={{ fontSize: 12, color: '#047857', marginTop: 3 }}>
+              The client has approved this quote. Review items and pricing, then generate the final quote to proceed.
+              If anything has changed, flag it as a deviation for admin approval.
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowFinalModal(true)}
+            style={{
+              flexShrink: 0, padding: '10px 20px', borderRadius: 10, border: 'none',
+              background: 'linear-gradient(135deg, #0d9488, #0f766e)', color: '#fff',
+              fontSize: 13, fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap',
+            }}
+          >
+            📋 Generate Final Quote
+          </button>
+        </div>
+      )}
+
+      {/* final_quoted → share with client + mark order placed */}
+      {quote.status === 'final_quoted' && (
+        <div style={{
+          background: 'linear-gradient(135deg, #f0fdfa, #e6fffa)',
+          border: '2px solid #14b8a6', borderRadius: 14,
+          padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap',
+        }}>
+          <span style={{ fontSize: 26, lineHeight: 1 }}>📋</span>
+          <div style={{ flex: 1, minWidth: 200 }}>
+            <div style={{ fontWeight: 900, fontSize: 15, color: '#0f766e' }}>
+              Final Quote Ready — Share with Client
+            </div>
+            <div style={{ fontSize: 12, color: '#0d9488', marginTop: 3 }}>
+              Share the final quote with the client using the WhatsApp or PDF buttons above.
+              Once the client confirms and places the order, mark it below.
+            </div>
+            {quote.final_quote_generated_at && (
+              <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
+                📅 Generated: {formatDate(quote.final_quote_generated_at)}
+              </div>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => onAdvanceOrderStatus('order_placed', '📦 Order marked as placed!')}
+            disabled={updatingOrderStatus}
+            style={{
+              flexShrink: 0, padding: '10px 20px', borderRadius: 10, border: 'none',
+              background: 'linear-gradient(135deg, #4f46e5, #4338ca)', color: '#fff',
+              fontSize: 13, fontWeight: 800, whiteSpace: 'nowrap',
+              cursor: updatingOrderStatus ? 'not-allowed' : 'pointer',
+              opacity: updatingOrderStatus ? 0.6 : 1,
+            }}
+          >
+            {updatingOrderStatus ? 'Updating…' : '📦 Mark Order Placed'}
+          </button>
+        </div>
+      )}
+
+      {/* order_placed → mark order delivered */}
+      {quote.status === 'order_placed' && (
+        <div style={{
+          background: 'linear-gradient(135deg, #eff6ff, #dbeafe)',
+          border: '2px solid #93c5fd', borderRadius: 14,
+          padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap',
+        }}>
+          <span style={{ fontSize: 26, lineHeight: 1 }}>📦</span>
+          <div style={{ flex: 1, minWidth: 200 }}>
+            <div style={{ fontWeight: 900, fontSize: 15, color: '#1e40af' }}>
+              Order Placed — Awaiting Delivery
+            </div>
+            <div style={{ fontSize: 12, color: '#1d4ed8', marginTop: 3 }}>
+              The client has confirmed this order. Mark it as delivered once the goods reach the client.
+            </div>
+            {quote.order_placed_at && (
+              <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
+                📅 Placed on: {formatDate(quote.order_placed_at)}
+              </div>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => onAdvanceOrderStatus('order_delivered', '🚚 Order marked as delivered!')}
+            disabled={updatingOrderStatus}
+            style={{
+              flexShrink: 0, padding: '10px 20px', borderRadius: 10, border: 'none',
+              background: 'linear-gradient(135deg, #0284c7, #0369a1)', color: '#fff',
+              fontSize: 13, fontWeight: 800, whiteSpace: 'nowrap',
+              cursor: updatingOrderStatus ? 'not-allowed' : 'pointer',
+              opacity: updatingOrderStatus ? 0.6 : 1,
+            }}
+          >
+            {updatingOrderStatus ? 'Updating…' : '🚚 Mark Order Delivered'}
+          </button>
+        </div>
+      )}
+
+      {/* order_delivered → generate bill */}
+      {quote.status === 'order_delivered' && (
+        <div style={{
+          background: 'linear-gradient(135deg, #f0fdf4, #dcfce7)',
+          border: '2px solid #6ee7b7', borderRadius: 14,
+          padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap',
+        }}>
+          <span style={{ fontSize: 26, lineHeight: 1 }}>🚚</span>
+          <div style={{ flex: 1, minWidth: 200 }}>
+            <div style={{ fontWeight: 900, fontSize: 15, color: '#15803d' }}>
+              Order Delivered! — Generate the Bill
+            </div>
+            <div style={{ fontSize: 12, color: '#16a34a', marginTop: 3 }}>
+              The order has been successfully delivered to the client. You can now generate the final bill.
+            </div>
+            {quote.order_delivered_at && (
+              <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
+                📅 Delivered on: {formatDate(quote.order_delivered_at)}
+              </div>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate(`/bills/new/${id}`)}
+            style={{
+              flexShrink: 0, padding: '10px 20px', borderRadius: 10, border: 'none',
+              background: 'linear-gradient(135deg, #059669, #047857)', color: '#fff',
+              fontSize: 13, fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap',
+            }}
+          >
+            🧾 Generate Bill
+          </button>
+        </div>
+      )}
+
       {/* ══ Modification Workflow Banners ════════════════════════════ */}
 
       {/* ⏳ Pending approval — seen by associate */}
@@ -1428,6 +1705,72 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
       {isAdmin && quote.modification_status === 'rejected' && (
         <div style={{ background: '#fef2f2', border: '1.5px solid #fecaca', borderRadius: 10, padding: '10px 16px', fontSize: 13, color: '#991b1b' }}>
           ❌ <strong>You rejected</strong> this modification.{quote.admin_note ? ` Reason: "${quote.admin_note}"` : ''} Associate will re-edit and resubmit.
+        </div>
+      )}
+
+      {/* ══ FINAL QUOTE CONFIRMATION MODAL ════════════════════════════ */}
+      {showFinalModal && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 999,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+          }}
+          onClick={() => { if (!generatingFinal) setShowFinalModal(false); }}
+        >
+          <div
+            style={{
+              background: '#fff', borderRadius: 18, padding: 28,
+              maxWidth: 440, width: '100%', boxShadow: '0 20px 60px rgba(0,0,0,0.25)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ fontSize: 18, fontWeight: 900, color: '#0f766e', marginBottom: 8 }}>
+              📋 Generate Final Quote
+            </div>
+            <div style={{ fontSize: 13, color: '#374151', lineHeight: 1.6, marginBottom: 20 }}>
+              Are the prices and quantities the same as the accepted quote, or do any items differ?
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <button
+                type="button"
+                onClick={() => onConfirmFinalQuote(false)}
+                disabled={generatingFinal}
+                style={{
+                  padding: '13px 20px', borderRadius: 10, border: 'none', textAlign: 'left',
+                  cursor: generatingFinal ? 'not-allowed' : 'pointer',
+                  background: generatingFinal ? '#99f6e4' : 'linear-gradient(135deg, #0d9488, #0f766e)',
+                  color: '#fff', fontSize: 14, fontWeight: 800,
+                }}
+              >
+                ✅ Confirm — No changes, same as accepted quote
+              </button>
+              <button
+                type="button"
+                onClick={() => onConfirmFinalQuote(true)}
+                disabled={generatingFinal}
+                style={{
+                  padding: '13px 20px', borderRadius: 10, textAlign: 'left',
+                  border: '1.5px solid #f59e0b',
+                  cursor: generatingFinal ? 'not-allowed' : 'pointer',
+                  background: '#fffbeb', color: '#92400e', fontSize: 14, fontWeight: 800,
+                }}
+              >
+                ⚠️ Flag Deviation — Prices / quantities differ (needs admin approval)
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowFinalModal(false)}
+                disabled={generatingFinal}
+                style={{
+                  padding: '10px 20px', borderRadius: 10, border: '1px solid #e2e8f0',
+                  background: '#fff', color: '#64748b', fontSize: 13, cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

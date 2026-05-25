@@ -424,7 +424,11 @@ router.patch('/:id/status', async (req, res) => {
   const client = await pool.connect();
   try {
     const { status } = req.body || {};
-    if (!['draft', 'sent', 'accepted', 'modifications_required', 'hold', 'rejected'].includes(status)) {
+    const VALID = [
+      'draft', 'sent', 'accepted', 'modifications_required', 'hold', 'rejected',
+      'final_quoted', 'order_placed', 'order_delivered',
+    ];
+    if (!VALID.includes(status)) {
       return res.status(400).json({ error: 'Invalid status' });
     }
     const { rows } = await pool.query('SELECT * FROM quotes WHERE id = $1', [req.params.id]);
@@ -439,9 +443,35 @@ router.patch('/:id/status', async (req, res) => {
         discount_approval_required: true,
       });
     }
+    // Block final_quoted if discount approval is pending
+    if (status === 'final_quoted' && rows[0].discount_approval_status === 'pending') {
+      return res.status(400).json({
+        error: 'Deviation approval is pending. Wait for admin to approve before generating the final quote.',
+        discount_approval_required: true,
+      });
+    }
 
     await client.query('BEGIN');
-    await client.query('UPDATE quotes SET status = $1 WHERE id = $2', [status, req.params.id]);
+
+    // Build the SET clause — add timestamps for new stages
+    if (status === 'final_quoted') {
+      await client.query(
+        'UPDATE quotes SET status = $1, final_quote_generated_at = NOW() WHERE id = $2',
+        [status, req.params.id]
+      );
+    } else if (status === 'order_placed') {
+      await client.query(
+        'UPDATE quotes SET status = $1, order_placed_at = NOW() WHERE id = $2',
+        [status, req.params.id]
+      );
+    } else if (status === 'order_delivered') {
+      await client.query(
+        'UPDATE quotes SET status = $1, order_delivered_at = NOW() WHERE id = $2',
+        [status, req.params.id]
+      );
+    } else {
+      await client.query('UPDATE quotes SET status = $1 WHERE id = $2', [status, req.params.id]);
+    }
 
     if (status === 'accepted') {
       await client.query(
@@ -467,6 +497,7 @@ router.patch('/:id/status', async (req, res) => {
         [req.params.id]
       );
     }
+    // final_quoted / order_placed / order_delivered → lead stays 'converted'
     await client.query('COMMIT');
 
     const updated = await pool.query('SELECT * FROM quotes WHERE id = $1', [req.params.id]);
@@ -681,6 +712,10 @@ router.get('/:id/pdf-data', async (req, res) => {
           client_approval_at:     q.client_approval_at ? new Date(q.client_approval_at).toISOString() : null,
           client_approval_note:   q.client_approval_note   || null,
           client_approved_by_name: q.client_approved_by_name || null,
+          // Order flow timestamps
+          final_quote_generated_at: q.final_quote_generated_at ? new Date(q.final_quote_generated_at).toISOString() : null,
+          order_placed_at:          q.order_placed_at          ? new Date(q.order_placed_at).toISOString()          : null,
+          order_delivered_at:       q.order_delivered_at       ? new Date(q.order_delivered_at).toISOString()       : null,
         },
         client: {
           name: q.client_name, business_name: q.client_business_name, type: q.client_type,
