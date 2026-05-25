@@ -146,6 +146,9 @@ export default function QuotePreview() {
   const [gettingLink, setGettingLink] = useState(false);
   const [approvalLink, setApprovalLink] = useState('');
   const [linkCopied, setLinkCopied]     = useState(false);
+  const [waEnabled,   setWaEnabled]     = useState(false);
+  const [sendingWA,   setSendingWA]     = useState(false);
+  const [waMessages,  setWaMessages]    = useState([]);
   const docRef    = useRef(null);
   const headerRef = useRef(null);
 
@@ -167,7 +170,21 @@ export default function QuotePreview() {
     }
   };
 
-  useEffect(() => { fetchQuote(); }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const fetchWAMessages = async (quoteId) => {
+    try {
+      const res = await api.get(`/api/whatsapp/messages?quote_id=${quoteId}`);
+      setWaMessages(res.data.messages || []);
+    } catch { /* silent — WA may not be configured */ }
+  };
+
+  useEffect(() => {
+    fetchQuote();
+    // Check if WA is configured
+    api.get('/api/whatsapp/config')
+      .then(({ data }) => { setWaEnabled(!!data.config?.phone_number_id); })
+      .catch(() => {});
+    fetchWAMessages(id);
+  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const onSaveDates = async () => {
     setSavingDates(true);
@@ -608,6 +625,20 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
         ? `https://wa.me/${phone.length === 10 ? '91' + phone : phone}?text=${encodeURIComponent(msg)}`
         : `https://wa.me/?text=${encodeURIComponent(msg)}`;
       window.open(wa, '_blank', 'noopener,noreferrer');
+    }
+  };
+
+  /* ── Send quote via WhatsApp Cloud API ─────────────────────── */
+  const onSendWA = async () => {
+    setSendingWA(true);
+    try {
+      const { data: resp } = await api.post(`/api/whatsapp/send/quote/${id}`);
+      toast('✅ WhatsApp message sent to client!', { kind: 'success' });
+      setWaMessages((prev) => [resp.message, ...prev].slice(0, 10));
+    } catch (e) {
+      toast(e?.response?.data?.error || 'WhatsApp send failed', { kind: 'error' });
+    } finally {
+      setSendingWA(false);
     }
   };
 
@@ -1140,6 +1171,23 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
             </button>
           )}
 
+          {/* WhatsApp Cloud API send — shown only when WA is configured */}
+          {waEnabled && (
+            <button
+              type="button"
+              onClick={onSendWA}
+              disabled={sendingWA || discountBlocked}
+              title={discountBlocked ? blockTitle : 'Send quote directly via WhatsApp Business API'}
+              className="inline-flex items-center gap-2 text-sm font-semibold rounded-xl px-4 py-2.5 shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{ minHeight: 44, background: '#075e54', color: '#fff', border: 'none' }}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M20.52 3.48A11.93 11.93 0 0 0 12.04 0C5.47 0 .14 5.33.14 11.9c0 2.1.55 4.15 1.6 5.96L0 24l6.32-1.66a11.9 11.9 0 0 0 5.72 1.46h.01c6.57 0 11.9-5.33 11.9-11.9 0-3.18-1.24-6.17-3.43-8.42z" />
+              </svg>
+              <span>{sendingWA ? 'Sending…' : '📲 Send via API'}</span>
+            </button>
+          )}
+
           <Link
             to="/quotes/new"
             className="inline-flex items-center gap-1 border border-slate-300 text-slate-600 hover:bg-slate-50 text-sm font-medium rounded-xl px-4 py-2.5"
@@ -1177,6 +1225,43 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
               >
                 {linkCopied ? '✅ Copied' : '📋 Copy'}
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── WhatsApp API message log ── */}
+        {waEnabled && waMessages.length > 0 && (
+          <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: 10, marginTop: 4 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#374151', marginBottom: 6 }}>
+              📲 WhatsApp API — Recent Messages
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+              {waMessages.slice(0, 5).map((m) => {
+                const statusColor = {
+                  sent:      { bg: '#eff6ff', border: '#bfdbfe', dot: '#3b82f6', label: 'Sent' },
+                  delivered: { bg: '#f0fdf4', border: '#bbf7d0', dot: '#22c55e', label: 'Delivered' },
+                  read:      { bg: '#f0fdf4', border: '#86efac', dot: '#059669', label: 'Read ✓✓' },
+                  failed:    { bg: '#fef2f2', border: '#fca5a5', dot: '#ef4444', label: 'Failed' },
+                  pending:   { bg: '#fafaf9', border: '#e7e5e4', dot: '#a8a29e', label: 'Pending' },
+                }[m.status] || { bg: '#f8fafc', border: '#e2e8f0', dot: '#94a3b8', label: m.status };
+                return (
+                  <div key={m.id} style={{
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    background: statusColor.bg, border: `1px solid ${statusColor.border}`,
+                    borderRadius: 7, padding: '5px 10px', fontSize: 11,
+                  }}>
+                    <span style={{ width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
+                      background: statusColor.dot, display: 'inline-block' }} />
+                    <span style={{ flex: 1, color: '#374151' }}>
+                      <strong>{m.message_type}</strong> → {m.to_name || m.to_phone}
+                    </span>
+                    <span style={{ color: statusColor.dot, fontWeight: 700 }}>{statusColor.label}</span>
+                    <span style={{ color: '#94a3b8', marginLeft: 6 }}>
+                      {new Date(m.sent_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import api from '../../utils/api';
 import { useToast } from '../../components/Toast';
 
@@ -207,6 +207,268 @@ function ResetCard({ opt, onDone }) {
 }
 
 /* ════════════════════════════════════════════════════════════════
+   WHATSAPP SETTINGS SECTION
+════════════════════════════════════════════════════════════════ */
+function WhatsAppSettingsSection() {
+  const { toast } = useToast();
+  const [form, setForm] = useState({
+    access_token:          '',
+    phone_number_id:       '',
+    webhook_verify_token:  '',
+    quote_template_name:   '',
+    bill_template_name:    '',
+  });
+  const [loading,  setLoading]  = useState(true);
+  const [saving,   setSaving]   = useState(false);
+  const [testing,  setTesting]  = useState(false);
+  const [testPhone, setTestPhone] = useState('');
+  const [showToken, setShowToken] = useState(false);
+
+  useEffect(() => {
+    api.get('/api/whatsapp/config')
+      .then(({ data }) => {
+        const c = data.config || {};
+        setForm({
+          access_token:         c.access_token         || '',
+          phone_number_id:      c.phone_number_id      || '',
+          webhook_verify_token: c.webhook_verify_token || '',
+          quote_template_name:  c.quote_template_name  || '',
+          bill_template_name:   c.bill_template_name   || '',
+        });
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const set = (k) => (e) => setForm((p) => ({ ...p, [k]: e.target.value }));
+
+  const onSave = async () => {
+    setSaving(true);
+    try {
+      await api.patch('/api/whatsapp/config', form);
+      toast('✅ WhatsApp settings saved!', { kind: 'success' });
+    } catch (e) {
+      toast(e?.response?.data?.error || 'Save failed', { kind: 'error' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const onTest = async () => {
+    if (!testPhone.trim()) { toast('Enter a phone number to test', { kind: 'error' }); return; }
+    setTesting(true);
+    try {
+      const { data } = await api.post('/api/whatsapp/test', { phone: testPhone.trim() });
+      toast(`✅ Test message sent! WA ID: ${data.wa_message_id || '—'}`, { kind: 'success' });
+    } catch (e) {
+      toast(e?.response?.data?.error || 'Test failed', { kind: 'error' });
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  if (loading) return (
+    <div style={{ padding: '20px 0', color: '#94a3b8', fontSize: 13 }}>
+      Loading WhatsApp settings…
+    </div>
+  );
+
+  const isConfigured = !!form.phone_number_id && form.access_token && !form.access_token.startsWith('****');
+  const tokenIsSet   = form.access_token && form.access_token.length > 4;
+
+  return (
+    <div style={{ border: '2px solid #dcfce7', borderRadius: 14, background: '#fff', overflow: 'hidden', marginBottom: 24 }}>
+      {/* Header */}
+      <div style={{ background: 'linear-gradient(135deg, #f0fdf4, #dcfce7)', padding: '12px 18px',
+        borderBottom: '1px solid #bbf7d0', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <span style={{ fontSize: 22 }}>💬</span>
+        <div>
+          <div style={{ fontWeight: 800, fontSize: 14, color: '#14532d' }}>
+            WhatsApp Business API
+          </div>
+          <div style={{ fontSize: 11, color: '#166534' }}>
+            Meta Cloud API — send quotes &amp; bills directly to clients via WhatsApp
+          </div>
+        </div>
+        {isConfigured && (
+          <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 700,
+            background: '#dcfce7', color: '#15803d', border: '1px solid #86efac',
+            borderRadius: 99, padding: '3px 10px' }}>
+            ✅ Configured
+          </span>
+        )}
+        {!isConfigured && (form.phone_number_id || tokenIsSet) && (
+          <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 700,
+            background: '#fef3c7', color: '#92400e', border: '1px solid #fcd34d',
+            borderRadius: 99, padding: '3px 10px' }}>
+            ⚠️ Incomplete
+          </span>
+        )}
+      </div>
+
+      <div style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+        {/* Access Token */}
+        <div>
+          <label style={{ fontSize: 12, fontWeight: 700, color: '#374151', display: 'block', marginBottom: 5 }}>
+            Access Token <span style={{ color: '#dc2626' }}>*</span>
+            <span style={{ fontWeight: 400, color: '#94a3b8', marginLeft: 6 }}>
+              (Permanent token from Meta Business &gt; WhatsApp &gt; API Setup)
+            </span>
+          </label>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <input
+              type={showToken ? 'text' : 'password'}
+              value={form.access_token}
+              onChange={set('access_token')}
+              placeholder="EAAxxxxxx…  (leave blank to keep existing)"
+              style={{ flex: 1, border: '1.5px solid #d1fae5', borderRadius: 8,
+                padding: '9px 12px', fontSize: 13, outline: 'none',
+                fontFamily: 'monospace', background: '#f9fafb' }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowToken((v) => !v)}
+              style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #d1fae5',
+                background: '#f0fdf4', color: '#15803d', fontSize: 12, cursor: 'pointer',
+                fontWeight: 600, whiteSpace: 'nowrap' }}
+            >
+              {showToken ? '🙈 Hide' : '👁 Show'}
+            </button>
+          </div>
+          {tokenIsSet && (
+            <div style={{ fontSize: 11, color: '#6b7280', marginTop: 3 }}>
+              Token is set. Enter a new value to replace it, or leave blank to keep.
+            </div>
+          )}
+        </div>
+
+        {/* Phone Number ID */}
+        <div>
+          <label style={{ fontSize: 12, fontWeight: 700, color: '#374151', display: 'block', marginBottom: 5 }}>
+            Phone Number ID <span style={{ color: '#dc2626' }}>*</span>
+            <span style={{ fontWeight: 400, color: '#94a3b8', marginLeft: 6 }}>
+              (Meta Business &gt; WhatsApp &gt; API Setup — numeric ID)
+            </span>
+          </label>
+          <input
+            type="text"
+            value={form.phone_number_id}
+            onChange={set('phone_number_id')}
+            placeholder="e.g. 123456789012345"
+            style={{ width: '100%', boxSizing: 'border-box', border: '1.5px solid #d1fae5',
+              borderRadius: 8, padding: '9px 12px', fontSize: 13, outline: 'none',
+              fontFamily: 'monospace', background: '#f9fafb' }}
+          />
+        </div>
+
+        {/* Webhook Verify Token */}
+        <div>
+          <label style={{ fontSize: 12, fontWeight: 700, color: '#374151', display: 'block', marginBottom: 5 }}>
+            Webhook Verify Token
+            <span style={{ fontWeight: 400, color: '#94a3b8', marginLeft: 6 }}>
+              (any random string you set in Meta webhook config for verification)
+            </span>
+          </label>
+          <input
+            type="text"
+            value={form.webhook_verify_token}
+            onChange={set('webhook_verify_token')}
+            placeholder="e.g. aromadelite_secret_2024"
+            style={{ width: '100%', boxSizing: 'border-box', border: '1.5px solid #e2e8f0',
+              borderRadius: 8, padding: '9px 12px', fontSize: 13, outline: 'none', background: '#f9fafb' }}
+          />
+          <div style={{ fontSize: 11, color: '#6b7280', marginTop: 3 }}>
+            Webhook URL to register in Meta:{' '}
+            <code style={{ background: '#f1f5f9', padding: '1px 5px', borderRadius: 4 }}>
+              {window.location.origin}/api/whatsapp/webhook
+            </code>
+          </div>
+        </div>
+
+        {/* Template Names row */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 700, color: '#374151', display: 'block', marginBottom: 5 }}>
+              Quote Template Name
+              <span style={{ fontWeight: 400, color: '#94a3b8', marginLeft: 6 }}>(optional)</span>
+            </label>
+            <input
+              type="text"
+              value={form.quote_template_name}
+              onChange={set('quote_template_name')}
+              placeholder="e.g. aromadelite_quote"
+              style={{ width: '100%', boxSizing: 'border-box', border: '1.5px solid #e2e8f0',
+                borderRadius: 8, padding: '9px 12px', fontSize: 13, outline: 'none', background: '#f9fafb' }}
+            />
+          </div>
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 700, color: '#374151', display: 'block', marginBottom: 5 }}>
+              Bill Template Name
+              <span style={{ fontWeight: 400, color: '#94a3b8', marginLeft: 6 }}>(optional)</span>
+            </label>
+            <input
+              type="text"
+              value={form.bill_template_name}
+              onChange={set('bill_template_name')}
+              placeholder="e.g. aromadelite_bill"
+              style={{ width: '100%', boxSizing: 'border-box', border: '1.5px solid #e2e8f0',
+                borderRadius: 8, padding: '9px 12px', fontSize: 13, outline: 'none', background: '#f9fafb' }}
+            />
+          </div>
+        </div>
+        <div style={{ fontSize: 11, color: '#6b7280', marginTop: -8 }}>
+          If template names are blank, free-form text messages are sent (only within 24-hour conversation window).
+          Templates work anytime and are recommended for first-time outreach.
+        </div>
+
+        {/* Action buttons */}
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', paddingTop: 4, borderTop: '1px solid #f1f5f9' }}>
+          <button
+            type="button"
+            onClick={onSave}
+            disabled={saving}
+            style={{ padding: '9px 22px', borderRadius: 9, border: 'none',
+              background: saving ? '#86efac' : 'linear-gradient(135deg, #16a34a, #15803d)',
+              color: '#fff', fontSize: 13, fontWeight: 800,
+              cursor: saving ? 'not-allowed' : 'pointer' }}
+          >
+            {saving ? 'Saving…' : '💾 Save WhatsApp Config'}
+          </button>
+
+          {/* Test section */}
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginLeft: 'auto' }}>
+            <input
+              type="text"
+              value={testPhone}
+              onChange={(e) => setTestPhone(e.target.value)}
+              placeholder="Test phone (10-digit)"
+              style={{ border: '1.5px solid #d1fae5', borderRadius: 8,
+                padding: '8px 12px', fontSize: 12, outline: 'none',
+                fontFamily: 'monospace', width: 180, background: '#f9fafb' }}
+            />
+            <button
+              type="button"
+              onClick={onTest}
+              disabled={testing || !form.phone_number_id}
+              title={!form.phone_number_id ? 'Save Phone Number ID first' : 'Send a test text message'}
+              style={{ padding: '8px 16px', borderRadius: 9,
+                border: '1.5px solid #d1fae5', background: '#f0fdf4',
+                color: '#15803d', fontSize: 12, fontWeight: 700,
+                cursor: testing || !form.phone_number_id ? 'not-allowed' : 'pointer',
+                opacity: !form.phone_number_id ? 0.5 : 1 }}
+            >
+              {testing ? '📤 Sending…' : '📤 Test Send'}
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════
    MAIN SETTINGS TAB
 ════════════════════════════════════════════════════════════════ */
 export default function SettingsTab() {
@@ -223,6 +485,9 @@ export default function SettingsTab() {
           Manage database records. Use the Danger Zone to clear test data before going live.
         </p>
       </div>
+
+      {/* WhatsApp Business API Settings */}
+      <WhatsAppSettingsSection />
 
       {/* Danger Zone */}
       <div style={{ border: '2px solid #fca5a5', borderRadius: 14,
