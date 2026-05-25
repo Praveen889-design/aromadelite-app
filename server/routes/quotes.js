@@ -642,6 +642,11 @@ router.get('/:id/pdf-data', async (req, res) => {
           modification_note: q.modification_note || null,
           admin_note: q.admin_note || null,
           modified_at: q.modified_at ? new Date(q.modified_at).toISOString() : null,
+          // Discount approval fields
+          discount_approval_status: q.discount_approval_status || null,
+          max_discount_pct: q.max_discount_pct != null ? Number(q.max_discount_pct) : null,
+          discount_approval_note: q.discount_approval_note || null,
+          employee_name: q.employee_name || null,
         },
         client: {
           name: q.client_name, business_name: q.client_business_name, type: q.client_type,

@@ -558,6 +558,14 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
     }
   };
 
+  // Block ALL client-facing actions (share/send) while discount approval is pending or rejected
+  const discountBlocked = quote.discount_approval_status === 'pending' || quote.discount_approval_status === 'rejected';
+  const blockTitle = quote.discount_approval_status === 'pending'
+    ? 'Awaiting discount approval — sharing is disabled until an admin approves'
+    : quote.discount_approval_status === 'rejected'
+    ? 'Discount rejected — revise pricing before sharing'
+    : undefined;
+
   return (
     <div className="space-y-4">
 
@@ -821,14 +829,16 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
           </div>
         )}
 
-        {/* Row 2: action buttons */}
+        {/* Row 2: action buttons — all share/send disabled when discount approval is pending/rejected */}
         <div className="flex flex-wrap gap-2">
 
           {/* WhatsApp — primary share on mobile */}
           <button
             type="button"
             onClick={onShareWhatsApp}
-            className="inline-flex items-center gap-2 bg-[#25D366] hover:bg-[#1ebe59] active:bg-[#17a84e] text-white text-sm font-semibold rounded-xl px-4 py-2.5 shadow-sm"
+            disabled={discountBlocked}
+            title={blockTitle}
+            className="inline-flex items-center gap-2 bg-[#25D366] hover:bg-[#1ebe59] active:bg-[#17a84e] text-white text-sm font-semibold rounded-xl px-4 py-2.5 shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
             style={{ minHeight: 44 }}
           >
             <WhatsAppIcon />
@@ -840,7 +850,9 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
             <button
               type="button"
               onClick={onNativeShare}
-              className="inline-flex items-center gap-2 bg-violet-600 hover:bg-violet-700 active:bg-violet-800 text-white text-sm font-semibold rounded-xl px-4 py-2.5 shadow-sm"
+              disabled={discountBlocked}
+              title={blockTitle}
+              className="inline-flex items-center gap-2 bg-violet-600 hover:bg-violet-700 active:bg-violet-800 text-white text-sm font-semibold rounded-xl px-4 py-2.5 shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
               style={{ minHeight: 44 }}
             >
               <ShareIcon />
@@ -852,8 +864,9 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
           <button
             type="button"
             onClick={onSharePdf}
-            disabled={sharingPdf}
-            className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-sm font-semibold rounded-xl px-4 py-2.5 shadow-sm disabled:opacity-60"
+            disabled={sharingPdf || discountBlocked}
+            title={blockTitle}
+            className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-sm font-semibold rounded-xl px-4 py-2.5 shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
             style={{ minHeight: 44 }}
           >
             {canShareFiles() ? <SharePdfIcon /> : <DownloadIcon />}
@@ -871,8 +884,9 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
             <button
               type="button"
               onClick={onDownloadPdf}
-              disabled={downloading}
-              className="inline-flex items-center gap-2 bg-slate-600 hover:bg-slate-700 text-white text-sm font-semibold rounded-xl px-4 py-2.5 shadow-sm disabled:opacity-60"
+              disabled={downloading || discountBlocked}
+              title={blockTitle}
+              className="inline-flex items-center gap-2 bg-slate-600 hover:bg-slate-700 text-white text-sm font-semibold rounded-xl px-4 py-2.5 shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
               style={{ minHeight: 44 }}
             >
               <DownloadIcon />
@@ -885,12 +899,8 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
             <button
               type="button"
               onClick={onMarkSent}
-              disabled={marking || quote.discount_approval_status === 'pending' || quote.discount_approval_status === 'rejected'}
-              title={
-                quote.discount_approval_status === 'pending' ? 'Awaiting discount approval from admin'
-                : quote.discount_approval_status === 'rejected' ? 'Discount was rejected — revise pricing'
-                : undefined
-              }
+              disabled={marking || discountBlocked}
+              title={blockTitle}
               className="inline-flex items-center gap-2 bg-[#1F6BC7] hover:bg-[#155DA6] text-white text-sm font-semibold rounded-xl px-4 py-2.5 shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
               style={{ minHeight: 44 }}
             >
