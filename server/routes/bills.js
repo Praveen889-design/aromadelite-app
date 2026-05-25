@@ -470,6 +470,8 @@ router.get('/:id/pdf-data', async (req, res) => {
         bill: {
           number: b.bill_number,
           status: b.status,
+          payment_status: b.payment_status || 'pending',
+          amount_paid: +Number(b.amount_paid || 0).toFixed(2),
           gst_mode,
           created_at: created.toISOString().slice(0, 10),
           quote_id: b.quote_id,

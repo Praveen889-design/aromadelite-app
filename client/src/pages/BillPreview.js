@@ -613,7 +613,7 @@ export default function BillPreview() {
                         </span>
                       </div>
                       <div className="text-xs text-slate-500 mt-0.5">
-                        {new Date(p.payment_date + 'T00:00:00').toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' })}
+                        {new Date(String(p.payment_date || '').slice(0, 10) + 'T00:00:00').toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' })}
                         {p.recorded_by_name ? ` · by ${p.recorded_by_name}` : ''}
                         {p.notes ? ` · ${p.notes}` : ''}
                       </div>
@@ -671,7 +671,7 @@ export default function BillPreview() {
                         </span>
                       </div>
                       <div className="text-xs text-slate-500 mt-0.5">
-                        {new Date(p.payment_date + 'T00:00:00').toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' })}
+                        {new Date(String(p.payment_date || '').slice(0, 10) + 'T00:00:00').toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' })}
                         {p.recorded_by_name ? ` · by ${p.recorded_by_name}` : ''}
                         {p.notes ? ` · ${p.notes}` : ''}
                       </div>
