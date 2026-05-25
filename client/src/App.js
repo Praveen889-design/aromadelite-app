@@ -16,6 +16,7 @@ import ClientProfile from './pages/ClientProfile';
 import Layout from './components/Layout';
 import RequireAuth from './components/RequireAuth';
 import { QuoteBuilderProvider } from './context/QuoteBuilderContext';
+import { NotificationsProvider } from './context/NotificationsContext';
 import { ToastProvider } from './components/Toast';
 
 export default function App() {
@@ -27,23 +28,25 @@ export default function App() {
         <Route
           element={
             <RequireAuth>
-              <QuoteBuilderProvider>
-                <Layout />
-              </QuoteBuilderProvider>
+              <NotificationsProvider>
+                <QuoteBuilderProvider>
+                  <Layout />
+                </QuoteBuilderProvider>
+              </NotificationsProvider>
             </RequireAuth>
           }
         >
           <Route index element={<Dashboard />} />
-          <Route path="quotes/new" element={<NewQuote />} />
-          <Route path="quotes/:id/modify" element={<QuoteModificationEditor />} />
-          <Route path="quotes/:id" element={<QuotePreview />} />
-          <Route path="quotes"     element={<MyQuotes />} />
-          <Route path="bills/new/:quoteId" element={<BillBuilder />} />
-          <Route path="bills/:id"          element={<BillPreview />} />
-          <Route path="products"   element={<Products />} />
-          <Route path="leads"      element={<Leads />} />
-          <Route path="clients/:id" element={<ClientProfile />} />
-          <Route path="clients"     element={<Clients />} />
+          <Route path="quotes/new"             element={<NewQuote />} />
+          <Route path="quotes/:id/modify"      element={<QuoteModificationEditor />} />
+          <Route path="quotes/:id"             element={<QuotePreview />} />
+          <Route path="quotes"                 element={<MyQuotes />} />
+          <Route path="bills/new/:quoteId"     element={<BillBuilder />} />
+          <Route path="bills/:id"              element={<BillPreview />} />
+          <Route path="products"               element={<Products />} />
+          <Route path="leads"                  element={<Leads />} />
+          <Route path="clients/:id"            element={<ClientProfile />} />
+          <Route path="clients"                element={<Clients />} />
           <Route
             path="admin"
             element={

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import TeamTab from './admin/TeamTab';
 import ProductsTab from './admin/ProductsTab';
 import QuotesTab from './admin/QuotesTab';
@@ -2015,7 +2016,9 @@ const TABS = [
 
 export default function AdminPanel() {
   const { user } = useAuth();
-  const [tab, setTab] = useState('overview');
+  const { search } = useLocation();
+  const initialTab = new URLSearchParams(search).get('tab') || 'overview';
+  const [tab, setTab] = useState(initialTab);
   const [tabFilters, setTabFilters] = useState({});
   const [pendingModCount, setPendingModCount]         = useState(0);
   const [pendingPaymentCount, setPendingPaymentCount] = useState(0);
