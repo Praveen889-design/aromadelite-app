@@ -339,7 +339,7 @@ export default function NewQuote() {
           )}
         </div>
 
-        <div className="flex-1 overflow-y-auto p-3 space-y-2">
+        <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-2">
           {items.length === 0 ? (
             <div className="text-center text-sm text-slate-500 py-12 px-4">
               No items yet. Pick products from the left to start building this quote.
