@@ -698,6 +698,12 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
     }
   };
 
+  // Bill already generated for this quote?
+  const billGenerated = !!quote.bill_id;
+  const billId        = quote.bill_id;
+  const billNumber    = quote.bill_number;
+  const billPayStatus = quote.bill_payment_status; // 'pending' | 'partial' | 'completed'
+
   // Block ALL client-facing actions (share/send) while discount approval is pending or rejected
   const discountBlocked = quote.discount_approval_status === 'pending' || quote.discount_approval_status === 'rejected';
   const blockTitle = quote.discount_approval_status === 'pending'
@@ -1130,8 +1136,8 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
             </button>
           )}
 
-          {/* Client response status dropdown — shown once quote is sent */}
-          {['sent', 'modifications_required', 'hold'].includes(quote.status) && (
+          {/* Client response status dropdown — shown once quote is sent, hidden once billed */}
+          {['sent', 'modifications_required', 'hold'].includes(quote.status) && !billGenerated && (
             <div style={{ position: 'relative' }}>
               <button
                 type="button"
@@ -1184,8 +1190,10 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
             </div>
           )}
 
+          {/* ── Order-flow action buttons (hidden once bill is generated) ── */}
+
           {/* Generate Final Quote — shown when accepted (new order flow) */}
-          {quote.status === 'accepted' && (
+          {quote.status === 'accepted' && !billGenerated && (
             <button
               type="button"
               onClick={() => setShowFinalModal(true)}
@@ -1197,7 +1205,7 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
           )}
 
           {/* Mark Order Placed — shown when final_quoted */}
-          {quote.status === 'final_quoted' && (
+          {quote.status === 'final_quoted' && !billGenerated && (
             <button
               type="button"
               onClick={() => onAdvanceOrderStatus('order_placed', '📦 Order marked as placed!')}
@@ -1210,7 +1218,7 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
           )}
 
           {/* Mark Order Delivered — shown when order_placed */}
-          {quote.status === 'order_placed' && (
+          {quote.status === 'order_placed' && !billGenerated && (
             <button
               type="button"
               onClick={() => onAdvanceOrderStatus('order_delivered', '🚚 Order marked as delivered!')}
@@ -1222,8 +1230,8 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
             </button>
           )}
 
-          {/* Generate Bill — shown when order_delivered OR modification flow approved (backward compat) */}
-          {(quote.status === 'order_delivered' || quote.modification_status === 'approved') && (
+          {/* Generate Bill — shown when order_delivered OR modification flow approved — only if NOT yet billed */}
+          {(quote.status === 'order_delivered' || quote.modification_status === 'approved') && !billGenerated && (
             <button
               type="button"
               onClick={() => navigate(`/bills/new/${id}`)}
@@ -1231,6 +1239,21 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
               style={{ minHeight: 44, background: 'linear-gradient(135deg, #059669, #047857)' }}
             >
               <span>🧾 Generate Bill</span>
+            </button>
+          )}
+
+          {/* View Bill — shown once a bill has been generated */}
+          {billGenerated && (
+            <button
+              type="button"
+              onClick={() => navigate(`/bills/${billId}`)}
+              className="inline-flex items-center gap-2 text-white text-sm font-bold rounded-xl px-5 py-2.5 shadow-sm"
+              style={{ minHeight: 44, background: 'linear-gradient(135deg, #0369a1, #0284c7)' }}
+            >
+              <span>
+                {billPayStatus === 'completed' ? '✅' : billPayStatus === 'partial' ? '💰' : '🧾'}
+                {' '}View Bill {billNumber ? `· ${billNumber}` : ''}
+              </span>
             </button>
           )}
 
@@ -1488,8 +1511,41 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
 
       {/* ══ ORDER FLOW BANNERS ════════════════════════════ */}
 
+      {/* ── Bill already generated — lock banner ── */}
+      {billGenerated && (
+        <div style={{
+          background: 'linear-gradient(135deg, #f0fdf4, #dcfce7)',
+          border: '2px solid #6ee7b7', borderRadius: 14,
+          padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap',
+        }}>
+          <span style={{ fontSize: 26, lineHeight: 1 }}>
+            {billPayStatus === 'completed' ? '✅' : billPayStatus === 'partial' ? '💰' : '🧾'}
+          </span>
+          <div style={{ flex: 1, minWidth: 200 }}>
+            <div style={{ fontWeight: 900, fontSize: 15, color: '#15803d' }}>
+              Bill Generated — {billPayStatus === 'completed' ? 'Fully Paid' : billPayStatus === 'partial' ? 'Partially Paid' : 'Awaiting Payment'}
+            </div>
+            <div style={{ fontSize: 12, color: '#16a34a', marginTop: 3 }}>
+              {billNumber ? `Bill ${billNumber} has been created for this quote.` : 'A bill has already been created for this quote.'}
+              {' '}All quote actions are locked. Use the bill page to record payments.
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate(`/bills/${billId}`)}
+            style={{
+              flexShrink: 0, padding: '10px 20px', borderRadius: 10, border: 'none',
+              background: 'linear-gradient(135deg, #0369a1, #0284c7)', color: '#fff',
+              fontSize: 13, fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap',
+            }}
+          >
+            {billPayStatus === 'completed' ? '✅ View Bill' : '💳 Go to Bill & Pay'}
+          </button>
+        </div>
+      )}
+
       {/* accepted → generate final quote */}
-      {quote.status === 'accepted' && (
+      {quote.status === 'accepted' && !billGenerated && (
         <div style={{
           background: 'linear-gradient(135deg, #f0fdfa, #ccfbf1)',
           border: '2px solid #6ee7b7', borderRadius: 14,
@@ -1520,7 +1576,7 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
       )}
 
       {/* final_quoted → share with client + mark order placed */}
-      {quote.status === 'final_quoted' && (
+      {quote.status === 'final_quoted' && !billGenerated && (
         <div style={{
           background: 'linear-gradient(135deg, #f0fdfa, #e6fffa)',
           border: '2px solid #14b8a6', borderRadius: 14,
@@ -1559,7 +1615,7 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
       )}
 
       {/* order_placed → mark order delivered */}
-      {quote.status === 'order_placed' && (
+      {quote.status === 'order_placed' && !billGenerated && (
         <div style={{
           background: 'linear-gradient(135deg, #eff6ff, #dbeafe)',
           border: '2px solid #93c5fd', borderRadius: 14,
@@ -1597,7 +1653,7 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
       )}
 
       {/* order_delivered → generate bill */}
-      {quote.status === 'order_delivered' && (
+      {quote.status === 'order_delivered' && !billGenerated && (
         <div style={{
           background: 'linear-gradient(135deg, #f0fdf4, #dcfce7)',
           border: '2px solid #6ee7b7', borderRadius: 14,

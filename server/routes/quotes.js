@@ -611,9 +611,13 @@ router.get('/:id/pdf-data', async (req, res) => {
   try {
     const { rows } = await pool.query(`
       SELECT q.*, e.name AS employee_name, e.employee_id AS employee_code,
-             e.phone AS employee_phone, e.email AS employee_email, e.region
+             e.phone AS employee_phone, e.email AS employee_email, e.region,
+             b.id AS bill_id, b.bill_number AS bill_number, b.status AS bill_status,
+             b.payment_status AS bill_payment_status
       FROM quotes q JOIN employees e ON e.id = q.employee_id
+      LEFT JOIN bills b ON b.quote_id = q.id
       WHERE q.id = $1
+      LIMIT 1
     `, [req.params.id]);
     if (!rows[0]) return res.status(404).json({ error: 'Quote not found' });
     const q = rows[0];
@@ -716,6 +720,11 @@ router.get('/:id/pdf-data', async (req, res) => {
           final_quote_generated_at: q.final_quote_generated_at ? new Date(q.final_quote_generated_at).toISOString() : null,
           order_placed_at:          q.order_placed_at          ? new Date(q.order_placed_at).toISOString()          : null,
           order_delivered_at:       q.order_delivered_at       ? new Date(q.order_delivered_at).toISOString()       : null,
+          // Linked bill (if already generated)
+          bill_id:             q.bill_id             || null,
+          bill_number:         q.bill_number         || null,
+          bill_status:         q.bill_status         || null,
+          bill_payment_status: q.bill_payment_status || null,
         },
         client: {
           name: q.client_name, business_name: q.client_business_name, type: q.client_type,
