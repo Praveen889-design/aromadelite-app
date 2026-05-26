@@ -107,7 +107,7 @@ export default function AiInsightsTab() {
           AI Business Insights
         </h2>
         <p style={{ fontSize: 14, color: '#64748b', maxWidth: 460, lineHeight: 1.6, margin: '0 0 28px' }}>
-          Powered by <strong>Google Gemini 1.5 Flash</strong>. Analyzes your last 30 days of
+          Powered by <strong>Google Gemini 2.0 Flash</strong>. Analyzes your last 30 days of
           revenue, quotes, associate performance, payments and client activity — then gives
           you actionable recommendations in seconds.
         </p>
@@ -120,7 +120,7 @@ export default function AiInsightsTab() {
           <span>✨</span> Generate AI Insights
         </button>
         <div style={{ marginTop: 20, fontSize: 11, color: '#94a3b8' }}>
-          Uses Gemini 1.5 Flash (free tier) · No client PII sent to AI · ~5 seconds
+          Uses Gemini 2.0 Flash (free tier) · No client PII sent to AI · ~5 seconds
         </div>
       </div>
     );
@@ -228,7 +228,7 @@ export default function AiInsightsTab() {
             <span>🤖</span> AI Business Insights
           </div>
           <div style={{ fontSize: 12, color: '#ddd6fe', marginTop: 2 }}>
-            Generated at {fmtTime(generatedAt)} · Powered by Gemini 1.5 Flash · Last 30 days data
+            Generated at {fmtTime(generatedAt)} · Powered by Gemini 2.0 Flash · Last 30 days data
           </div>
         </div>
         <button onClick={generate} style={{
