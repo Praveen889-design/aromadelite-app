@@ -248,6 +248,13 @@ export default function BillPreview() {
   /* ── PDF builder — canvas-sliced, header repeats on every page ── */
   const buildPdf = async () => {
     const scale = 2;
+
+    // Measure header height directly from DOM before canvas capture.
+    // This is more accurate than deriving it from canvas aspect-ratio maths
+    // (the headerRef sits inside a padded docRef, so their widths differ and
+    // the normalization formula over/under-estimates the true pixel height).
+    const hdrCssH = headerRef.current.offsetHeight; // includes padding + border
+
     const [fullCanvas, headerCanvas] = await Promise.all([
       html2canvas(docRef.current,    { scale, useCORS: true, backgroundColor: '#ffffff' }),
       html2canvas(headerRef.current, { scale, useCORS: true, backgroundColor: '#ffffff' }),
@@ -260,9 +267,15 @@ export default function BillPreview() {
     const pxToPt  = pageW / fullCanvas.width;
     const pageHpx = pageH / pxToPt; // float — no rounding to avoid drift
 
-    // Normalise header to the same pixel width as fullCanvas
-    const hdrNormH = Math.round((headerCanvas.height / headerCanvas.width) * fullCanvas.width);
+    // DOM-measured height in fullCanvas pixel space (scale=2)
+    const hdrNormH = Math.round(hdrCssH * scale);
     const hdrHpt   = hdrNormH * pxToPt;
+
+    // Extra gap (in pts) between repeated header and content on pages 2+.
+    // Prevents the last line of the header visually overlapping the first
+    // content row when the two are rendered flush against each other.
+    const GAP_PT = 4;
+    const gapPx  = Math.round(GAP_PT / pxToPt);
 
     // Single reusable temp canvas
     const tmp    = document.createElement('canvas');
@@ -288,14 +301,16 @@ export default function BillPreview() {
     while (srcY < fullCanvas.height) {
       pdf.addPage();
       pdf.addImage(hdrData, 'JPEG', 0, 0, pageW, hdrHpt, undefined, 'FAST');
-      const sliceH = Math.min(pageHpx - hdrNormH, fullCanvas.height - srcY);
+      // Content starts after header + gap; slice is reduced by the same gap
+      // so it never overflows the page bottom.
+      const sliceH = Math.min(pageHpx - hdrNormH - gapPx, fullCanvas.height - srcY);
       if (sliceH > 0) {
         const sliceData = crop(fullCanvas, srcY, sliceH, fullCanvas.width);
         if (sliceData) {
-          pdf.addImage(sliceData, 'JPEG', 0, hdrHpt, pageW, sliceH * pxToPt, undefined, 'FAST');
+          pdf.addImage(sliceData, 'JPEG', 0, hdrHpt + GAP_PT, pageW, sliceH * pxToPt, undefined, 'FAST');
         }
       }
-      srcY += (pageHpx - hdrNormH);
+      srcY += (pageHpx - hdrNormH - gapPx);
     }
     return pdf;
   };
