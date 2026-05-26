@@ -52,8 +52,9 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'employee_id, name, password, and role are required' });
     }
     if (!['admin', 'associate'].includes(role)) return res.status(400).json({ error: 'Invalid role' });
-    if (role === 'associate' && region && !['Hyderabad', 'Vijayawada', 'Warangal'].includes(region)) {
-      return res.status(400).json({ error: 'Invalid region' });
+    const VALID_REGIONS = ['Hyderabad', 'Nizamabad', 'Warangal', 'Karimnagar', 'Vijayawada', 'Guntur', 'Medak'];
+    if (role === 'associate' && region && !VALID_REGIONS.includes(region)) {
+      return res.status(400).json({ error: `Invalid region. Must be one of: ${VALID_REGIONS.join(', ')}` });
     }
 
     const existing = await pool.query('SELECT id FROM employees WHERE employee_id = $1', [employee_id]);
