@@ -85,7 +85,7 @@ router.get('/:token', async (req, res) => {
 
     // 3. Full product catalog
     const { rows: products } = await pool.query(`
-      SELECT p.id, p.name, p.description, p.system_price, p.unit, p.hsn_code,
+      SELECT p.id, p.name, p.description, p.base_price, p.unit, p.hsn_code,
              p.gst_percent, p.variants, p.pack_sizes,
              c.name AS category_name, c.icon_emoji AS category_icon
       FROM products p
@@ -95,13 +95,13 @@ router.get('/:token', async (req, res) => {
     `);
 
     const catalog = products.map(p => {
-      const sysPrice = Number(p.system_price) || 0;
+      const sysPrice = Number(p.base_price) || 0;
       const neg      = negotiated[`${p.id}||`];
       return {
         id:               p.id,
         name:             p.name,
         description:      p.description || null,
-        system_price:     sysPrice,
+        base_price:     sysPrice,
         negotiated_price: neg ? neg.unit_price : null,
         display_price:    neg ? neg.unit_price : sysPrice,
         unit:             p.unit || 'Nos',
