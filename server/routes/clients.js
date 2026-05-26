@@ -40,6 +40,76 @@ const upsertClient = async (q) => {
   return rows[0];
 };
 
+// ── GET /api/clients/by-city?city=Hyderabad ──────────────────
+// Returns unique clients for a given city (used by the quote form for auto-fill).
+// Associates see only their own clients; admins see all.
+router.get('/by-city', async (req, res) => {
+  try {
+    const { city } = req.query;
+    if (!city) return res.json({ clients: [] });
+    const isAdmin = req.user.role === 'admin';
+    const vals = [city.toLowerCase().trim()];
+    if (!isAdmin) vals.push(req.user.id);
+    const empClause = isAdmin ? '' : 'AND q.employee_id = $2';
+
+    const { rows } = await pool.query(`
+      SELECT
+        MAX(q.client_name)            AS contact_name,
+        MAX(q.client_business_name)   AS business_name,
+        MAX(q.client_phone)           AS phone,
+        MAX(q.client_email)           AS email,
+        MAX(q.client_city)            AS city,
+        MAX(q.client_type)            AS client_type,
+        c.id                          AS client_id
+      FROM quotes q
+      LEFT JOIN clients c ON
+        LOWER(TRIM(COALESCE(c.phone,''))) = LOWER(TRIM(COALESCE(q.client_phone,'')))
+        AND LOWER(TRIM(COALESCE(c.business_name,''))) = LOWER(TRIM(COALESCE(q.client_business_name,'')))
+      WHERE LOWER(TRIM(COALESCE(q.client_city,''))) = $1 ${empClause}
+      GROUP BY
+        LOWER(TRIM(COALESCE(q.client_phone,''))),
+        LOWER(TRIM(COALESCE(q.client_business_name,''))),
+        c.id
+      ORDER BY MAX(q.created_at) DESC
+    `, vals);
+
+    res.json({ clients: rows });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── POST /api/clients ─────────────────────────────────────────
+// Manually onboard a new client from the Clients dashboard.
+router.post('/', async (req, res) => {
+  try {
+    const { contact_name, business_name, phone, email, city, client_type, notes } = req.body || {};
+    if (!contact_name && !business_name) {
+      return res.status(400).json({ error: 'contact_name or business_name is required' });
+    }
+    // Check for duplicate by phone + business_name
+    const normPhone = (phone || '').toLowerCase().trim();
+    const normBiz   = (business_name || '').toLowerCase().trim();
+    const { rows: existing } = await pool.query(`
+      SELECT id FROM clients
+      WHERE LOWER(TRIM(COALESCE(phone,''))) = $1
+        AND LOWER(TRIM(COALESCE(business_name,''))) = $2
+      LIMIT 1
+    `, [normPhone, normBiz]);
+    if (existing[0]) return res.status(409).json({ error: 'Client already exists', client_id: existing[0].id });
+
+    const { rows } = await pool.query(`
+      INSERT INTO clients (contact_name, business_name, phone, email, city, client_type, notes)
+      VALUES ($1,$2,$3,$4,$5,$6,$7)
+      RETURNING *
+    `, [contact_name || null, business_name || null, phone || null,
+        email || null, city || null, client_type || null, notes || null]);
+    res.status(201).json({ client: rows[0] });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── GET /api/clients ─────────────────────────────────────────
 // Returns unique clients with aggregated stats from quotes + bills.
 router.get('/', async (req, res) => {

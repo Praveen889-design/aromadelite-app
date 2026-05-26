@@ -3,6 +3,181 @@ import { Link } from 'react-router-dom';
 import api from '../utils/api';
 import { SkeletonCards } from '../components/Skeleton';
 import { useToast } from '../components/Toast';
+import { CLIENT_TYPES } from '../components/quote/ClientModal';
+
+const CITIES = ['Hyderabad', 'Nizamabad', 'Warangal', 'Karimnagar',
+                'Vijayawada', 'Guntur', 'Medak', 'Siddipet'];
+
+const inputCls = 'w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500';
+
+/* ── Onboard New Client Modal ─────────────────────────────── */
+function OnboardModal({ open, onClose, onSaved }) {
+  const { toast } = useToast();
+  const EMPTY = { contact_name: '', business_name: '', phone: '', email: '', city: '', client_type: 'Hospital', notes: '' };
+  const [form,   setForm]   = useState(EMPTY);
+  const [errors, setErrors] = useState({});
+  const [saving, setSaving] = useState(false);
+  const isCustomCity = form.city && !CITIES.includes(form.city);
+
+  useEffect(() => { if (open) { setForm(EMPTY); setErrors({}); } }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!open) return null;
+
+  const upd = (patch) => setForm((s) => ({ ...s, ...patch }));
+
+  const validate = () => {
+    const e = {};
+    if (!form.contact_name.trim() && !form.business_name.trim()) e.contact_name = 'At least one of contact name or business name is required';
+    if (!form.phone.trim()) e.phone = 'Required';
+    else if (!/^[6-9]\d{9}$/.test(form.phone.trim())) e.phone = 'Enter a valid 10-digit mobile number';
+    if (!form.city.trim()) e.city = 'Required';
+    if (form.email && !/^\S+@\S+\.\S+$/.test(form.email)) e.email = 'Enter a valid email';
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
+
+  const handleSave = async () => {
+    if (!validate()) return;
+    setSaving(true);
+    try {
+      await api.post('/api/clients', form);
+      toast('✅ Client onboarded successfully!', { kind: 'success' });
+      onSaved();
+      onClose();
+    } catch (err) {
+      const msg = err?.response?.data?.error || 'Failed to save client';
+      if (err?.response?.status === 409) {
+        toast('ℹ️ This client already exists in the directory.', { kind: 'success' });
+        onSaved(); onClose();
+      } else {
+        toast(`❌ ${msg}`, { kind: 'error' });
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center',
+                  justifyContent: 'center', background: 'rgba(15,23,42,0.5)', padding: '16px' }}
+         onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div style={{ background: '#fff', borderRadius: 16, width: '100%', maxWidth: 520,
+                    boxShadow: '0 20px 60px rgba(0,0,0,0.2)', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+
+        {/* Header */}
+        <div style={{ padding: '14px 20px', borderBottom: '1px solid #e2e8f0',
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: '#0f172a' }}>➕ Onboard New Client</div>
+            <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>Add a client to the directory</div>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 20,
+                                              color: '#94a3b8', cursor: 'pointer' }}>×</button>
+        </div>
+
+        {/* Body */}
+        <div style={{ padding: '18px 20px', overflowY: 'auto', flex: 1,
+                      display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 4 }}>
+              Contact Person Name {!form.business_name && <span style={{ color: '#dc2626' }}>*</span>}
+            </div>
+            <input className={inputCls} value={form.contact_name}
+              onChange={(e) => upd({ contact_name: e.target.value })}
+              placeholder="e.g. Ramesh Kumar" />
+            {errors.contact_name && <div style={{ fontSize: 11, color: '#dc2626', marginTop: 3 }}>{errors.contact_name}</div>}
+          </div>
+
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 4 }}>Business Name</div>
+            <input className={inputCls} value={form.business_name}
+              onChange={(e) => upd({ business_name: e.target.value })}
+              placeholder="e.g. Sunrise Hospital" />
+          </div>
+
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 4 }}>
+              Business Type
+            </div>
+            <select className={inputCls} value={form.client_type}
+              onChange={(e) => upd({ client_type: e.target.value })}>
+              {CLIENT_TYPES.map(([label, value]) => (
+                <option key={label} value={value}>{label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 4 }}>
+              Phone <span style={{ color: '#dc2626' }}>*</span>
+            </div>
+            <input className={inputCls} value={form.phone} inputMode="numeric" maxLength={10}
+              onChange={(e) => upd({ phone: e.target.value.replace(/\D/g, '').slice(0, 10) })}
+              placeholder="9XXXXXXXXX" />
+            {errors.phone && <div style={{ fontSize: 11, color: '#dc2626', marginTop: 3 }}>{errors.phone}</div>}
+          </div>
+
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 4 }}>Email</div>
+            <input className={inputCls} type="email" value={form.email}
+              onChange={(e) => upd({ email: e.target.value })} placeholder="buyer@company.in" />
+            {errors.email && <div style={{ fontSize: 11, color: '#dc2626', marginTop: 3 }}>{errors.email}</div>}
+          </div>
+
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 4 }}>
+              City <span style={{ color: '#dc2626' }}>*</span>
+            </div>
+            <select className={inputCls}
+              value={CITIES.includes(form.city) ? form.city : form.city ? 'Others' : ''}
+              onChange={(e) => upd({ city: e.target.value === 'Others' ? '' : e.target.value })}>
+              <option value="">Select city…</option>
+              {CITIES.map((c) => <option key={c} value={c}>{c}</option>)}
+              <option value="Others">Others</option>
+            </select>
+            {isCustomCity && (
+              <input className={`${inputCls} mt-1.5`} value={form.city}
+                onChange={(e) => upd({ city: e.target.value })} placeholder="Enter city…" autoFocus />
+            )}
+            {!form.city && !isCustomCity && errors.city && (
+              <div style={{ fontSize: 11, color: '#dc2626', marginTop: 3 }}>{errors.city}</div>
+            )}
+          </div>
+
+          <div style={{ gridColumn: '1 / -1' }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 4 }}>Notes</div>
+            <textarea className={inputCls} rows={2} value={form.notes}
+              onChange={(e) => upd({ notes: e.target.value })}
+              placeholder="Any notes about this client…" />
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding: '12px 20px', borderTop: '1px solid #e2e8f0',
+                      display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+          <button onClick={onClose} disabled={saving}
+            style={{ padding: '8px 16px', borderRadius: 8, fontSize: 13, border: '1px solid #cbd5e1',
+                     background: '#fff', color: '#374151', cursor: 'pointer' }}>
+            Cancel
+          </button>
+          <button onClick={handleSave} disabled={saving}
+            style={{ padding: '8px 20px', borderRadius: 8, fontSize: 13, fontWeight: 700,
+                     background: 'linear-gradient(135deg, #0891b2, #0e7490)', color: '#fff',
+                     border: 'none', cursor: saving ? 'wait' : 'pointer',
+                     display: 'inline-flex', alignItems: 'center', gap: 6,
+                     opacity: saving ? 0.7 : 1 }}>
+            {saving && <svg className="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
+            </svg>}
+            {saving ? 'Saving…' : '✅ Save Client'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const fmtINR = (n) =>
   new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n || 0);
@@ -146,12 +321,13 @@ function PortalLinkBtn({ client, onClientCreated }) {
 
 /* ── Main page ───────────────────────────────────────────────── */
 export default function Clients() {
-  const [clients, setClients]   = useState([]);
-  const [loading, setLoading]   = useState(true);
-  const [search, setSearch]     = useState('');
-  const [debouncedQ, setDQ]     = useState('');
-  const [sortBy, setSortBy]     = useState('last_quote_at');
-  const [error, setError]       = useState('');
+  const [clients, setClients]     = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [search, setSearch]       = useState('');
+  const [debouncedQ, setDQ]       = useState('');
+  const [sortBy, setSortBy]       = useState('last_quote_at');
+  const [error, setError]         = useState('');
+  const [showOnboard, setShowOnboard] = useState(false);
 
   useEffect(() => {
     const t = setTimeout(() => setDQ(search), 300);
@@ -191,6 +367,12 @@ export default function Clients() {
   return (
     <div className="space-y-5">
 
+      <OnboardModal
+        open={showOnboard}
+        onClose={() => setShowOnboard(false)}
+        onSaved={fetchClients}
+      />
+
       {/* Header */}
       <div className="bg-white rounded-xl border border-slate-200 p-5">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -211,6 +393,18 @@ export default function Clients() {
               <div className="text-lg font-bold text-purple-700">{fmtINR(totalRevenue)}</div>
               <div className="text-[10px] font-semibold uppercase text-purple-500">Total Billed</div>
             </div>
+            <button
+              onClick={() => setShowOnboard(true)}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                padding: '9px 16px', borderRadius: 10, fontSize: 13, fontWeight: 700,
+                background: 'linear-gradient(135deg, #0891b2, #0e7490)',
+                color: '#fff', border: 'none', cursor: 'pointer',
+                boxShadow: '0 2px 8px rgba(8,145,178,0.3)',
+              }}
+            >
+              ➕ Onboard New Client
+            </button>
           </div>
         </div>
       </div>

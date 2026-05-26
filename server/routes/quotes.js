@@ -139,6 +139,27 @@ router.post('/', async (req, res) => {
 
     await client.query('COMMIT');
 
+    // Auto-upsert client to clients directory (non-critical — never fail the quote)
+    try {
+      const normPhone = (b.client_phone || '').toLowerCase().trim();
+      const normBiz   = (b.client_business_name || '').toLowerCase().trim();
+      const { rows: existing } = await pool.query(
+        `SELECT id FROM clients
+         WHERE LOWER(TRIM(COALESCE(phone,''))) = $1
+           AND LOWER(TRIM(COALESCE(business_name,''))) = $2
+         LIMIT 1`,
+        [normPhone, normBiz]
+      );
+      if (!existing[0]) {
+        await pool.query(
+          `INSERT INTO clients (contact_name, business_name, phone, email, city, client_type)
+           VALUES ($1,$2,$3,$4,$5,$6)`,
+          [b.client_name, b.client_business_name || null, b.client_phone || null,
+           b.client_email || null, b.client_city || null, b.client_type || null]
+        );
+      }
+    } catch { /* non-critical — ignore */ }
+
     const { rows } = await pool.query('SELECT * FROM quotes WHERE id = $1', [quote_id]);
     res.status(201).json({ quote: hydrate(rows[0]), lead_id });
   } catch (err) {
