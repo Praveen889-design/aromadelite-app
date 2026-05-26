@@ -211,6 +211,62 @@ router.get('/:id/history', async (req, res) => {
   }
 });
 
+// ── POST /api/clients/portal-link-by-client ──────────────────
+// Clients list uses this: find-or-create client by phone+biz, then
+// generate (or return) a portal token — all in one call, no client_id needed.
+router.post('/portal-link-by-client', async (req, res) => {
+  try {
+    const { contact_name, business_name, phone, email, city, client_type } = req.body || {};
+    const { randomUUID } = require('crypto');
+
+    // Normalise keys for matching
+    const normPhone = (phone || '').toLowerCase().trim();
+    const normBiz   = (business_name || '').toLowerCase().trim();
+
+    // Try to find existing client row
+    let { rows } = await pool.query(`
+      SELECT * FROM clients
+      WHERE LOWER(TRIM(COALESCE(phone,''))) = $1
+        AND LOWER(TRIM(COALESCE(business_name,''))) = $2
+      LIMIT 1
+    `, [normPhone, normBiz]);
+
+    let client = rows[0];
+
+    if (!client) {
+      // Insert a new client (no conflict constraint needed)
+      const ins = await pool.query(`
+        INSERT INTO clients (contact_name, business_name, phone, email, city, client_type)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING *
+      `, [
+        contact_name || business_name || 'Unknown',
+        business_name || null,
+        phone  || null,
+        email  || null,
+        city   || null,
+        client_type || null,
+      ]);
+      client = ins.rows[0];
+    }
+
+    // Return existing token or generate a new one
+    let token = client.portal_token;
+    if (!token) {
+      token = randomUUID();
+      await pool.query(
+        'UPDATE clients SET portal_token = $1, updated_at = NOW() WHERE id = $2',
+        [token, client.id]
+      );
+    }
+
+    const origin = req.headers.origin || 'https://aromadelite-app.vercel.app';
+    res.json({ token, url: `${origin}/portal/${token}`, client_id: client.id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── POST /api/clients/:id/portal-link ─────────────────────────
 // Generate (or return existing) a permanent portal token for a client.
 router.post('/:id/portal-link', async (req, res) => {

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../utils/api';
 import { SkeletonCards } from '../components/Skeleton';
+import { useToast } from '../components/Toast';
 
 const fmtINR = (n) =>
   new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n || 0);
@@ -32,6 +33,7 @@ const PayBehavior = ({ paid, partial, pending }) => {
 
 /* ── Portal Link Button ───────────────────────────────────────── */
 function PortalLinkBtn({ client, onClientCreated }) {
+  const { toast } = useToast();
   const [loading,  setLoading]  = useState(false);
   const [copied,   setCopied]   = useState(false);
   const [url,      setUrl]      = useState(
@@ -56,31 +58,25 @@ function PortalLinkBtn({ client, onClientCreated }) {
 
     setLoading(true);
     try {
-      let clientId = client.client_id;
-
-      // If no client record yet, auto-create it first
-      if (!clientId) {
-        const { data: upserted } = await api.post('/api/clients/upsert', {
-          client_name:          client.contact_name,
-          client_business_name: client.business_name,
-          client_phone:         client.phone,
-          client_email:         client.email,
-          client_city:          client.city,
-          client_type:          client.client_type,
-        });
-        clientId = upserted.client.id;
-        onClientCreated && onClientCreated(clientId);
-      }
-
-      const { data: resp } = await api.post(`/api/clients/${clientId}/portal-link`);
+      // Single endpoint: find-or-create client + generate portal token
+      const { data: resp } = await api.post('/api/clients/portal-link-by-client', {
+        contact_name:  client.contact_name || client.business_name || 'Unknown',
+        business_name: client.business_name || null,
+        phone:         client.phone         || null,
+        email:         client.email         || null,
+        city:          client.city          || null,
+        client_type:   client.client_type   || null,
+      });
       const link = resp.url;
       setUrl(link);
       navigator.clipboard?.writeText(link).catch(() => {});
       setCopied(true);
       clearTimeout(timerRef.current);
       timerRef.current = setTimeout(() => setCopied(false), 2500);
-    } catch {
-      /* silent */
+      toast('🛒 Order link copied! Share it with the client.', { kind: 'success' });
+    } catch (err) {
+      const msg = err?.response?.data?.error || err?.message || 'Failed to generate link';
+      toast(`❌ ${msg}`, { kind: 'error' });
     } finally {
       setLoading(false);
     }
