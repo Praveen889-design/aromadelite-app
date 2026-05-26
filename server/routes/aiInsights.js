@@ -263,8 +263,55 @@ Portal orders (last 7 days): ${metrics.portalOrders.cnt} orders worth ${fmt(metr
 }`;
 }
 
+/* ── List available Gemini models ───────────────────────────── */
+function listGeminiModels(apiKey) {
+  return new Promise((resolve, reject) => {
+    const options = {
+      hostname: 'generativelanguage.googleapis.com',
+      path:     `/v1beta/models?key=${apiKey}&pageSize=50`,
+      method:   'GET',
+    };
+    const req = https.request(options, (res) => {
+      let data = '';
+      res.on('data', (c) => { data += c; });
+      res.on('end', () => {
+        try { resolve(JSON.parse(data)); }
+        catch (e) { reject(new Error('Failed to list models: ' + e.message)); }
+      });
+    });
+    req.on('error', reject);
+    req.setTimeout(10000, () => { req.destroy(); reject(new Error('List models timed out')); });
+    req.end();
+  });
+}
+
+/* Pick best available flash model that supports generateContent */
+async function pickModel(apiKey) {
+  const PREFERRED = [
+    'gemini-2.5-flash', 'gemini-2.5-pro',
+    'gemini-2.0-flash', 'gemini-2.0-flash-lite',
+    'gemini-1.5-flash', 'gemini-1.5-pro',
+    'gemini-pro',
+  ];
+  try {
+    const { models = [] } = await listGeminiModels(apiKey);
+    const supported = models
+      .filter(m => (m.supportedGenerationMethods || []).includes('generateContent'))
+      .map(m => m.name.replace('models/', ''));
+    console.log('[ai-insights] available models:', supported.join(', '));
+    for (const pref of PREFERRED) {
+      const match = supported.find(n => n === pref || n.startsWith(pref));
+      if (match) { console.log('[ai-insights] using model:', match); return match; }
+    }
+    if (supported.length) return supported[0];
+  } catch (e) {
+    console.warn('[ai-insights] model discovery failed, falling back:', e.message);
+  }
+  return 'gemini-1.5-flash'; // last-resort fallback
+}
+
 /* ── Call Gemini API ─────────────────────────────────────────── */
-function callGemini(prompt, apiKey) {
+function callGemini(prompt, apiKey, model) {
   return new Promise((resolve, reject) => {
     const body = JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
@@ -273,7 +320,7 @@ function callGemini(prompt, apiKey) {
 
     const options = {
       hostname: 'generativelanguage.googleapis.com',
-      path:     `/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`,
+      path:     `/v1beta/models/${model}:generateContent?key=${apiKey}`,
       method:   'POST',
       headers:  { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
     };
@@ -313,11 +360,11 @@ router.post('/', async (req, res) => {
   }
 
   try {
-    const metrics = await fetchMetrics();
+    const [metrics, model] = await Promise.all([fetchMetrics(), pickModel(apiKey)]);
     const prompt  = buildPrompt(metrics);
-    const result  = await callGemini(prompt, apiKey);
+    const result  = await callGemini(prompt, apiKey, model);
 
-    res.json({ insights: result, generated_at: new Date().toISOString() });
+    res.json({ insights: result, generated_at: new Date().toISOString(), model_used: model });
   } catch (err) {
     console.error('[ai-insights]', err.message);
     res.status(500).json({ error: err.message });
