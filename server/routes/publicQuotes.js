@@ -142,3 +142,57 @@ router.post('/quote-approval/:token/respond', async (req, res) => {
 });
 
 module.exports = router;
+
+// ── GET /api/public/catalog ─────────────────────────────────────────────────
+router.get('/catalog', async (req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT p.id, p.name, p.base_price, p.gst_percent, p.unit, p.description,
+             pc.name AS category
+      FROM products p
+      LEFT JOIN product_categories pc ON pc.id = p.category_id
+      WHERE p.is_active = 1
+      ORDER BY pc.name, p.name
+    `);
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── POST /api/public/order-inquiry ─────────────────────────────────────────
+router.post('/order-inquiry', async (req, res) => {
+  try {
+    const { name, business_name, phone, city, message } = req.body;
+    if (!name || !phone) return res.status(400).json({ error: 'Name and phone required' });
+
+    // Check if existing client — return portal link
+    const { rows: clients } = await pool.query(
+      `SELECT id, portal_token FROM clients
+       WHERE LOWER(TRIM(COALESCE(phone,''))) = LOWER(TRIM($1)) LIMIT 1`,
+      [phone]
+    );
+    if (clients[0]?.portal_token) {
+      return res.json({
+        type: 'portal',
+        url: `${process.env.APP_URL || 'https://aromadelite-app.vercel.app'}/portal/${clients[0].portal_token}`,
+        message: 'Welcome back! Here is your personalised order link.',
+      });
+    }
+
+    // Create lead for follow-up
+    await pool.query(
+      `INSERT INTO leads (name, company, phone, city, notes, status, source)
+       VALUES ($1,$2,$3,$4,$5,'new','website') ON CONFLICT DO NOTHING`,
+      [name, business_name || null, phone, city || null,
+       message ? `Website inquiry: ${message}` : 'Website landing page inquiry']
+    ).catch(() => {});
+
+    res.json({
+      type: 'inquiry',
+      message: 'Thank you! Our team will contact you within 24 hours to set up your account.',
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});

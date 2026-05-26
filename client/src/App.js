@@ -15,6 +15,7 @@ import Clients from './pages/Clients';
 import ClientProfile from './pages/ClientProfile';
 import QuoteApproval from './pages/QuoteApproval';
 import ClientPortal from './pages/ClientPortal';
+import LandingPage from './pages/LandingPage';
 import Layout from './components/Layout';
 import RequireAuth from './components/RequireAuth';
 import { QuoteBuilderProvider } from './context/QuoteBuilderContext';
@@ -27,6 +28,7 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         {/* Public — no auth required */}
+        <Route path="/home" element={<LandingPage />} />
         <Route path="/q/:token" element={<QuoteApproval />} />
         <Route path="/portal/:token" element={<ClientPortal />} />
 
