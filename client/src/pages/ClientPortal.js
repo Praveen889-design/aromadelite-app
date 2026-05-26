@@ -98,8 +98,8 @@ export default function ClientPortal() {
       return {
         product_id:  it.product_id,
         name:        it.product_name || it.name,
-        unit_price:  prod?.negotiated_price ?? prod?.display_price ?? Number(it.unit_price) || 0,
-        gst_percent: prod?.gst_percent ?? Number(it.gst_percent) || 0,
+        unit_price:  (prod?.negotiated_price ?? prod?.display_price ?? Number(it.unit_price)) || 0,
+        gst_percent: (prod?.gst_percent ?? Number(it.gst_percent)) || 0,
         unit:        it.unit || 'Nos',
         hsn_code:    it.hsn_code || prod?.hsn_code || '',
         category_name: it.category_name || prod?.category_name || '',
