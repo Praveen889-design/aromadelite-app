@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 /* ─────────────────────────────────────────────────────────────
    DATA
@@ -114,7 +114,7 @@ function useInView(options = {}) {
     const obs = new IntersectionObserver(([e]) => { if (e.isIntersecting) { setInView(true); obs.disconnect(); } }, { threshold: 0.15, ...options });
     obs.observe(el);
     return () => obs.disconnect();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   return [ref, inView];
 }
 
@@ -190,7 +190,6 @@ export default function LandingPage() {
   const [activeCategory, setActiveCat] = useState('all');
   const [navScrolled, setNavScrolled]  = useState(false);
   const [statsRef, statsInView]        = useInView();
-  const [formOpen, setFormOpen]        = useState(false);
   const [form, setForm]   = useState({ name:'', business_name:'', phone:'', city:'', message:'' });
   const [submitting, setSubmitting]    = useState(false);
   const [submitResult, setSubmitResult]= useState(null);
@@ -494,8 +493,7 @@ export default function LandingPage() {
                     <img src={meta.img} alt={cat}
                       style={{ width:'100%', height:'100%', objectFit:'cover', position:'absolute', inset:0 }}
                       onError={e => { e.target.style.display='none'; }} />
-                    <div style={{ position:'absolute', inset:0, background: meta.gradient.replace('135deg','180deg').replace(')',',0.82)').replace('linear-gradient(','linear-gradient(') + ',' + meta.gradient.replace(')',',0.6)') ,
-                                   background: `linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.2) 100%), ${meta.gradient}88` }} />
+                    <div style={{ position:'absolute', inset:0, background: `linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.2) 100%), ${meta.gradient}88` }} />
                     <div style={{ position:'absolute', inset:0, padding:'28px 24px',
                                    display:'flex', flexDirection:'column', justifyContent:'flex-end' }}>
                       <div style={{ fontSize:36, marginBottom:10 }}>{meta.icon}</div>
