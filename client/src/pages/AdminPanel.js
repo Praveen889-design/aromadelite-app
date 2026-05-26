@@ -14,6 +14,7 @@ import PaymentPendingTab from './admin/PaymentPendingTab';
 import FollowUpsTab from './admin/FollowUpsTab';
 import AssociatePerformanceTab from './admin/AssociatePerformanceTab';
 import DiscountApprovalTab from './admin/DiscountApprovalTab';
+import AiInsightsTab from './admin/AiInsightsTab';
 import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
 import { useToast } from '../components/Toast';
@@ -2012,6 +2013,7 @@ const TABS = [
   { id: 'commissions', label: '💰 Commissions' },
   { id: 'reports',     label: 'Reports'        },
   { id: 'settings',    label: '⚙️ Settings'   },
+  { id: 'ai',          label: '🤖 AI Insights' },
 ];
 
 export default function AdminPanel() {
@@ -2150,6 +2152,7 @@ export default function AdminPanel() {
         {tab === 'commissions' && <CommissionTab />}
         {tab === 'reports'     && <ReportsTab />}
         {tab === 'settings'    && <SettingsTab />}
+        {tab === 'ai'          && <AiInsightsTab />}
       </div>
     </div>
   );

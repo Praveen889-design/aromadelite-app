@@ -32,6 +32,7 @@ const notificationRoutes      = require('./routes/notifications');
 const publicQuoteRoutes       = require('./routes/publicQuotes');
 const whatsappRoutes          = require('./routes/whatsapp');
 const portalRoutes            = require('./routes/portal');
+const aiInsightsRoutes        = require('./routes/aiInsights');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -78,6 +79,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/public',        publicQuoteRoutes);   // no auth — client-facing
 app.use('/api/portal',        portalRoutes);         // no auth — client order portal
 app.use('/api/whatsapp',      whatsappRoutes);
+app.use('/api/ai-insights',   aiInsightsRoutes);
 
 // In production, serve the built React app + SPA-fallback for client-side routes.
 const clientBuildPath = path.resolve(__dirname, '../client/build');
