@@ -13,7 +13,16 @@ router.get('/', async (req, res) => {
     const isAdmin = req.user.role === 'admin';
 
     if (isAdmin) {
-      // 0. Portal orders received (last 24 hours)
+      // 0a. Website landing page inquiries (last 7 days)
+      const { rows: inquiryRows } = await pool.query(`
+        SELECT id, name, company, phone, city, notes, created_at
+        FROM leads
+        WHERE source = 'website'
+          AND created_at >= NOW() - INTERVAL '7 days'
+        ORDER BY created_at DESC
+      `).catch(() => ({ rows: [] }));
+
+      // 0b. Portal orders received (last 48 hours)
       const { rows: portalRows } = await pool.query(`
         SELECT q.id, q.quote_number, q.client_name, q.client_business_name,
                q.total_amount, q.portal_ordered_at,
@@ -55,6 +64,16 @@ router.get('/', async (req, res) => {
       `);
 
       const notifications = [
+        ...inquiryRows.map((r) => ({
+          id:          `inquiry_${r.id}`,
+          type:        'website_inquiry',
+          lead_id:     r.id,
+          created_at:  r.created_at,
+          title:       '🌐 New Website Inquiry',
+          message:     `${r.name}${r.company ? ` · ${r.company}` : ''} · 📞 ${r.phone}${r.city ? ` · ${r.city}` : ''}`,
+          link:        '/leads',
+          icon:        '🌐',
+        })),
         ...portalRows.map((r) => {
           const clientDisplay = r.client_business_name || r.client_name;
           const fmtAmt = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(r.total_amount || 0);
