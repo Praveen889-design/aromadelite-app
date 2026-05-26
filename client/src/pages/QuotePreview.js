@@ -110,15 +110,15 @@ const buildTaxSummary = (items) => {
 };
 
 const TH = ({ children, style }) => (
-  <th style={{ padding: '6px 8px', textAlign: 'left', fontWeight: 700, fontSize: 11,
-    background: '#f0f2f8', color: '#1a1a2e', borderBottom: '1.5px solid #000',
-    borderRight: '1px solid #ccc', ...style }}>
+  <th style={{ padding: '7px 10px', textAlign: 'left', fontWeight: 700, fontSize: 10.5,
+    background: '#1a2b5e', color: '#ffffff', borderBottom: 'none',
+    borderRight: '1px solid #2d3f72', letterSpacing: 0.3, ...style }}>
     {children}
   </th>
 );
 const TD = ({ children, style }) => (
-  <td style={{ padding: '5px 8px', fontSize: 11, color: '#1a1a2e',
-    borderBottom: '1px solid #e0e0e0', borderRight: '1px solid #e8e8e8', ...style }}>
+  <td style={{ padding: '6px 10px', fontSize: 11, color: '#1e293b',
+    borderBottom: '1px solid #e8edf5', borderRight: '1px solid #eef1f7', ...style }}>
     {children}
   </td>
 );
@@ -1948,215 +1948,257 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
       )}
 
       {/* PDF-capturable document */}
-      <div style={{ background: '#f3f3f3', padding: '24px', borderRadius: 12 }}>
+      <div style={{ background: '#e8edf5', padding: '28px 24px', borderRadius: 12 }}>
         <div
           ref={docRef}
           style={{
             width: 794, background: '#ffffff',
             fontFamily: 'Arial, Helvetica, sans-serif',
-            fontSize: 11, color: '#1a1a2e', margin: '0 auto', padding: '24px 28px 28px',
+            fontSize: 11, color: '#1e293b', margin: '0 auto',
+            boxShadow: '0 4px 24px rgba(0,0,0,0.10)',
           }}
         >
-          {/* ── TITLE ── */}
-          <div style={{ textAlign: 'center', marginBottom: 16 }}>
-            <span style={{ fontSize: 20, fontWeight: 900, fontFamily: 'Georgia, serif', letterSpacing: 0.5 }}>
-              Quotation
-            </span>
-          </div>
+          {/* ══ HEADER BAND ══ */}
+          <div ref={headerRef}>
+            {/* Top accent stripe */}
+            <div style={{ height: 5, background: 'linear-gradient(90deg, #1a2b5e 0%, #1F6BC7 60%, #38bdf8 100%)' }} />
 
-          {/* ══ OUTER BOX ══ */}
-          <div style={{ border: '1.5px solid #000' }}>
-
-            {/* ── Company Header ── */}
-            <div ref={headerRef} style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '12px 16px', borderBottom: '1.5px solid #000' }}>
-              <div style={{ width: 110, height: 72, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <img src="/aromadelite-logo.png" alt="Aromadelite" style={{ width: 110, height: 'auto', maxHeight: 72, objectFit: 'contain' }} />
+            {/* Company block */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 20, padding: '18px 28px 16px', background: '#ffffff', borderBottom: '1px solid #e2e8f0' }}>
+              {/* Logo */}
+              <div style={{ width: 100, height: 64, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <img src="/aromadelite-logo.png" alt="Aromadelite" style={{ width: 100, height: 'auto', maxHeight: 64, objectFit: 'contain' }} />
               </div>
+              {/* Company info */}
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 22, fontWeight: 900, color: '#1a2b5e', letterSpacing: 0.3, lineHeight: 1.15, fontFamily: 'Arial, sans-serif' }}>
+                <div style={{ fontSize: 19, fontWeight: 900, color: '#1a2b5e', letterSpacing: 0.5, lineHeight: 1.1 }}>
                   SRI VEMURI SAI ENTERPRISES
                 </div>
-                <div style={{ fontSize: 11, color: '#333', marginTop: 4 }}>
+                <div style={{ fontSize: 10, color: '#64748b', marginTop: 4, letterSpacing: 0.1 }}>
                   SAI NAGAR HNO 8-229/8, NVV NAGAR, CHINTAL, QUTHBULLAPUR, MALKAJGIRI – 500054
                 </div>
-                <div style={{ display: 'flex', gap: 32, marginTop: 3, fontSize: 11 }}>
-                  <span><strong>Phone:</strong>&nbsp; +91 63043 82947</span>
-                  <span><strong>Email:</strong>&nbsp; contact@aromadelite.in</span>
+                <div style={{ display: 'flex', gap: 24, marginTop: 5, fontSize: 10, color: '#475569' }}>
+                  <span>📞 +91 63043 82947</span>
+                  <span>✉ contact@aromadelite.in</span>
+                  <span>🌐 aromadelite.in</span>
                 </div>
-                <div style={{ display: 'flex', gap: 32, marginTop: 2, fontSize: 11 }}>
-                  <span><strong>GSTIN:</strong>&nbsp; 36AQJPV7026L2Z5</span>
-                  <span><strong>State:</strong>&nbsp; 36-Telangana</span>
+                <div style={{ display: 'flex', gap: 24, marginTop: 3, fontSize: 10, color: '#475569' }}>
+                  <span><strong style={{ color: '#1a2b5e' }}>GSTIN:</strong> 36AQJPV7026L2Z5</span>
+                  <span><strong style={{ color: '#1a2b5e' }}>State:</strong> 36-Telangana</span>
+                </div>
+              </div>
+              {/* QUOTATION label */}
+              <div style={{ flexShrink: 0, textAlign: 'right' }}>
+                <div style={{ fontSize: 22, fontWeight: 900, color: '#1a2b5e', letterSpacing: 2, textTransform: 'uppercase', lineHeight: 1 }}>
+                  QUOTATION
+                </div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#1F6BC7', marginTop: 4, letterSpacing: 0.5 }}>
+                  {quote.number}
                 </div>
               </div>
             </div>
-
-            {/* ── Bill To / Quote Details ── */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderBottom: '1.5px solid #000' }}>
-              <div style={{ padding: '10px 14px', borderRight: '1.5px solid #000' }}>
-                <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 6 }}>Bill To:</div>
-                {client.business_name && (
-                  <div style={{ fontWeight: 800, fontSize: 12, color: '#8B0000' }}>{client.business_name}</div>
-                )}
-                <div style={{ fontWeight: 700, fontSize: 11 }}>{client.name}</div>
-                {client.type && <div style={{ fontSize: 11, color: '#555' }}>{client.type}</div>}
-                {client.city && <div style={{ fontSize: 11 }}>{client.city}</div>}
-                {client.phone && <div style={{ fontSize: 11, marginTop: 2 }}>Contact No: {client.phone}</div>}
-                {client.requirement_type && (
-                  <div style={{ marginTop: 5 }}>
-                    <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1,
-                      background: '#ECFEFF', color: '#0e7490', border: '1px solid #67E8F9',
-                      padding: '2px 8px', borderRadius: 3 }}>
-                      {client.requirement_type}
-                    </span>
-                  </div>
-                )}
-              </div>
-              <div style={{ padding: '10px 14px' }}>
-                <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 6 }}>Quote Details:</div>
-                <div style={{ fontSize: 11 }}><strong>No:</strong>&nbsp; {quote.number}</div>
-                <div style={{ fontSize: 11, marginTop: 3 }}><strong>Date:</strong>&nbsp; {formatDate(quote.created_at)}</div>
-                <div style={{ fontSize: 11, marginTop: 3 }}><strong>Valid Until:</strong>&nbsp; {formatDate(quote.valid_until)}</div>
-                {quote.next_follow_up_date && (
-                  <div style={{ fontSize: 11, marginTop: 3 }}><strong>Follow-up:</strong>&nbsp; {formatDate(quote.next_follow_up_date)}</div>
-                )}
-                {isWithoutGst ? (
-                  <div style={{ marginTop: 6 }}>
-                    <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1,
-                      background: '#FFFBEB', color: '#92400e', border: '1px solid #FCD34D',
-                      padding: '2px 8px', borderRadius: 3 }}>
-                      GST Inclusive Pricing
-                    </span>
-                  </div>
-                ) : (
-                  <div style={{ marginTop: 6 }}>
-                    <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1,
-                      background: '#EFF6FF', color: '#1e40af', border: '1px solid #BFDBFE',
-                      padding: '2px 8px', borderRadius: 3 }}>
-                      Prices Excl. GST (CGST + SGST Applicable)
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* ── Items Table ── */}
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr>
-                  <TH style={{ width: 28, textAlign: 'center' }}>#</TH>
-                  <TH>Item name</TH>
-                  <TH style={{ width: 72 }}>HSN/ SAC</TH>
-                  <TH style={{ width: 60, textAlign: 'right' }}>Quantity</TH>
-                  <TH style={{ width: 40 }}>Unit</TH>
-                  <TH style={{ width: 90, textAlign: 'right' }}>Price/ Unit(₹)</TH>
-                  <TH style={{ width: 90, textAlign: 'right', borderRight: 'none' }}>Amount(₹)</TH>
-                </tr>
-              </thead>
-              <tbody>
-                {groupByCategory(items).map((group) => (
-                  <React.Fragment key={group.name}>
-                    {/* ── Category header row ── */}
-                    <tr>
-                      <td colSpan={7} style={{
-                        padding: '5px 10px',
-                        background: '#EFF6FF',
-                        borderTop: '1.5px solid #BFDBFE',
-                        borderBottom: '1px solid #BFDBFE',
-                        fontWeight: 800,
-                        fontSize: 11,
-                        color: '#1e40af',
-                        letterSpacing: 0.3,
-                      }}>
-                        {group.rows[0]?.category_icon && (
-                          <span style={{ marginRight: 5 }}>{group.rows[0].category_icon}</span>
-                        )}
-                        {group.name}
-                      </td>
-                    </tr>
-                    {/* ── Items in this category ── */}
-                    {group.rows.map((it, i) => {
-                      const lineTotal   = it.line_total || 0;
-                      const gst         = Number(it.gst_percent) || 0;
-                      const dispUnit    = isWithoutGst
-                        ? +(it.unit_price * (1 + gst / 100)).toFixed(2)
-                        : it.unit_price;
-                      const dispSysUnit = isWithoutGst
-                        ? +(it.system_price * (1 + gst / 100)).toFixed(2)
-                        : it.system_price;
-                      return (
-                        <tr key={it._idx} style={{ background: i % 2 === 0 ? '#ffffff' : '#fafafa' }}>
-                          <TD style={{ textAlign: 'center', color: '#888' }}>{it._idx}</TD>
-                          <TD>
-                            <span style={{ fontWeight: 700 }}>{it.product_name}</span>
-                            {(it.variant || it.pack_size) && (
-                              <span style={{ color: '#666', fontWeight: 400 }}>
-                                {' '}({[it.variant, it.pack_size].filter(Boolean).join(', ')})
-                              </span>
-                            )}
-                          </TD>
-                          <TD>{it.hsn_code || ''}</TD>
-                          <TD style={{ textAlign: 'right' }}>{fmtNum(it.quantity, 0)}</TD>
-                          <TD>{it.unit || 'Nos'}</TD>
-                          <TD style={{ textAlign: 'right' }}>
-                            {it.system_price && it.system_price > it.unit_price ? (
-                              <div>
-                                <div style={{ textDecoration: 'line-through', color: '#9CA3AF', fontSize: 9 }}>
-                                  ₹ {fmtNum(dispSysUnit)}
-                                </div>
-                                <div style={{ color: '#059669', fontWeight: 600 }}>₹ {fmtNum(dispUnit)}</div>
-                              </div>
-                            ) : `₹ ${fmtNum(dispUnit)}`}
-                          </TD>
-                          <TD style={{ textAlign: 'right', borderRight: 'none', fontWeight: 600 }}>
-                            ₹ {fmtNum(lineTotal)}
-                          </TD>
-                        </tr>
-                      );
-                    })}
-                    {/* ── Category subtotal row ── */}
-                    <tr style={{ background: '#f8faff' }}>
-                      <td colSpan={6} style={{ padding: '4px 8px', fontSize: 10, textAlign: 'right',
-                        color: '#64748b', borderBottom: '1px solid #e2e8f0', borderRight: '1px solid #e8e8e8',
-                        fontStyle: 'italic' }}>
-                        {group.rows[0]?.category_icon} {group.name} subtotal
-                      </td>
-                      <td style={{ padding: '4px 8px', fontSize: 10, textAlign: 'right',
-                        color: '#1e40af', fontWeight: 700, borderBottom: '1px solid #e2e8f0' }}>
-                        ₹ {fmtNum(group.subtotal)}
-                      </td>
-                    </tr>
-                  </React.Fragment>
-                ))}
-                {/* ── Grand Total row ── */}
-                <tr style={{ borderTop: '2px solid #000', fontWeight: 800, background: '#f0f4ff' }}>
-                  <td colSpan={3} style={{ padding: '7px 8px', fontSize: 12, fontWeight: 900, borderRight: '1px solid #ccc', color: '#1a2b5e' }}>Total</td>
-                  <td style={{ padding: '7px 8px', textAlign: 'right', fontSize: 12, fontWeight: 900, borderRight: '1px solid #ccc', color: '#1a2b5e' }}>
-                    {fmtNum(items.reduce((s, it) => s + (Number(it.quantity) || 0), 0), 0)}
-                  </td>
-                  <td style={{ padding: '7px 8px', borderRight: '1px solid #ccc' }}></td>
-                  <td style={{ padding: '7px 8px', borderRight: '1px solid #ccc' }}></td>
-                  <td style={{ padding: '7px 8px', textAlign: 'right', fontSize: 12, fontWeight: 900, color: '#1a2b5e' }}>
-                    ₹ {fmtNum(subTotal)}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
           </div>
-          {/* ══ END OUTER BOX ══ */}
+          {/* ══ END HEADER BAND ══ */}
+
+          {/* ── Bill To / Quote Details ── */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
+            {/* Bill To */}
+            <div style={{ padding: '14px 20px', borderRight: '1px solid #e2e8f0' }}>
+              <div style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1.2, color: '#94a3b8', marginBottom: 8 }}>
+                BILL TO
+              </div>
+              {client.business_name && (
+                <div style={{ fontWeight: 900, fontSize: 13, color: '#1a2b5e', lineHeight: 1.2 }}>{client.business_name}</div>
+              )}
+              <div style={{ fontWeight: client.business_name ? 600 : 800, fontSize: client.business_name ? 11 : 13, color: '#334155', marginTop: client.business_name ? 2 : 0 }}>
+                {client.name}
+              </div>
+              {client.type && <div style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>{client.type}</div>}
+              {client.city && <div style={{ fontSize: 10, color: '#64748b', marginTop: 1 }}>{client.city}</div>}
+              {client.phone && (
+                <div style={{ fontSize: 10, color: '#475569', marginTop: 4 }}>
+                  <strong>Contact:</strong> {client.phone}
+                </div>
+              )}
+              {client.requirement_type && (
+                <div style={{ marginTop: 8 }}>
+                  <span style={{
+                    fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.8,
+                    background: '#dbeafe', color: '#1e40af', padding: '3px 10px', borderRadius: 20,
+                    display: 'inline-block',
+                  }}>
+                    {client.requirement_type}
+                  </span>
+                </div>
+              )}
+            </div>
+            {/* Quote Details */}
+            <div style={{ padding: '14px 20px' }}>
+              <div style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1.2, color: '#94a3b8', marginBottom: 8 }}>
+                QUOTE DETAILS
+              </div>
+              <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+                <tbody>
+                  {[
+                    ['Quote No.', quote.number, '#1F6BC7', true],
+                    ['Date', formatDate(quote.created_at), null, false],
+                    ['Valid Until', formatDate(quote.valid_until), null, false],
+                    ...(quote.next_follow_up_date ? [['Follow-up', formatDate(quote.next_follow_up_date), null, false]] : []),
+                  ].map(([label, value, color, bold]) => (
+                    <tr key={label}>
+                      <td style={{ padding: '3px 0', fontSize: 10, color: '#64748b', width: 80, verticalAlign: 'top' }}>{label}</td>
+                      <td style={{ padding: '3px 0', fontSize: 10, color: '#475569', width: 10 }}>:</td>
+                      <td style={{ padding: '3px 0', fontSize: 10, fontWeight: bold ? 800 : 600, color: color || '#1e293b' }}>{value}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div style={{ marginTop: 10 }}>
+                {isWithoutGst ? (
+                  <span style={{
+                    fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.8,
+                    background: '#fef9c3', color: '#854d0e', padding: '3px 10px', borderRadius: 20,
+                    display: 'inline-block',
+                  }}>
+                    GST Inclusive Pricing
+                  </span>
+                ) : (
+                  <span style={{
+                    fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.8,
+                    background: '#ede9fe', color: '#5b21b6', padding: '3px 10px', borderRadius: 20,
+                    display: 'inline-block',
+                  }}>
+                    Prices Excl. GST · CGST + SGST Applicable
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* ── Items Table ── */}
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr>
+                <TH style={{ width: 30, textAlign: 'center', paddingLeft: 10 }}>#</TH>
+                <TH>Item Description</TH>
+                <TH style={{ width: 68, textAlign: 'center' }}>HSN/SAC</TH>
+                <TH style={{ width: 58, textAlign: 'right' }}>Qty</TH>
+                <TH style={{ width: 38, textAlign: 'center' }}>Unit</TH>
+                <TH style={{ width: 88, textAlign: 'right' }}>Unit Price (₹)</TH>
+                <TH style={{ width: 92, textAlign: 'right', borderRight: 'none', paddingRight: 14 }}>Amount (₹)</TH>
+              </tr>
+            </thead>
+            <tbody>
+              {groupByCategory(items).map((group) => (
+                <React.Fragment key={group.name}>
+                  {/* ── Category header row ── */}
+                  <tr>
+                    <td colSpan={7} style={{
+                      padding: '6px 14px 6px 12px',
+                      background: '#f1f5f9',
+                      borderTop: '1px solid #e2e8f0',
+                      borderBottom: '1px solid #e2e8f0',
+                      borderLeft: '3px solid #1F6BC7',
+                      fontWeight: 800,
+                      fontSize: 10.5,
+                      color: '#1e40af',
+                      letterSpacing: 0.5,
+                      textTransform: 'uppercase',
+                    }}>
+                      {group.rows[0]?.category_icon && (
+                        <span style={{ marginRight: 6 }}>{group.rows[0].category_icon}</span>
+                      )}
+                      {group.name}
+                    </td>
+                  </tr>
+                  {/* ── Items in this category ── */}
+                  {group.rows.map((it, i) => {
+                    const lineTotal   = it.line_total || 0;
+                    const gst         = Number(it.gst_percent) || 0;
+                    const dispUnit    = isWithoutGst
+                      ? +(it.unit_price * (1 + gst / 100)).toFixed(2)
+                      : it.unit_price;
+                    const dispSysUnit = isWithoutGst
+                      ? +(it.system_price * (1 + gst / 100)).toFixed(2)
+                      : it.system_price;
+                    return (
+                      <tr key={it._idx} style={{ background: i % 2 === 0 ? '#ffffff' : '#fafbfd' }}>
+                        <TD style={{ textAlign: 'center', color: '#94a3b8', fontSize: 10, paddingLeft: 10 }}>{it._idx}</TD>
+                        <TD style={{ paddingLeft: 14 }}>
+                          <span style={{ fontWeight: 700, color: '#1e293b' }}>{it.product_name}</span>
+                          {(it.variant || it.pack_size) && (
+                            <span style={{ color: '#94a3b8', fontWeight: 400, fontSize: 10 }}>
+                              {' '}· {[it.variant, it.pack_size].filter(Boolean).join(', ')}
+                            </span>
+                          )}
+                        </TD>
+                        <TD style={{ textAlign: 'center', color: '#64748b', fontSize: 10 }}>{it.hsn_code || '—'}</TD>
+                        <TD style={{ textAlign: 'right', fontWeight: 600 }}>{fmtNum(it.quantity, 0)}</TD>
+                        <TD style={{ textAlign: 'center', color: '#64748b', fontSize: 10 }}>{it.unit || 'Nos'}</TD>
+                        <TD style={{ textAlign: 'right' }}>
+                          {it.system_price && it.system_price > it.unit_price ? (
+                            <div>
+                              <div style={{ textDecoration: 'line-through', color: '#cbd5e1', fontSize: 9 }}>
+                                ₹ {fmtNum(dispSysUnit)}
+                              </div>
+                              <div style={{ color: '#059669', fontWeight: 700 }}>₹ {fmtNum(dispUnit)}</div>
+                            </div>
+                          ) : <span style={{ color: '#334155' }}>₹ {fmtNum(dispUnit)}</span>}
+                        </TD>
+                        <TD style={{ textAlign: 'right', fontWeight: 700, color: '#1e293b', borderRight: 'none', paddingRight: 14 }}>
+                          ₹ {fmtNum(lineTotal)}
+                        </TD>
+                      </tr>
+                    );
+                  })}
+                  {/* ── Category subtotal row ── */}
+                  <tr style={{ background: '#f8fafc' }}>
+                    <td colSpan={6} style={{
+                      padding: '5px 14px 5px 10px', fontSize: 10, textAlign: 'right',
+                      color: '#475569', borderBottom: '1px solid #e2e8f0',
+                      borderRight: '1px solid #eef1f7', fontStyle: 'italic',
+                    }}>
+                      {group.name} subtotal
+                    </td>
+                    <td style={{
+                      padding: '5px 14px 5px 10px', fontSize: 10.5, textAlign: 'right',
+                      color: '#1e40af', fontWeight: 800, borderBottom: '1px solid #e2e8f0',
+                    }}>
+                      ₹ {fmtNum(group.subtotal)}
+                    </td>
+                  </tr>
+                </React.Fragment>
+              ))}
+              {/* ── Grand Total row ── */}
+              <tr style={{ background: '#1a2b5e' }}>
+                <td colSpan={3} style={{ padding: '10px 14px', fontSize: 12, fontWeight: 900, color: '#ffffff', paddingLeft: 14 }}>
+                  TOTAL
+                </td>
+                <td style={{ padding: '10px 10px', textAlign: 'right', fontSize: 11, fontWeight: 700, color: '#e2e8f0' }}>
+                  {fmtNum(items.reduce((s, it) => s + (Number(it.quantity) || 0), 0), 0)}
+                </td>
+                <td style={{ padding: '10px 8px' }}></td>
+                <td style={{ padding: '10px 10px' }}></td>
+                <td style={{ padding: '10px 14px', textAlign: 'right', fontSize: 14, fontWeight: 900, color: '#ffffff' }}>
+                  ₹ {fmtNum(subTotal)}
+                </td>
+              </tr>
+            </tbody>
+          </table>
 
           {/* ══ TAX SUMMARY (With GST only) ══ */}
           {!isWithoutGst && taxSummary.length > 0 && (
-            <div style={{ display: 'grid', gridTemplateColumns: '3fr 1fr', gap: 0, marginTop: 12, border: '1px solid #ccc' }}>
-              <div style={{ borderRight: '1.5px solid #ccc' }}>
-                <div style={{ background: '#f0f2f8', padding: '5px 10px', fontWeight: 800, fontSize: 11, borderBottom: '1px solid #ccc' }}>
-                  Tax Summary:
+            <div style={{ display: 'grid', gridTemplateColumns: '3fr 1fr', marginTop: 16, border: '1px solid #e2e8f0', borderRadius: 6, overflow: 'hidden' }}>
+              <div style={{ borderRight: '1px solid #e2e8f0' }}>
+                <div style={{ background: '#f1f5f9', padding: '6px 12px', fontWeight: 800, fontSize: 10.5, color: '#1e40af', letterSpacing: 0.3, textTransform: 'uppercase' }}>
+                  Tax Summary
                 </div>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead>
-                    <tr style={{ background: '#f7f8fc' }}>
-                      {['HSN/ SAC', 'Taxable Amount (₹)', 'CGST Rate (%)', 'CGST Amt (₹)', 'SGST Rate (%)', 'SGST Amt (₹)', 'Total Tax (₹)'].map((h) => (
-                        <th key={h} style={{ padding: '5px 7px', fontSize: 10, fontWeight: 700, textAlign: 'right',
-                          borderBottom: '1px solid #ccc', borderRight: '1px solid #e0e0e0', color: '#333' }}>
+                    <tr style={{ background: '#f8fafc' }}>
+                      {['HSN/SAC', 'Taxable (₹)', 'CGST %', 'CGST (₹)', 'SGST %', 'SGST (₹)', 'Tax Total (₹)'].map((h) => (
+                        <th key={h} style={{ padding: '5px 8px', fontSize: 9.5, fontWeight: 700, textAlign: 'right',
+                          borderBottom: '1px solid #e2e8f0', color: '#475569', letterSpacing: 0.2 }}>
                           {h}
                         </th>
                       ))}
@@ -2164,56 +2206,55 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
                   </thead>
                   <tbody>
                     {taxSummary.map((row, i) => (
-                      <tr key={i} style={{ background: i % 2 === 0 ? '#fff' : '#fafafa' }}>
-                        <td style={{ padding: '4px 7px', fontSize: 10, textAlign: 'right', borderRight: '1px solid #e0e0e0', borderBottom: '1px solid #f0f0f0' }}>{row.hsn || '—'}</td>
-                        <td style={{ padding: '4px 7px', fontSize: 10, textAlign: 'right', borderRight: '1px solid #e0e0e0', borderBottom: '1px solid #f0f0f0' }}>{fmtNum(row.taxable)}</td>
-                        <td style={{ padding: '4px 7px', fontSize: 10, textAlign: 'right', borderRight: '1px solid #e0e0e0', borderBottom: '1px solid #f0f0f0' }}>{row.rate / 2}</td>
-                        <td style={{ padding: '4px 7px', fontSize: 10, textAlign: 'right', borderRight: '1px solid #e0e0e0', borderBottom: '1px solid #f0f0f0' }}>{fmtNum(row.cgst)}</td>
-                        <td style={{ padding: '4px 7px', fontSize: 10, textAlign: 'right', borderRight: '1px solid #e0e0e0', borderBottom: '1px solid #f0f0f0' }}>{row.rate / 2}</td>
-                        <td style={{ padding: '4px 7px', fontSize: 10, textAlign: 'right', borderRight: '1px solid #e0e0e0', borderBottom: '1px solid #f0f0f0' }}>{fmtNum(row.sgst)}</td>
-                        <td style={{ padding: '4px 7px', fontSize: 10, textAlign: 'right', borderBottom: '1px solid #f0f0f0' }}>{fmtNum(row.total_tax)}</td>
+                      <tr key={i} style={{ background: i % 2 === 0 ? '#fff' : '#fafbfd' }}>
+                        {[row.hsn || '—', fmtNum(row.taxable), row.rate / 2, fmtNum(row.cgst), row.rate / 2, fmtNum(row.sgst), fmtNum(row.total_tax)].map((v, j) => (
+                          <td key={j} style={{ padding: '4px 8px', fontSize: 10, textAlign: 'right', borderBottom: '1px solid #f1f5f9', color: '#334155' }}>{v}</td>
+                        ))}
                       </tr>
                     ))}
-                    <tr style={{ background: '#f0f2f8', fontWeight: 800, borderTop: '1.5px solid #999' }}>
-                      <td style={{ padding: '5px 7px', fontSize: 10, fontWeight: 800, borderRight: '1px solid #ccc' }}>TOTAL</td>
-                      <td style={{ padding: '5px 7px', fontSize: 10, fontWeight: 800, textAlign: 'right', borderRight: '1px solid #ccc' }}>{fmtNum(taxTotals.taxable)}</td>
-                      <td style={{ padding: '5px 7px', fontSize: 10, textAlign: 'right', borderRight: '1px solid #ccc' }}></td>
-                      <td style={{ padding: '5px 7px', fontSize: 10, fontWeight: 800, textAlign: 'right', borderRight: '1px solid #ccc' }}>{fmtNum(taxTotals.cgst)}</td>
-                      <td style={{ padding: '5px 7px', fontSize: 10, textAlign: 'right', borderRight: '1px solid #ccc' }}></td>
-                      <td style={{ padding: '5px 7px', fontSize: 10, fontWeight: 800, textAlign: 'right', borderRight: '1px solid #ccc' }}>{fmtNum(taxTotals.sgst)}</td>
-                      <td style={{ padding: '5px 7px', fontSize: 10, fontWeight: 800, textAlign: 'right' }}>{fmtNum(taxTotals.total_tax)}</td>
+                    <tr style={{ background: '#1a2b5e' }}>
+                      <td style={{ padding: '5px 8px', fontSize: 10, fontWeight: 800, color: '#fff' }}>TOTAL</td>
+                      {[fmtNum(taxTotals.taxable), '', fmtNum(taxTotals.cgst), '', fmtNum(taxTotals.sgst), fmtNum(taxTotals.total_tax)].map((v, j) => (
+                        <td key={j} style={{ padding: '5px 8px', fontSize: 10, fontWeight: 800, textAlign: 'right', color: '#e2e8f0' }}>{v}</td>
+                      ))}
                     </tr>
                   </tbody>
                 </table>
               </div>
-              {/* Right: totals + amount in words */}
-              <div style={{ padding: 0 }}>
+              {/* Right: totals */}
+              <div style={{ background: '#f8fafc' }}>
+                <div style={{ background: '#f1f5f9', padding: '6px 14px', fontWeight: 800, fontSize: 10.5, color: '#1e40af', letterSpacing: 0.3, textTransform: 'uppercase' }}>
+                  Summary
+                </div>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <tbody>
-                    <tr style={{ borderBottom: '1px solid #e0e0e0' }}>
-                      <td style={{ padding: '6px 10px', fontSize: 11, fontWeight: 600 }}>Sub Total</td>
-                      <td style={{ padding: '6px 4px', fontSize: 11 }}>:</td>
-                      <td style={{ padding: '6px 10px 6px 2px', fontSize: 11, textAlign: 'right', fontWeight: 600 }}>{formatINR(subTotal)}</td>
+                    <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+                      <td style={{ padding: '6px 14px', fontSize: 10.5, color: '#475569' }}>Sub Total</td>
+                      <td style={{ padding: '6px 14px', fontSize: 10.5, textAlign: 'right', fontWeight: 600, color: '#1e293b' }}>{formatINR(subTotal)}</td>
+                    </tr>
+                    <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+                      <td style={{ padding: '6px 14px', fontSize: 10.5, color: '#475569' }}>GST</td>
+                      <td style={{ padding: '6px 14px', fontSize: 10.5, textAlign: 'right', fontWeight: 600, color: '#1e293b' }}>{formatINR(taxTotals.total_tax)}</td>
                     </tr>
                     {roundOff !== 0 && (
-                      <tr style={{ borderBottom: '1px solid #e0e0e0' }}>
-                        <td style={{ padding: '6px 10px', fontSize: 11 }}>Round Off</td>
-                        <td style={{ padding: '6px 4px', fontSize: 11 }}>:</td>
-                        <td style={{ padding: '6px 10px 6px 2px', fontSize: 11, textAlign: 'right', color: roundOff > 0 ? '#059669' : '#dc2626' }}>
+                      <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+                        <td style={{ padding: '6px 14px', fontSize: 10.5, color: '#475569' }}>Round Off</td>
+                        <td style={{ padding: '6px 14px', fontSize: 10.5, textAlign: 'right', color: roundOff > 0 ? '#059669' : '#dc2626' }}>
                           {roundOff > 0 ? '+' : ''}{formatINR(roundOff)}
                         </td>
                       </tr>
                     )}
-                    <tr>
-                      <td style={{ padding: '8px 10px', fontSize: 13, fontWeight: 900, color: '#1a2b5e' }}>Total</td>
-                      <td style={{ padding: '8px 4px', fontSize: 13, fontWeight: 900 }}>:</td>
-                      <td style={{ padding: '8px 10px 8px 2px', fontSize: 13, fontWeight: 900, textAlign: 'right', color: '#1a2b5e' }}>{formatINR(grandTotal)}</td>
+                    <tr style={{ background: '#1a2b5e' }}>
+                      <td style={{ padding: '9px 14px', fontSize: 13, fontWeight: 900, color: '#fff' }}>TOTAL</td>
+                      <td style={{ padding: '9px 14px', fontSize: 13, fontWeight: 900, textAlign: 'right', color: '#fff' }}>{formatINR(grandTotal)}</td>
                     </tr>
                   </tbody>
                 </table>
-                <div style={{ borderTop: '1.5px solid #ccc', padding: '8px 10px' }}>
-                  <div style={{ fontSize: 10, fontWeight: 800, marginBottom: 4 }}>Amount in Words:</div>
-                  <div style={{ fontSize: 10, color: '#333', fontStyle: 'italic', lineHeight: 1.5 }}>
+                <div style={{ padding: '10px 14px', borderTop: '1px solid #e2e8f0' }}>
+                  <div style={{ fontSize: 9, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 }}>
+                    Amount in Words
+                  </div>
+                  <div style={{ fontSize: 10, color: '#334155', fontStyle: 'italic', lineHeight: 1.5 }}>
                     {amountInWords(grandTotal)} Only
                   </div>
                 </div>
@@ -2221,31 +2262,34 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
             </div>
           )}
 
-          {/* ══ WITHOUT GST — total only (GST absorbed by seller, not shown to client) ══ */}
+          {/* ══ WITHOUT GST — totals ══ */}
           {isWithoutGst && (
-            <div style={{ marginTop: 12, display: 'flex', justifyContent: 'flex-end' }}>
-              <div style={{ border: '1px solid #ccc', minWidth: 280 }}>
+            <div style={{ marginTop: 16, display: 'flex', justifyContent: 'flex-end' }}>
+              <div style={{ border: '1px solid #e2e8f0', borderRadius: 6, overflow: 'hidden', minWidth: 300 }}>
+                <div style={{ background: '#f1f5f9', padding: '6px 14px', fontWeight: 800, fontSize: 10.5, color: '#1e40af', letterSpacing: 0.3, textTransform: 'uppercase' }}>
+                  Summary
+                </div>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <tbody>
                     {roundOff !== 0 && (
-                      <tr style={{ borderBottom: '1px solid #e0e0e0' }}>
-                        <td style={{ padding: '6px 14px', fontSize: 11 }}>Round Off</td>
-                        <td style={{ padding: '6px 4px', fontSize: 11 }}>:</td>
-                        <td style={{ padding: '6px 14px', fontSize: 11, textAlign: 'right', color: roundOff > 0 ? '#059669' : '#dc2626' }}>
+                      <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+                        <td style={{ padding: '6px 14px', fontSize: 10.5, color: '#475569' }}>Round Off</td>
+                        <td style={{ padding: '6px 14px', fontSize: 10.5, textAlign: 'right', color: roundOff > 0 ? '#059669' : '#dc2626' }}>
                           {roundOff > 0 ? '+' : ''}{formatINR(roundOff)}
                         </td>
                       </tr>
                     )}
-                    <tr style={{ background: '#f5f5f5' }}>
-                      <td style={{ padding: '9px 14px', fontSize: 14, fontWeight: 900, color: '#1a2b5e' }}>Total</td>
-                      <td style={{ padding: '9px 4px', fontSize: 14, fontWeight: 900 }}>:</td>
-                      <td style={{ padding: '9px 14px', fontSize: 14, fontWeight: 900, textAlign: 'right', color: '#1a2b5e' }}>{formatINR(grandTotal)}</td>
+                    <tr style={{ background: '#1a2b5e' }}>
+                      <td style={{ padding: '10px 14px', fontSize: 13, fontWeight: 900, color: '#fff' }}>TOTAL</td>
+                      <td style={{ padding: '10px 14px', fontSize: 13, fontWeight: 900, textAlign: 'right', color: '#fff' }}>{formatINR(grandTotal)}</td>
                     </tr>
                   </tbody>
                 </table>
-                <div style={{ borderTop: '1.5px solid #ccc', padding: '8px 14px' }}>
-                  <div style={{ fontSize: 10, fontWeight: 800, marginBottom: 3 }}>Amount in Words:</div>
-                  <div style={{ fontSize: 10, color: '#333', fontStyle: 'italic', lineHeight: 1.5 }}>
+                <div style={{ padding: '10px 14px', borderTop: '1px solid #e2e8f0' }}>
+                  <div style={{ fontSize: 9, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 }}>
+                    Amount in Words
+                  </div>
+                  <div style={{ fontSize: 10, color: '#334155', fontStyle: 'italic', lineHeight: 1.5 }}>
                     {amountInWords(grandTotal)} Only
                   </div>
                 </div>
@@ -2255,47 +2299,70 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
 
           {/* ── Notes ── */}
           {quote.notes && (
-            <div style={{ marginTop: 10, padding: '8px 12px', background: '#FFF7ED', border: '1px solid #FED7AA', borderRadius: 6, fontSize: 10 }}>
+            <div style={{ marginTop: 14, padding: '10px 14px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 6, fontSize: 10.5, color: '#92400e', borderLeft: '3px solid #f59e0b' }}>
               <strong>Notes:</strong> {quote.notes}
             </div>
           )}
 
-          {/* ── Terms & Conditions ── */}
-          <div style={{ marginTop: 10, border: '1px solid #ccc' }}>
-            <div style={{ background: '#f0f2f8', padding: '5px 10px', fontWeight: 700, fontSize: 11, borderBottom: '1px solid #ccc' }}>
-              Terms &amp; Conditions:
+          {/* ── Terms & Conditions + Bank + Signature ── */}
+          <div style={{ marginTop: 16, border: '1px solid #e2e8f0', borderRadius: 6, overflow: 'hidden' }}>
+
+            {/* Terms header */}
+            <div style={{ background: '#f1f5f9', padding: '7px 14px', fontWeight: 800, fontSize: 10.5, color: '#1e40af', letterSpacing: 0.3, textTransform: 'uppercase', borderBottom: '1px solid #e2e8f0' }}>
+              Terms &amp; Conditions
             </div>
-            <div style={{ padding: '6px 10px', fontSize: 10, color: '#555', lineHeight: 1.7 }}>
-              1. This quotation is valid for 7 days from date of issue.
-              &nbsp;&nbsp;2. Prices are subject to change without prior notice.
-              &nbsp;&nbsp;3. Delivery within 3–5 working days from confirmed order.
+            <div style={{ padding: '8px 14px 10px', fontSize: 10, color: '#475569', lineHeight: 1.8, background: '#fafbfd' }}>
+              <span style={{ marginRight: 18 }}>1. This quotation is valid for 7 days from date of issue.</span>
+              <span style={{ marginRight: 18 }}>2. Prices are subject to change without prior notice.</span>
+              <span>3. Delivery within 3–5 working days from confirmed order.</span>
+            </div>
+
+            {/* Bank + Signature */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderTop: '1px solid #e2e8f0' }}>
+              {/* Bank Details */}
+              <div style={{ padding: '12px 16px', borderRight: '1px solid #e2e8f0' }}>
+                <div style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1.2, color: '#94a3b8', marginBottom: 8 }}>
+                  BANK DETAILS
+                </div>
+                <table style={{ borderCollapse: 'collapse' }}>
+                  <tbody>
+                    {[
+                      ['Bank', 'INDIAN BANK, CHINTHAL'],
+                      ['Account No.', '6878749399'],
+                      ['IFSC Code', 'IDIB000C135'],
+                      ['Account Name', 'SRI VEMURI SAI ENTERPRISES'],
+                    ].map(([label, value]) => (
+                      <tr key={label}>
+                        <td style={{ padding: '2px 0', fontSize: 10, color: '#64748b', width: 90, verticalAlign: 'top' }}>{label}</td>
+                        <td style={{ padding: '2px 4px', fontSize: 10, color: '#475569' }}>:</td>
+                        <td style={{ padding: '2px 0', fontSize: 10, fontWeight: 600, color: '#1e293b' }}>{value}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {/* Signature */}
+              <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: '#1a2b5e', textAlign: 'right' }}>
+                  For SRI VEMURI SAI ENTERPRISES
+                </div>
+                <div style={{ textAlign: 'center', width: '100%' }}>
+                  <img
+                    src="/signature.png"
+                    alt="Authorized Signature"
+                    style={{ maxWidth: 150, maxHeight: 70, display: 'block', margin: '6px auto', mixBlendMode: 'multiply' }}
+                    onError={(e) => { e.target.style.display = 'none'; }}
+                  />
+                  <div style={{ display: 'inline-block', borderTop: '1.5px solid #94a3b8', paddingTop: 5, fontSize: 10, fontWeight: 700, color: '#475569', minWidth: 160, textAlign: 'center', marginTop: 2 }}>
+                    Authorized Signatory
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* ── Bank Details + Signature ── */}
-          <div style={{ marginTop: 0, display: 'grid', gridTemplateColumns: '1fr 1fr', border: '1px solid #ccc', borderTop: 'none' }}>
-            <div style={{ padding: '10px 12px', borderRight: '1.5px solid #ccc' }}>
-              <div style={{ fontWeight: 800, fontSize: 11, marginBottom: 5 }}>Bank Details:</div>
-              <div style={{ fontSize: 11 }}><strong>Name :</strong> INDIAN BANK, CHINTHAL</div>
-              <div style={{ fontSize: 11, marginTop: 3 }}><strong>Account No. :</strong> 6878749399</div>
-              <div style={{ fontSize: 11, marginTop: 3 }}><strong>IFSC code :</strong> IDIB000C135</div>
-              <div style={{ fontSize: 11, marginTop: 3 }}><strong>Account holder's name :</strong> SRI VEMURI SAI ENTERPRISES</div>
-            </div>
-            <div style={{ padding: '10px 12px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ fontSize: 11, fontWeight: 700, alignSelf: 'flex-end', width: '100%', textAlign: 'right' }}>
-                For SRI VEMURI SAI ENTERPRISES:
-              </div>
-              <img
-                src="/signature.png"
-                alt="Authorized Signature"
-                style={{ maxWidth: 160, maxHeight: 80, display: 'block', margin: '8px auto 4px', mixBlendMode: 'multiply' }}
-                onError={(e) => { e.target.style.display = 'none'; }}
-              />
-              <div style={{ fontSize: 11, fontWeight: 700, borderTop: '1px solid #aaa', paddingTop: 4, width: '70%' }}>
-                Authorized Signatory
-              </div>
-            </div>
-          </div>
+          {/* Bottom padding */}
+          <div style={{ height: 20 }} />
 
         </div>
       </div>
