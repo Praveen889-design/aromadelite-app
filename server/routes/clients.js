@@ -78,7 +78,8 @@ router.get('/', async (req, res) => {
         COUNT(DISTINCT CASE WHEN b.payment_status='partial'   THEN b.id END) AS partial_bills,
         COUNT(DISTINCT CASE WHEN b.payment_status='pending'   THEN b.id END) AS pending_bills,
         c.id                          AS client_id,
-        c.notes                       AS client_notes
+        c.notes                       AS client_notes,
+        c.portal_token                AS portal_token
       FROM quotes q
       LEFT JOIN bills b ON b.client_phone = q.client_phone
         AND LOWER(TRIM(COALESCE(b.client_business_name,''))) = LOWER(TRIM(COALESCE(q.client_business_name,'')))
@@ -86,7 +87,7 @@ router.get('/', async (req, res) => {
         LOWER(TRIM(COALESCE(c.phone,''))) = LOWER(TRIM(COALESCE(q.client_phone,'')))
         AND LOWER(TRIM(COALESCE(c.business_name,''))) = LOWER(TRIM(COALESCE(q.client_business_name,'')))
       WHERE 1=1 ${empClause} ${searchClause}
-      GROUP BY phone_key, biz_key, c.id, c.notes
+      GROUP BY phone_key, biz_key, c.id, c.notes, c.portal_token
       ORDER BY last_quote_at DESC
     `, vals);
 
