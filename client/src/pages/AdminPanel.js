@@ -15,6 +15,7 @@ import FollowUpsTab from './admin/FollowUpsTab';
 import AssociatePerformanceTab from './admin/AssociatePerformanceTab';
 import DiscountApprovalTab from './admin/DiscountApprovalTab';
 import AiInsightsTab from './admin/AiInsightsTab';
+import PartnersCostsTab from './admin/PartnersCostsTab';
 import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
 import { useToast } from '../components/Toast';
@@ -2014,6 +2015,7 @@ const TABS = [
   { id: 'reports',     label: 'Reports'        },
   { id: 'settings',    label: '⚙️ Settings'   },
   { id: 'ai',          label: '🤖 AI Insights' },
+  { id: 'partners',    label: '👥 Partners & Costs' },
 ];
 
 export default function AdminPanel() {
@@ -2153,6 +2155,7 @@ export default function AdminPanel() {
         {tab === 'reports'     && <ReportsTab />}
         {tab === 'settings'    && <SettingsTab />}
         {tab === 'ai'          && <AiInsightsTab />}
+        {tab === 'partners'    && <PartnersCostsTab />}
       </div>
     </div>
   );
