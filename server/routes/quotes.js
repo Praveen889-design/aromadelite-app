@@ -619,9 +619,13 @@ router.get('/:id/pdf-data', async (req, res) => {
       SELECT q.*, e.name AS employee_name, e.employee_id AS employee_code,
              e.phone AS employee_phone, e.email AS employee_email, e.region,
              b.id AS bill_id, b.bill_number AS bill_number, b.status AS bill_status,
-             b.payment_status AS bill_payment_status
+             b.payment_status AS bill_payment_status,
+             c.id AS client_id, c.portal_token AS portal_token
       FROM quotes q JOIN employees e ON e.id = q.employee_id
       LEFT JOIN bills b ON b.quote_id = q.id
+      LEFT JOIN clients c ON
+        LOWER(TRIM(COALESCE(c.phone,''))) = LOWER(TRIM(COALESCE(q.client_phone,'')))
+        AND LOWER(TRIM(COALESCE(c.business_name,''))) = LOWER(TRIM(COALESCE(q.client_business_name,'')))
       WHERE q.id = $1
       LIMIT 1
     `, [req.params.id]);
@@ -731,6 +735,9 @@ router.get('/:id/pdf-data', async (req, res) => {
           bill_number:         q.bill_number         || null,
           bill_status:         q.bill_status         || null,
           bill_payment_status: q.bill_payment_status || null,
+          // Client record (for portal link)
+          client_id:    q.client_id    || null,
+          portal_token: q.portal_token || null,
         },
         client: {
           name: q.client_name, business_name: q.client_business_name, type: q.client_type,

@@ -210,4 +210,44 @@ router.get('/:id/history', async (req, res) => {
   }
 });
 
+// ── POST /api/clients/:id/portal-link ─────────────────────────
+// Generate (or return existing) a permanent portal token for a client.
+router.post('/:id/portal-link', async (req, res) => {
+  try {
+    const { rows: cRows } = await pool.query('SELECT * FROM clients WHERE id = $1', [req.params.id]);
+    if (!cRows[0]) return res.status(404).json({ error: 'Client not found' });
+    const c = cRows[0];
+
+    // Return existing token if already generated
+    if (c.portal_token) {
+      const url = `${req.headers.origin || 'https://aromadelite-app.vercel.app'}/portal/${c.portal_token}`;
+      return res.json({ token: c.portal_token, url });
+    }
+
+    // Generate new UUID token
+    const { randomUUID } = require('crypto');
+    const token = randomUUID();
+    await pool.query('UPDATE clients SET portal_token = $1, updated_at = NOW() WHERE id = $2', [token, c.id]);
+
+    const url = `${req.headers.origin || 'https://aromadelite-app.vercel.app'}/portal/${token}`;
+    res.json({ token, url });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── GET /api/clients/:id/portal-link ──────────────────────────
+// Return existing portal link (if generated)
+router.get('/:id/portal-link', async (req, res) => {
+  try {
+    const { rows } = await pool.query('SELECT portal_token FROM clients WHERE id = $1', [req.params.id]);
+    if (!rows[0]) return res.status(404).json({ error: 'Client not found' });
+    if (!rows[0].portal_token) return res.json({ token: null, url: null });
+    const url = `${req.headers.origin || 'https://aromadelite-app.vercel.app'}/portal/${rows[0].portal_token}`;
+    res.json({ token: rows[0].portal_token, url });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

@@ -13,6 +13,17 @@ router.get('/', async (req, res) => {
     const isAdmin = req.user.role === 'admin';
 
     if (isAdmin) {
+      // 0. Portal orders received (last 24 hours)
+      const { rows: portalRows } = await pool.query(`
+        SELECT q.id, q.quote_number, q.client_name, q.client_business_name,
+               q.total_amount, q.portal_ordered_at,
+               e.name AS employee_name
+        FROM quotes q JOIN employees e ON e.id = q.employee_id
+        WHERE q.source = 'portal'
+          AND q.portal_ordered_at >= NOW() - INTERVAL '48 hours'
+        ORDER BY q.portal_ordered_at DESC
+      `).catch(() => ({ rows: [] }));
+
       // 1. Pending discount approvals
       const { rows: discountRows } = await pool.query(`
         SELECT q.id, q.quote_number, q.max_discount_pct, q.created_at,
@@ -44,6 +55,22 @@ router.get('/', async (req, res) => {
       `);
 
       const notifications = [
+        ...portalRows.map((r) => {
+          const clientDisplay = r.client_business_name || r.client_name;
+          const fmtAmt = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(r.total_amount || 0);
+          return {
+            id:           `portal_order_${r.id}`,
+            type:         'portal_order',
+            quote_id:     r.id,
+            quote_number: r.quote_number,
+            employee_name: r.employee_name,
+            created_at:   r.portal_ordered_at,
+            title:        '🛒 New Client Order Received',
+            message:      `${clientDisplay} placed an order for ${fmtAmt} · ${r.quote_number}`,
+            link:         `/quotes/${r.id}`,
+            icon:         '🛒',
+          };
+        }),
         ...discountRows.map((r) => ({
           id:             `discount_${r.id}`,
           type:           'discount_approval',
@@ -96,6 +123,18 @@ router.get('/', async (req, res) => {
     }
 
     // ── Associate view: decisions on their own quotes ──────────
+
+    // Portal orders assigned to this associate (last 48 hours)
+    const { rows: myPortalRows } = await pool.query(`
+      SELECT q.id, q.quote_number, q.client_name, q.client_business_name,
+             q.total_amount, q.portal_ordered_at
+      FROM quotes q
+      WHERE q.employee_id = $1
+        AND q.source = 'portal'
+        AND q.portal_ordered_at >= NOW() - INTERVAL '48 hours'
+      ORDER BY q.portal_ordered_at DESC
+    `, [req.user.id]).catch(() => ({ rows: [] }));
+
     const { rows: decisionRows } = await pool.query(`
       SELECT q.id, q.quote_number, q.discount_approval_status, q.discount_approval_note,
              q.discount_approval_at, q.max_discount_pct,
@@ -195,6 +234,23 @@ router.get('/', async (req, res) => {
           icon:         isApproved ? '✅' : '✏️',
         });
       }
+    }
+
+    // Prepend portal orders for this associate
+    for (const r of (myPortalRows || [])) {
+      const clientDisplay = r.client_business_name || r.client_name;
+      const fmtAmt = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(r.total_amount || 0);
+      notifications.push({
+        id:           `portal_order_${r.id}`,
+        type:         'portal_order',
+        quote_id:     r.id,
+        quote_number: r.quote_number,
+        created_at:   r.portal_ordered_at,
+        title:        '🛒 New Client Order Received',
+        message:      `${clientDisplay} placed an order for ${fmtAmt} · ${r.quote_number}`,
+        link:         `/quotes/${r.id}`,
+        icon:         '🛒',
+      });
     }
 
     notifications.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));

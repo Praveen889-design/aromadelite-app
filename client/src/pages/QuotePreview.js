@@ -152,6 +152,9 @@ export default function QuotePreview() {
   const [generatingFinal, setGeneratingFinal] = useState(false);
   const [showFinalModal,  setShowFinalModal]  = useState(false);
   const [updatingOrderStatus, setUpdatingOrderStatus] = useState(false);
+  const [portalLink,         setPortalLink]         = useState('');
+  const [gettingPortalLink,  setGettingPortalLink]  = useState(false);
+  const [portalLinkCopied,   setPortalLinkCopied]   = useState(false);
   const docRef    = useRef(null);
   const headerRef = useRef(null);
 
@@ -167,6 +170,11 @@ export default function QuotePreview() {
       if (res.data.pdf.quote.client_approval_token) {
         const base = window.location.origin;
         setApprovalLink(`${base}/q/${res.data.pdf.quote.client_approval_token}`);
+      }
+      // Pre-populate portal link if client already has a token
+      if (res.data.pdf.quote.portal_token) {
+        const base = window.location.origin;
+        setPortalLink(`${base}/portal/${res.data.pdf.quote.portal_token}`);
       }
     } catch (e) {
       setError(e?.response?.data?.error || 'Failed to load quote');
@@ -695,6 +703,50 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
       toast(e?.response?.data?.error || 'Failed to update status', { kind: 'error' });
     } finally {
       setUpdatingOrderStatus(false);
+    }
+  };
+
+  /* ── Get / copy client order portal link ───────────────────── */
+  const onGetPortalLink = async () => {
+    if (portalLink) {
+      navigator.clipboard?.writeText(portalLink).catch(() => {});
+      setPortalLinkCopied(true);
+      setTimeout(() => setPortalLinkCopied(false), 2500);
+      return;
+    }
+    const clientId = quote.client_id;
+    if (!clientId) {
+      toast('No client record found. Open the Clients page to create one first.', { kind: 'error' });
+      return;
+    }
+    setGettingPortalLink(true);
+    try {
+      const { data: resp } = await api.post(`/api/clients/${clientId}/portal-link`);
+      const url = resp.url;
+      setPortalLink(url);
+      navigator.clipboard?.writeText(url).catch(() => {});
+      setPortalLinkCopied(true);
+      setTimeout(() => setPortalLinkCopied(false), 2500);
+      toast('🛒 Portal link copied! Share it with the client.', { kind: 'success' });
+    } catch (e) {
+      toast(e?.response?.data?.error || 'Failed to generate portal link', { kind: 'error' });
+    } finally {
+      setGettingPortalLink(false);
+    }
+  };
+
+  const onSharePortalLink = () => {
+    if (!portalLink) return;
+    const clientDisplay = client.business_name || client.name;
+    const msg = `Hi ${clientDisplay},\n\nYou can now place your Aromadelite orders directly using this link:\n\n${portalLink}\n\nBrowse our products, see your prices, and place orders anytime!\n🌿 Aromadelite Team`;
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      navigator.share({ title: 'Aromadelite Order Portal', text: msg, url: portalLink }).catch(() => {});
+    } else {
+      const phone = (client.phone || '').replace(/\D/g, '');
+      const wa = phone
+        ? `https://wa.me/${phone.length === 10 ? '91' + phone : phone}?text=${encodeURIComponent(msg)}`
+        : `https://wa.me/?text=${encodeURIComponent(msg)}`;
+      window.open(wa, '_blank', 'noopener,noreferrer');
     }
   };
 
@@ -1383,6 +1435,71 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
             </div>
           </div>
         )}
+
+        {/* ── Client Order Portal link section ── */}
+        <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: 10, marginTop: 4 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#374151', marginBottom: 6 }}>
+            🛒 Client Order Portal
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            <button
+              type="button"
+              onClick={onGetPortalLink}
+              disabled={gettingPortalLink}
+              title={portalLink ? 'Copy portal link again' : 'Generate a permanent order portal link for this client'}
+              className="inline-flex items-center gap-2 text-sm font-semibold rounded-xl px-4 py-2.5 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{ minHeight: 40, background: '#fdf4ff', color: '#7c3aed', border: '1.5px solid #d8b4fe' }}
+            >
+              <span>
+                {gettingPortalLink ? 'Generating…'
+                  : portalLinkCopied ? '✅ Link Copied!'
+                  : portalLink ? '📋 Copy Portal Link'
+                  : '🛒 Get Client Order Link'}
+              </span>
+            </button>
+            {portalLink && (
+              <button
+                type="button"
+                onClick={onSharePortalLink}
+                className="inline-flex items-center gap-2 text-sm font-semibold rounded-xl px-4 py-2.5 shadow-sm"
+                style={{ minHeight: 40, background: '#f0fdf4', color: '#15803d', border: '1.5px solid #86efac' }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M20.52 3.48A11.93 11.93 0 0 0 12.04 0C5.47 0 .14 5.33.14 11.9c0 2.1.55 4.15 1.6 5.96L0 24l6.32-1.66a11.9 11.9 0 0 0 5.72 1.46h.01c6.57 0 11.9-5.33 11.9-11.9 0-3.18-1.24-6.17-3.43-8.42z" />
+                </svg>
+                <span>Send via WhatsApp</span>
+              </button>
+            )}
+          </div>
+          {portalLink && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 7 }}>
+              <input
+                readOnly
+                value={portalLink}
+                onFocus={(e) => e.target.select()}
+                style={{
+                  flex: 1, border: '1px solid #d8b4fe', borderRadius: 8,
+                  padding: '6px 10px', fontSize: 11, color: '#6d28d9',
+                  background: '#fdf4ff', outline: 'none', fontFamily: 'monospace',
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}
+              />
+              <button
+                type="button"
+                onClick={onGetPortalLink}
+                style={{
+                  flexShrink: 0, padding: '6px 12px', borderRadius: 8,
+                  border: '1px solid #d8b4fe',
+                  background: portalLinkCopied ? '#dcfce7' : '#fdf4ff',
+                  color: portalLinkCopied ? '#15803d' : '#7c3aed',
+                  fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
+                }}
+              >
+                {portalLinkCopied ? '✅ Copied' : '📋 Copy'}
+              </button>
+            </div>
+          )}
+        </div>
 
         {/* ── WhatsApp API message log ── */}
         {waEnabled && waMessages.length > 0 && (
