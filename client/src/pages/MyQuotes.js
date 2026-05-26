@@ -24,6 +24,9 @@ const STATUS_CONFIG = {
   modifications_required:{ bg: '#FEF3C7', fg: '#92400E',  border: '#F59E0B', label: '✏️ Modifications' },
   hold:                  { bg: '#EDE9FE', fg: '#4C1D95',  border: '#7C3AED', label: '⏸ Hold' },
   rejected:              { bg: '#FEE2E2', fg: '#991B1B',  border: '#EF4444', label: 'Rejected' },
+  final_quoted:          { bg: '#CCFBF1', fg: '#0F766E',  border: '#14B8A6', label: '📋 Final Quote' },
+  order_placed:          { bg: '#E0E7FF', fg: '#3730A3',  border: '#6366F1', label: '📦 Order Placed' },
+  order_delivered:       { bg: '#D1FAE5', fg: '#065F46',  border: '#10B981', label: '🚚 Delivered' },
 };
 
 const StatusBadge = ({ status }) => {
@@ -55,19 +58,26 @@ const FilterTab = ({ children, active, onClick }) => (
   }}>{children}</button>
 );
 
-const QuoteCard = ({ quote, onClick, onGenerateBill }) => {
+const QuoteCard = ({ quote, onClick, onGenerateBill, onViewBill }) => {
   const status = (quote.status || 'draft').toLowerCase();
   const isDraft = status === 'draft';
   const isRejected = status === 'rejected';
-  const isAccepted = status === 'accepted';
+  // All post-acceptance statuses
+  const isAccepted      = status === 'accepted';
+  const isFinalQuoted   = status === 'final_quoted';
+  const isOrderPlaced   = status === 'order_placed';
+  const isOrderDelivered= status === 'order_delivered';
+  const isPostAccepted  = isAccepted || isFinalQuoted || isOrderPlaced || isOrderDelivered;
+  const billGenerated   = !!quote.bill_id;
+  const billPayStatus   = quote.bill_payment_status;
   const emoji = CLIENT_EMOJI[quote.client_type] || '📦';
 
   return (
     <div onClick={onClick} style={{
       background: isDraft ? '#F8FAFC' : '#FFFFFF',
       border: '1px solid',
-      borderColor: isAccepted ? '#6EE7B7' : isRejected ? '#FECACA' : '#A5F3FC',
-      borderLeft: isAccepted ? '4px solid #059669' : isRejected ? '4px solid #EF4444' : '1px solid #A5F3FC',
+      borderColor: isPostAccepted ? '#6EE7B7' : isRejected ? '#FECACA' : '#A5F3FC',
+      borderLeft: isPostAccepted ? '4px solid #059669' : isRejected ? '4px solid #EF4444' : '1px solid #A5F3FC',
       borderRadius: 14,
       padding: 14,
       cursor: 'pointer',
@@ -89,7 +99,7 @@ const QuoteCard = ({ quote, onClick, onGenerateBill }) => {
           <StatusBadge status={status} />
           <div style={{
             fontFamily: "'Nunito', sans-serif", fontWeight: 800, fontSize: 18,
-            color: isRejected ? '#9CA3AF' : '#0E7490',
+            color: isRejected ? '#9CA3AF' : isPostAccepted ? '#059669' : '#0E7490',
             textDecoration: isRejected ? 'line-through' : 'none',
             marginTop: 6, letterSpacing: '-.01em',
           }}>{formatINR(quote.grand_total)}</div>
@@ -149,7 +159,7 @@ const QuoteCard = ({ quote, onClick, onGenerateBill }) => {
       )}
 
       {/* Action buttons */}
-      <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+      <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
         {isDraft ? (
           <button onClick={(e) => { e.stopPropagation(); onClick(); }} style={{
             height: 34, padding: '0 14px',
@@ -166,26 +176,58 @@ const QuoteCard = ({ quote, onClick, onGenerateBill }) => {
             fontFamily: "'Nunito', sans-serif", fontWeight: 700, fontSize: 12,
             cursor: 'pointer',
           }}>Revise Quote</button>
-        ) : isAccepted ? (
+        ) : isPostAccepted ? (
           <>
+            {/* View Quote button */}
             <button onClick={(e) => { e.stopPropagation(); onClick(); }} style={smallActionBtn('#059669')}>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
               View
             </button>
-            <button
-              onClick={(e) => { e.stopPropagation(); onGenerateBill && onGenerateBill(quote.id); }}
-              style={{
-                height: 30, padding: '0 12px',
-                border: 'none', borderRadius: 8,
-                background: 'linear-gradient(135deg, #059669, #047857)',
-                color: '#FFFFFF',
-                fontFamily: "'Source Sans 3', sans-serif", fontWeight: 700, fontSize: 11.5,
+
+            {/* Bill already generated → View Bill */}
+            {billGenerated ? (
+              <button
+                onClick={(e) => { e.stopPropagation(); onViewBill && onViewBill(quote.bill_id); }}
+                style={{
+                  height: 30, padding: '0 12px',
+                  border: 'none', borderRadius: 8,
+                  background: 'linear-gradient(135deg, #0369a1, #0284c7)',
+                  color: '#FFFFFF',
+                  fontFamily: "'Source Sans 3', sans-serif", fontWeight: 700, fontSize: 11.5,
+                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                  cursor: 'pointer',
+                }}
+              >
+                {billPayStatus === 'completed' ? '✅' : billPayStatus === 'partial' ? '💰' : '🧾'} View Bill
+              </button>
+            ) : isOrderDelivered ? (
+              /* Order delivered, no bill yet → Generate Bill */
+              <button
+                onClick={(e) => { e.stopPropagation(); onGenerateBill && onGenerateBill(quote.id); }}
+                style={{
+                  height: 30, padding: '0 12px',
+                  border: 'none', borderRadius: 8,
+                  background: 'linear-gradient(135deg, #059669, #047857)',
+                  color: '#FFFFFF',
+                  fontFamily: "'Source Sans 3', sans-serif", fontWeight: 700, fontSize: 11.5,
+                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                  cursor: 'pointer',
+                }}
+              >
+                🧾 Generate Bill
+              </button>
+            ) : (
+              /* Still in flow (accepted/final_quoted/order_placed) — show pipeline stage badge */
+              <span style={{
+                height: 30, padding: '0 10px',
+                border: '1.5px solid #14b8a6', borderRadius: 8,
+                background: '#f0fdfa', color: '#0f766e',
+                fontFamily: "'Source Sans 3', sans-serif", fontWeight: 700, fontSize: 11,
                 display: 'inline-flex', alignItems: 'center', gap: 4,
-                cursor: 'pointer',
-              }}
-            >
-              📄 Generate Bill
-            </button>
+              }}>
+                {isAccepted ? '📋 Generate Final Quote' : isFinalQuoted ? '📦 Order Pending' : '🚚 Out for Delivery'}
+              </span>
+            )}
           </>
         ) : (
           <>
@@ -318,6 +360,7 @@ export default function MyQuotes() {
               quote={q}
               onClick={() => navigate(`/quotes/${q.id}`)}
               onGenerateBill={(qid) => navigate(`/bills/new/${qid}`)}
+              onViewBill={(bid) => navigate(`/bills/${bid}`)}
             />
           ))}
         </div>

@@ -155,13 +155,19 @@ router.get('/', async (req, res) => {
     const isAdmin = req.user.role === 'admin';
     const { rows } = isAdmin
       ? await pool.query(`
-          SELECT q.*, e.name AS employee_name, e.employee_id AS employee_code, e.region
-          FROM quotes q JOIN employees e ON e.id = q.employee_id
+          SELECT q.*, e.name AS employee_name, e.employee_id AS employee_code, e.region,
+                 b.id AS bill_id, b.bill_number, b.payment_status AS bill_payment_status
+          FROM quotes q
+          JOIN employees e ON e.id = q.employee_id
+          LEFT JOIN bills b ON b.quote_id = q.id
           ORDER BY q.created_at DESC
         `)
       : await pool.query(`
-          SELECT q.*, e.name AS employee_name, e.employee_id AS employee_code, e.region
-          FROM quotes q JOIN employees e ON e.id = q.employee_id
+          SELECT q.*, e.name AS employee_name, e.employee_id AS employee_code, e.region,
+                 b.id AS bill_id, b.bill_number, b.payment_status AS bill_payment_status
+          FROM quotes q
+          JOIN employees e ON e.id = q.employee_id
+          LEFT JOIN bills b ON b.quote_id = q.id
           WHERE q.employee_id = $1
           ORDER BY q.created_at DESC
         `, [req.user.id]);
