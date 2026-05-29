@@ -275,20 +275,34 @@ export default function Products() {
       </div>
 
       {/* Category chips */}
-      <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, marginBottom: 14 }}>
-        <CategoryChip active={activeCat === 'all'} onClick={() => setActiveCat('all')}>All</CategoryChip>
-        {categories.map(c => {
-          const name = typeof c === 'string' ? c : c.name;
-          const emoji = typeof c === 'string' ? CATEGORY_EMOJI[c] : (c.icon_emoji || CATEGORY_EMOJI[c.name]);
-          return (
-            <CategoryChip
-              key={name}
-              active={activeCat === name}
-              emoji={emoji}
-              onClick={() => setActiveCat(name)}
-            >{name}</CategoryChip>
-          );
-        })}
+      <div style={{ position: 'relative', marginBottom: 14 }}>
+        <div style={{
+          display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4,
+          scrollbarWidth: 'none', msOverflowStyle: 'none',
+          WebkitOverflowScrolling: 'touch',
+        }}
+          className="hide-scrollbar"
+        >
+          <CategoryChip active={activeCat === 'all'} onClick={() => setActiveCat('all')}>All</CategoryChip>
+          {categories.map(c => {
+            const name = typeof c === 'string' ? c : c.name;
+            const emoji = typeof c === 'string' ? CATEGORY_EMOJI[c] : (c.icon_emoji || CATEGORY_EMOJI[c.name]);
+            return (
+              <CategoryChip
+                key={name}
+                active={activeCat === name}
+                emoji={emoji}
+                onClick={() => setActiveCat(name)}
+              >{name}</CategoryChip>
+            );
+          })}
+        </div>
+        {/* Fade-right to hint more chips */}
+        <div style={{
+          position: 'absolute', right: 0, top: 0, bottom: 4,
+          width: 32, pointerEvents: 'none',
+          background: 'linear-gradient(to right, transparent, #F1F5F9)',
+        }} />
       </div>
 
       {loadError && (

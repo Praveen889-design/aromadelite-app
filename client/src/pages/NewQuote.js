@@ -72,31 +72,31 @@ export default function NewQuote() {
     });
   }, [products, activeCat, search]);
 
-  // Count how many visible products can still be added (not yet in cart with default variant/size)
+  // Count how many visible products can still be added (not yet in cart)
   const addableCount = useMemo(() => filtered.filter((p) => {
     const firstSize    = (p.pack_sizes || [])[0];
     const firstVariant = (p.variants || [])[0] || null;
-    if (!firstSize) return false;
-    return !cartKeys.has(`${p.id}|${firstVariant || ''}|${firstSize.size}`);
+    const sizeKey      = firstSize ? firstSize.size : '';
+    return !cartKeys.has(`${p.id}|${firstVariant || ''}|${sizeKey}`);
   }).length, [filtered, cartKeys]);
 
-  // Add all visible products (qty=1, first variant, first pack size) that aren't already in cart
+  // Add all visible products (qty=1, first variant/pack size or base_price) not yet in cart
   const addAllVisible = useCallback(() => {
     let added = 0;
     for (const p of filtered) {
       const firstSize    = (p.pack_sizes || [])[0];
       const firstVariant = (p.variants || [])[0] || null;
-      if (!firstSize) continue;
-      if (cartKeys.has(`${p.id}|${firstVariant || ''}|${firstSize.size}`)) continue;
+      const sizeKey      = firstSize ? firstSize.size : '';
+      if (cartKeys.has(`${p.id}|${firstVariant || ''}|${sizeKey}`)) continue;
       addItem({
         product_id:    p.id,
         product_name:  p.name,
         category_id:   p.category_id,
         category_name: p.category_name,
         variant:       firstVariant,
-        pack_size:     firstSize.size,
+        pack_size:     sizeKey,
         quantity:      1,
-        unit_price:    firstSize.price,
+        unit_price:    firstSize ? firstSize.price : (p.base_price || 0),
         gst_percent:   p.gst_percent,
         hsn_code:      p.hsn_code,
       });
@@ -106,9 +106,9 @@ export default function NewQuote() {
     else toast('All visible products are already in the quote.', { kind: 'info' });
   }, [filtered, cartKeys, addItem, toast]);
 
-  // GST breakdown
+  // GST breakdown — dynamic, supports all GST rates (0, 3, 5, 12, 18, 28%)
   const gstBreakdown = useMemo(() => {
-    const buckets = { 12: { base: 0, gst: 0 }, 18: { base: 0, gst: 0 } };
+    const buckets = {};
     for (const it of items) {
       const line = (Number(it.quantity) || 0) * (Number(it.unit_price) || 0);
       const r = Number(it.gst_percent) || 0;
@@ -204,20 +204,24 @@ export default function NewQuote() {
         </div>
 
         {/* Category tabs */}
-        <div className="mt-3 -mx-1 px-1 overflow-x-auto">
-          <div className="inline-flex gap-1.5 min-w-full pb-1">
-            <CategoryTab active={activeCat === 'all'} onClick={() => setActiveCat('all')}>All</CategoryTab>
-            {categories.map((c) => (
-              <CategoryTab
-                key={c.id}
-                active={activeCat === c.id}
-                onClick={() => setActiveCat(c.id)}
-              >
-                <span className="mr-1">{c.icon_emoji}</span>{c.name}
-                <span className="ml-1 text-[10px] opacity-75">({c.product_count})</span>
-              </CategoryTab>
-            ))}
+        <div className="mt-3 -mx-1 px-1 relative">
+          <div className="overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div className="inline-flex gap-1.5 min-w-full pb-1">
+              <CategoryTab active={activeCat === 'all'} onClick={() => setActiveCat('all')}>All</CategoryTab>
+              {categories.map((c) => (
+                <CategoryTab
+                  key={c.id}
+                  active={activeCat === c.id}
+                  onClick={() => setActiveCat(c.id)}
+                >
+                  <span className="mr-1">{c.icon_emoji}</span>{c.name}
+                  <span className="ml-1 text-[10px] opacity-75">({c.product_count})</span>
+                </CategoryTab>
+              ))}
+            </div>
           </div>
+          {/* Fade-right hint */}
+          <div className="pointer-events-none absolute right-0 top-0 bottom-1 w-8 bg-gradient-to-r from-transparent to-white" />
         </div>
 
         {/* Quick-quote hint banner when a category is selected */}
@@ -355,20 +359,17 @@ export default function NewQuote() {
           {gstMode === 'with_gst' ? (
             <>
               <SummaryRow label="Subtotal (excl. GST)" value={formatINR(totals.subtotal)} />
-              {gstBreakdown[12].base > 0 && (
-                <SummaryRow
-                  label={`GST 12% on ${formatINR(gstBreakdown[12].base)}`}
-                  value={formatINR(gstBreakdown[12].gst)}
-                  muted
-                />
-              )}
-              {gstBreakdown[18].base > 0 && (
-                <SummaryRow
-                  label={`GST 18% on ${formatINR(gstBreakdown[18].base)}`}
-                  value={formatINR(gstBreakdown[18].gst)}
-                  muted
-                />
-              )}
+              {Object.entries(gstBreakdown)
+                .filter(([, v]) => v.base > 0)
+                .sort(([a], [b]) => Number(a) - Number(b))
+                .map(([rate, v]) => (
+                  <SummaryRow
+                    key={rate}
+                    label={`GST ${rate}% on ${formatINR(v.base)}`}
+                    value={formatINR(v.gst)}
+                    muted
+                  />
+                ))}
             </>
           ) : (
             <SummaryRow
