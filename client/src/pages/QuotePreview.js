@@ -17,6 +17,17 @@ const canShareFiles = () =>
 const formatINR = (n) =>
   new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(n || 0);
 
+/** Replace fancy Unicode punctuation with plain ASCII equivalents for PDF rendering */
+const pdfSafeText = (str) => {
+  if (!str) return str;
+  return str
+    .replace(/[–—]/g, '-')   // en-dash, em-dash → hyphen
+    .replace(/[‘’]/g, "'")   // curly single quotes → straight
+    .replace(/[“”]/g, '"')   // curly double quotes → straight
+    .replace(/•/g, '*')           // bullet → asterisk
+    .replace(/ /g, ' ');          // non-breaking space → space
+};
+
 const fmtNum = (n, dec = 2) =>
   new Intl.NumberFormat('en-IN', { maximumFractionDigits: dec }).format(n || 0);
 
@@ -280,11 +291,58 @@ export default function QuotePreview() {
 
   const fileName = `Aromadelite_Quote_${quote.number}.pdf`;
 
-  /* ── Shared PDF builder — canvas-sliced, header repeats on every page ── */
+  /* ── Shared PDF builder — smart row-aware page breaks ── */
   const buildPdf = async () => {
-    const scale = 2;
+    const scale      = 2;
+    const containerEl = docRef.current;
+
+    // ── 1. Measure every tagged row BEFORE canvas capture ──────────────────
+    // getBoundingClientRect gives CSS pixels; multiply by scale → canvas pixels
+    const containerTop = containerEl.getBoundingClientRect().top;
+    const rowEls       = containerEl.querySelectorAll('[data-pdf-row]');
+    const rowBounds    = Array.from(rowEls)
+      .map(el => {
+        const r = el.getBoundingClientRect();
+        return {
+          top:    Math.round((r.top    - containerTop) * scale),
+          bottom: Math.round((r.bottom - containerTop) * scale),
+          keepWithNext: el.dataset.pdfRow === 'cat-header',
+        };
+      })
+      .sort((a, b) => a.top - b.top);
+
+    // Return the largest Y ≤ targetY that does NOT cut through any row.
+    // Also respects "keep-with-next": a cat-header is never the last thing on a page.
+    const safeCutY = (targetY) => {
+      let y = targetY;
+      // Walk backward until we're between two rows
+      let changed = true;
+      while (changed) {
+        changed = false;
+        for (let i = rowBounds.length - 1; i >= 0; i--) {
+          const row = rowBounds[i];
+          if (row.top >= y) continue;
+          if (row.bottom <= y) {
+            // row ends before cut — perfect gap, but check keep-with-next
+            if (row.keepWithNext && y === row.bottom) {
+              // category header at the very bottom — push cut before it
+              y = row.top;
+              changed = true;
+            }
+            break;
+          }
+          // row straddles y — move cut to just before this row
+          y = row.top;
+          changed = true;
+          break;
+        }
+      }
+      return Math.max(y, 1); // never return 0 (would produce empty page)
+    };
+
+    // ── 2. Capture canvases ─────────────────────────────────────────────────
     const [fullCanvas, headerCanvas] = await Promise.all([
-      html2canvas(docRef.current,    { scale, useCORS: true, backgroundColor: '#ffffff' }),
+      html2canvas(containerEl,       { scale, useCORS: true, backgroundColor: '#ffffff' }),
       html2canvas(headerRef.current, { scale, useCORS: true, backgroundColor: '#ffffff' }),
     ]);
 
@@ -292,16 +350,13 @@ export default function QuotePreview() {
     const pageW = pdf.internal.pageSize.getWidth();
     const pageH = pdf.internal.pageSize.getHeight();
 
-    // pt per px — based on fullCanvas width matching pageW exactly
     const pxToPt  = pageW / fullCanvas.width;
-    const pageHpx = pageH / pxToPt; // keep float — rounding causes drift across pages
+    const pageHpx = pageH / pxToPt;
 
-    // Normalise header to the SAME pixel width as fullCanvas so pxToPt applies
-    // (headerCanvas may have a different natural width if the element has padding)
     const hdrNormH = Math.round((headerCanvas.height / headerCanvas.width) * fullCanvas.width);
     const hdrHpt   = hdrNormH * pxToPt;
 
-    // Reuse ONE temp canvas for all crops (avoids creating many large canvas objects)
+    // Reuse ONE temp canvas for all crops
     const tmp    = document.createElement('canvas');
     tmp.width    = fullCanvas.width;
     const tmpCtx = tmp.getContext('2d');
@@ -311,32 +366,41 @@ export default function QuotePreview() {
       if (h <= 0) return null;
       tmp.height = h;
       tmpCtx.clearRect(0, 0, tmp.width, h);
-      // drawImage with explicit dest width normalises header to fullCanvas width
       tmpCtx.drawImage(src, 0, srcY, srcNatW, srcH, 0, 0, tmp.width, h);
-      return tmp.toDataURL('image/jpeg', 0.92); // JPEG = ~4× smaller than PNG
+      return tmp.toDataURL('image/jpeg', 0.92);
     };
 
-    // Pre-render normalised header once
     const hdrData = crop(headerCanvas, 0, headerCanvas.height, headerCanvas.width);
 
-    // Page 1 — first slice of the full document
-    const p1H    = Math.min(pageHpx, fullCanvas.height);
-    const p1Data = crop(fullCanvas, 0, p1H, fullCanvas.width);
-    pdf.addImage(p1Data, 'JPEG', 0, 0, pageW, p1H * pxToPt, undefined, 'FAST');
+    // ── 3. Page 1 — smart cut at first page boundary ────────────────────────
+    const rawP1Cut = Math.min(pageHpx, fullCanvas.height);
+    const p1Cut    = fullCanvas.height <= pageHpx ? rawP1Cut : safeCutY(rawP1Cut);
+    const p1Data   = crop(fullCanvas, 0, p1Cut, fullCanvas.width);
+    pdf.addImage(p1Data, 'JPEG', 0, 0, pageW, p1Cut * pxToPt, undefined, 'FAST');
 
-    // Page 2+ — header stripe + next content slice (no overlap, exact pixel boundary)
-    let srcY = pageHpx;
+    // ── 4. Page 2+ — header stripe + smart-cut content slice ────────────────
+    let srcY = p1Cut;
     while (srcY < fullCanvas.height) {
       pdf.addPage();
       pdf.addImage(hdrData, 'JPEG', 0, 0, pageW, hdrHpt, undefined, 'FAST');
-      const sliceH = Math.min(pageHpx - hdrNormH, fullCanvas.height - srcY);
+
+      const contentH = pageHpx - hdrNormH;
+      const rawCut   = srcY + contentH;
+      const cut      = rawCut >= fullCanvas.height
+        ? fullCanvas.height
+        : safeCutY(rawCut);
+
+      // Safety: if safeCutY collapsed back to srcY (ultra-tall row), force advance
+      const advance = Math.max(cut - srcY, Math.ceil(contentH * 0.1));
+      const sliceH  = Math.min(advance, fullCanvas.height - srcY);
+
       if (sliceH > 0) {
         const sliceData = crop(fullCanvas, srcY, sliceH, fullCanvas.width);
         if (sliceData) {
           pdf.addImage(sliceData, 'JPEG', 0, hdrHpt, pageW, sliceH * pxToPt, undefined, 'FAST');
         }
       }
-      srcY += (pageHpx - hdrNormH);
+      srcY += sliceH;
     }
     return pdf;
   };
@@ -2091,7 +2155,7 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
               {groupByCategory(items).map((group) => (
                 <React.Fragment key={group.name}>
                   {/* ── Category header row ── */}
-                  <tr>
+                  <tr data-pdf-row="cat-header">
                     <td colSpan={7} style={{
                       padding: '6px 14px 6px 12px',
                       background: '#f1f5f9',
@@ -2121,7 +2185,7 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
                       ? +(it.system_price * (1 + gst / 100)).toFixed(2)
                       : it.system_price;
                     return (
-                      <tr key={it._idx} style={{ background: i % 2 === 0 ? '#ffffff' : '#fafbfd' }}>
+                      <tr key={it._idx} data-pdf-row="item" style={{ background: i % 2 === 0 ? '#ffffff' : '#fafbfd' }}>
                         <TD style={{ textAlign: 'center', color: '#94a3b8', fontSize: 10, paddingLeft: 10 }}>{it._idx}</TD>
                         <TD style={{ paddingLeft: 14 }}>
                           <span style={{ fontWeight: 700, color: '#1e293b' }}>{it.product_name}</span>
@@ -2132,7 +2196,7 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
                           )}
                           {it.description && (
                             <div style={{ fontSize: 9.5, color: '#64748b', fontWeight: 400, marginTop: 2, lineHeight: 1.35 }}>
-                              {it.description}
+                              {pdfSafeText(it.description)}
                             </div>
                           )}
                         </TD>
@@ -2156,7 +2220,7 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
                     );
                   })}
                   {/* ── Category subtotal row ── */}
-                  <tr style={{ background: '#f8fafc' }}>
+                  <tr data-pdf-row="subtotal" style={{ background: '#f8fafc' }}>
                     <td colSpan={6} style={{
                       padding: '5px 14px 5px 10px', fontSize: 10, textAlign: 'right',
                       color: '#475569', borderBottom: '1px solid #e2e8f0',

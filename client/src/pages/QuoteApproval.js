@@ -5,6 +5,16 @@ import api from '../utils/api';
 const fmt = (n) =>
   new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(n || 0);
 
+const pdfSafeText = (str) => {
+  if (!str) return str;
+  return str
+    .replace(/[–—]/g, '-')
+    .replace(/['']/g, "'")
+    .replace(/[""]/g, '"')
+    .replace(/•/g, '*')
+    .replace(/ /g, ' ');
+};
+
 const fmtDate = (iso) => {
   if (!iso) return '—';
   const d = iso.length === 10 ? new Date(iso + 'T00:00:00') : new Date(iso);
@@ -218,7 +228,7 @@ export default function QuoteApproval() {
                       )}
                       {it.description && (
                         <div style={{ fontSize: 11, color: '#64748b', marginTop: 2, lineHeight: 1.4 }}>
-                          {it.description}
+                          {pdfSafeText(it.description)}
                         </div>
                       )}
                     </td>
