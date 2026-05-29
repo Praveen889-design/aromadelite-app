@@ -101,8 +101,12 @@ export default function ProductModal({ open, mode = 'create', product, categorie
           </Field>
           <Field label="GST %" required>
             <select className={inputCls} value={v.gst_percent} onChange={(e) => upd({ gst_percent: Number(e.target.value) })}>
+              <option value={0}>0%</option>
+              <option value={3}>3%</option>
+              <option value={5}>5%</option>
               <option value={12}>12%</option>
               <option value={18}>18%</option>
+              <option value={28}>28%</option>
             </select>
           </Field>
           <div className="sm:col-span-2">

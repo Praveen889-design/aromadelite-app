@@ -99,7 +99,7 @@ router.post('/bulk-upload', requireRole('admin'), async (req, res) => {
       if (!catId) { results.errors.push(`Row ${i + 2}: unknown category "${row.category_name}"`); results.skipped++; continue; }
       if (!row.name) { results.errors.push(`Row ${i + 2}: name is required`); results.skipped++; continue; }
       const gst = Number(row.gst_percent);
-      if (![12, 18].includes(gst)) { results.errors.push(`Row ${i + 2}: gst_percent must be 12 or 18`); results.skipped++; continue; }
+      if (![0, 3, 5, 12, 18, 28].includes(gst)) { results.errors.push(`Row ${i + 2}: gst_percent must be 0, 3, 5, 12, 18, or 28`); results.skipped++; continue; }
 
       const variants = row.variants ? row.variants.split('|').map((s) => s.trim()).filter(Boolean) : [];
       const packSizes = row.pack_sizes ? row.pack_sizes.split('|').map((s) => {
@@ -152,8 +152,8 @@ router.get('/:id', async (req, res) => {
 router.post('/', requireRole('admin'), async (req, res) => {
   try {
     const b = req.body || {};
-    if (!b.name || !b.category_id || ![12, 18].includes(Number(b.gst_percent))) {
-      return res.status(400).json({ error: 'name, category_id, and gst_percent (12 or 18) are required' });
+    if (!b.name || !b.category_id || ![0, 3, 5, 12, 18, 28].includes(Number(b.gst_percent))) {
+      return res.status(400).json({ error: 'name, category_id, and gst_percent (0, 3, 5, 12, 18, or 28) are required' });
     }
     const variants = Array.isArray(b.variants) ? b.variants : [];
     const pack_sizes = Array.isArray(b.pack_sizes) ? b.pack_sizes : [];
@@ -200,7 +200,7 @@ router.patch('/:id', requireRole('admin'), async (req, res) => {
     if (b.bulk_price_20L !== undefined)  setClauses.push(`bulk_price_20L = ${$v(Number(b.bulk_price_20L) || null)}`);
     if (b.bulk_price_200L !== undefined) setClauses.push(`bulk_price_200L = ${$v(Number(b.bulk_price_200L) || null)}`);
     if (b.gst_percent !== undefined) {
-      if (![12, 18].includes(Number(b.gst_percent))) return res.status(400).json({ error: 'gst_percent must be 12 or 18' });
+      if (![0, 3, 5, 12, 18, 28].includes(Number(b.gst_percent))) return res.status(400).json({ error: 'gst_percent must be 0, 3, 5, 12, 18, or 28' });
       setClauses.push(`gst_percent = ${$v(Number(b.gst_percent))}`);
     }
     if (b.hsn_code !== undefined)           setClauses.push(`hsn_code = ${$v(b.hsn_code)}`);
