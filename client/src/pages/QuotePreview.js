@@ -381,7 +381,6 @@ export default function QuotePreview() {
         itemLines.push(
           `${serial}. *${it.product_name || it.name}*` +
           (it.variant ? ` – ${it.variant}` : '') +
-          (it.pack_size ? ` [${it.pack_size}]` : '') +
           `\n   Qty: ${it.quantity} × ₹${fmtAmt(it.unit_price)}${sysP} = *₹${fmtAmt(it.line_total)}*`
         );
         serial++;
@@ -2126,9 +2125,9 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
                         <TD style={{ textAlign: 'center', color: '#94a3b8', fontSize: 10, paddingLeft: 10 }}>{it._idx}</TD>
                         <TD style={{ paddingLeft: 14 }}>
                           <span style={{ fontWeight: 700, color: '#1e293b' }}>{it.product_name}</span>
-                          {(it.variant || it.pack_size) && (
+                          {it.variant && (
                             <span style={{ color: '#94a3b8', fontWeight: 400, fontSize: 10 }}>
-                              {' '}· {[it.variant, it.pack_size].filter(Boolean).join(', ')}
+                              {' '}· {it.variant}
                             </span>
                           )}
                           {it.description && (

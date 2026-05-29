@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import { useQuoteBuilder } from '../context/QuoteBuilderContext';
 import { useToast } from '../components/Toast';
-import ProductCard, { calcPackPrice } from '../components/quote/ProductCard';
+import ProductCard, { calcPackPrice, baseUnitLabel } from '../components/quote/ProductCard';
 import CartItem from '../components/quote/CartItem';
 import ClientModal from '../components/quote/ClientModal';
 import EmptyState from '../components/EmptyState';
@@ -72,22 +72,18 @@ export default function NewQuote() {
     });
   }, [products, activeCat, search]);
 
-  // Count how many visible products can still be added (not yet in cart)
+  // Count how many visible products can still be added (default = 1 unit, no pack size)
   const addableCount = useMemo(() => filtered.filter((p) => {
-    const firstSize    = (p.pack_sizes || [])[0];
     const firstVariant = (p.variants || [])[0] || null;
-    const sizeKey      = firstSize ? firstSize.size : '';
-    return !cartKeys.has(`${p.id}|${firstVariant || ''}|${sizeKey}`);
+    return !cartKeys.has(`${p.id}|${firstVariant || ''}|`);
   }).length, [filtered, cartKeys]);
 
-  // Add all visible products (qty=1, first variant/pack size or base_price) not yet in cart
+  // Add all visible products at 1-unit (base_price) — Select All defaults to per-unit pricing
   const addAllVisible = useCallback(() => {
     let added = 0;
     for (const p of filtered) {
-      const firstSize    = (p.pack_sizes || [])[0];
       const firstVariant = (p.variants || [])[0] || null;
-      const sizeKey      = firstSize ? firstSize.size : '';
-      if (cartKeys.has(`${p.id}|${firstVariant || ''}|${sizeKey}`)) continue;
+      if (cartKeys.has(`${p.id}|${firstVariant || ''}|`)) continue;
       addItem({
         product_id:    p.id,
         product_name:  p.name,
@@ -95,9 +91,9 @@ export default function NewQuote() {
         category_id:   p.category_id,
         category_name: p.category_name,
         variant:       firstVariant,
-        pack_size:     sizeKey,
+        pack_size:     '',          // base unit — no bulk pack size
         quantity:      1,
-        unit_price:    calcPackPrice(firstSize?.size, p.base_price, p.unit),
+        unit_price:    p.base_price || 0,
         gst_percent:   p.gst_percent,
         hsn_code:      p.hsn_code,
       });

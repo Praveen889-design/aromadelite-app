@@ -5,32 +5,22 @@ const formatINR = (n) =>
 
 /**
  * Calculate the pack price from the size label and the per-unit base_price.
+ * Only multiplies when the pack unit matches the product unit.
  *
- * Rules (unit-aware — only multiply when the pack unit matches the product unit):
- *   unit=ltr  + size has "ltr/litre/L"  →  qty × base_price
- *   unit=kg   + size has "kg/KG"        →  qty × base_price
- *   unit=kg   + size has "gms/gm/g"     →  (qty/1000) × base_price
- *   anything else                        →  base_price (no multiplier)
- *
- * Examples:
- *   "5ltr"   unit=ltr  base=40  → 5 × 40 = ₹200
- *   "10 KG"  unit=kg   base=120 → 10 × 120 = ₹1200
- *   "500gms" unit=kg   base=250 → 0.5 × 250 = ₹125
- *   "400 GMS" unit=BOX base=180 → ₹180  (unit mismatch – keep base)
- *   "50 GMS"  unit=1   base=48  → ₹48   (unit mismatch – keep base)
+ *   unit=ltr + size has "ltr/litre" → qty × base_price   (5ltr @ ₹40 = ₹200)
+ *   unit=kg  + size has "kg/KG"    → qty × base_price   (10 KG @ ₹120 = ₹1200)
+ *   unit=kg  + size has "gms/gm"   → (qty/1000) × base  (500gms @ ₹250 = ₹125)
+ *   unit mismatch / no match       → base_price unchanged
  */
 export function calcPackPrice(sizeLabel, basePrice, unit) {
   const base = Number(basePrice) || 0;
   const lbl  = (sizeLabel || '').toLowerCase().trim();
-  const u    = (unit    || '').toLowerCase().trim();
+  const u    = (unit || '').toLowerCase().trim();
 
-  // Litres
   if ((u === 'ltr' || u === 'litre' || u === 'l') && /ltr|litre/i.test(lbl)) {
     const qty = parseFloat(lbl);
     if (qty > 0) return Math.round(qty * base);
   }
-
-  // Kilograms
   if (u === 'kg') {
     if (/\bkg\b/i.test(lbl)) {
       const qty = parseFloat(lbl);
@@ -41,19 +31,34 @@ export function calcPackPrice(sizeLabel, basePrice, unit) {
       if (qty > 0) return Math.round((qty / 1000) * base);
     }
   }
-
-  // No matching multiplier → return base price
   return base;
+}
+
+/** Returns "1 Ltr", "1 Kg", "1 Box", "1 Pc", "1 Unit" based on product unit */
+export function baseUnitLabel(unit) {
+  const u = (unit || '').toLowerCase().trim();
+  if (u === 'ltr' || u === 'litre' || u === 'l') return '1 Ltr';
+  if (u === 'kg')                                  return '1 Kg';
+  if (u === 'box')                                 return '1 Box';
+  if (u === 'no' || u === 'pair' || u === 'pairs') return '1 Pc';
+  return '1 Unit';
 }
 
 export default function ProductCard({ product, inCart, onAdd }) {
   const variants = product.variants || [];
-  const sizes    = product.pack_sizes || [];
-  const [variant,  setVariant]  = useState(variants[0] || null);
-  const [sizeIdx,  setSizeIdx]  = useState(0);
-  const [qty,      setQty]      = useState(1);
+  const rawSizes = product.pack_sizes || [];
 
-  const selectedSize = sizes[sizeIdx];
+  // Always prepend "1 Unit/Ltr/Kg/..." as the default first option
+  const baseLabel = baseUnitLabel(product.unit);
+  const allSizes  = rawSizes.length > 0
+    ? [{ size: baseLabel, price: 0, isBase: true }, ...rawSizes]
+    : [];
+
+  const [variant, setVariant] = useState(variants[0] || null);
+  const [sizeIdx, setSizeIdx] = useState(0);   // 0 = base unit by default
+  const [qty,     setQty]     = useState(1);
+
+  const selectedSize = allSizes[sizeIdx];
 
   const lineKey = useMemo(
     () => `${product.id}|${variant || ''}|${selectedSize?.size || ''}`,
@@ -61,7 +66,7 @@ export default function ProductCard({ product, inCart, onAdd }) {
   );
   const alreadyAdded = inCart.has(lineKey);
 
-  // Price for the currently selected pack (or base_price for unit-sold products)
+  // Price for the selected pack option
   const effectivePrice = selectedSize
     ? calcPackPrice(selectedSize.size, product.base_price, product.unit)
     : (product.base_price || 0);
@@ -74,7 +79,7 @@ export default function ProductCard({ product, inCart, onAdd }) {
       category_id:   product.category_id,
       category_name: product.category_name,
       variant:       variant || null,
-      pack_size:     selectedSize?.size || '',
+      pack_size:     selectedSize?.isBase ? '' : (selectedSize?.size || ''),
       quantity:      Math.max(1, Number(qty) || 1),
       unit_price:    effectivePrice,
       gst_percent:   product.gst_percent,
@@ -106,26 +111,20 @@ export default function ProductCard({ product, inCart, onAdd }) {
           {variants.map((v) => {
             const active = v === variant;
             return (
-              <button
-                key={v}
-                type="button"
-                onClick={() => setVariant(v)}
+              <button key={v} type="button" onClick={() => setVariant(v)}
                 className={[
                   'text-[11px] px-2 py-0.5 rounded-full border transition-colors',
-                  active
-                    ? 'bg-cyan-600 text-white border-cyan-600'
-                    : 'bg-white text-slate-600 border-slate-300 hover:border-cyan-400',
+                  active ? 'bg-cyan-600 text-white border-cyan-600'
+                         : 'bg-white text-slate-600 border-slate-300 hover:border-cyan-400',
                 ].join(' ')}
-              >
-                {v}
-              </button>
+              >{v}</button>
             );
           })}
         </div>
       )}
 
       <div className="mt-3 grid grid-cols-5 gap-2">
-        {sizes.length > 0 ? (
+        {allSizes.length > 0 ? (
           <label className="col-span-3 text-xs text-slate-600">
             <div className="mb-1">Pack size</div>
             <select
@@ -133,7 +132,7 @@ export default function ProductCard({ product, inCart, onAdd }) {
               onChange={(e) => setSizeIdx(Number(e.target.value))}
               className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
             >
-              {sizes.map((s, i) => (
+              {allSizes.map((s, i) => (
                 <option key={`${s.size}-${i}`} value={i}>
                   {s.size} — {formatINR(calcPackPrice(s.size, product.base_price, product.unit))}
                 </option>
@@ -151,18 +150,14 @@ export default function ProductCard({ product, inCart, onAdd }) {
         <label className="col-span-2 text-xs text-slate-600">
           <div className="mb-1">Qty</div>
           <input
-            type="number"
-            min={1}
-            value={qty}
+            type="number" min={1} value={qty}
             onChange={(e) => setQty(e.target.value)}
             className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
           />
         </label>
       </div>
 
-      <button
-        type="button"
-        onClick={onClickAdd}
+      <button type="button" onClick={onClickAdd}
         className={[
           'mt-3 w-full text-sm font-semibold rounded-lg py-2 transition-colors',
           alreadyAdded

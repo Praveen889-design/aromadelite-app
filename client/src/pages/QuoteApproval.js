@@ -211,9 +211,9 @@ export default function QuoteApproval() {
                     <td style={{ padding: '9px 12px', textAlign: 'center', fontSize: 12, color: '#94a3b8' }}>{i + 1}</td>
                     <td style={{ padding: '9px 12px' }}>
                       <div style={{ fontWeight: 700, fontSize: 13, color: '#0f172a' }}>{it.product_name}</div>
-                      {(it.variant || it.pack_size) && (
+                      {it.variant && (
                         <div style={{ fontSize: 11, color: '#94a3b8' }}>
-                          {[it.variant, it.pack_size].filter(Boolean).join(' · ')}
+                          {it.variant}
                         </div>
                       )}
                       {it.description && (

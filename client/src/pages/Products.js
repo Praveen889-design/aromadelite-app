@@ -4,7 +4,7 @@ import api from '../utils/api';
 import { useQuoteBuilder } from '../context/QuoteBuilderContext';
 import { useToast } from '../components/Toast';
 import { SkeletonCards } from '../components/Skeleton';
-import { calcPackPrice } from '../components/quote/ProductCard';
+import { calcPackPrice, baseUnitLabel } from '../components/quote/ProductCard';
 
 const CATEGORY_EMOJI = {
   'Chemical Cleaners': '🧪',
@@ -55,8 +55,13 @@ function ProductCard({ product, inCart, cartQty, onAddToQuote, onQtyChange }) {
   const [selVariant, setSelVariant] = useState(0);
 
   const emoji = CATEGORY_EMOJI[product.category_name] || '📦';
-  const packs = product.packs || [];
+  const rawPacks = product.packs || [];
   const variants = product.variants || [];
+  // Always show "1 Unit/Ltr/Kg" as default first option
+  const baseLabel = baseUnitLabel(product.unit);
+  const packs = rawPacks.length > 0
+    ? [{ size: baseLabel, price: 0, isBase: true }, ...rawPacks]
+    : [];
   const activePack = packs[0] || {};
   const price = calcPackPrice(activePack.size, product.base_price, product.unit);
 
@@ -230,7 +235,7 @@ export default function Products() {
       product_id: product.id,
       product_name: product.name,
       category_name: product.category_name,
-      pack_size: pack?.size || pack?.label || '',
+      pack_size: (pack?.isBase ? '' : (pack?.size || pack?.label || '')),
       unit_price: calcPackPrice(pack?.size, product.base_price, product.unit),
       gst_rate: product.gst_rate || 18,
       qty: 1,
