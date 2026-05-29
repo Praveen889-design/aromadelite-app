@@ -42,10 +42,15 @@ export default function ProductCard({ product, inCart, onAdd }) {
       <div className="flex items-start gap-2">
         <span className="text-xl leading-none">{product.category_icon}</span>
         <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-slate-900 text-sm leading-tight truncate" title={product.name}>
+          <h3 className="font-semibold text-slate-900 text-sm leading-tight" title={product.name}>
             {product.name}
           </h3>
-          <div className="text-[11px] text-slate-500 mt-0.5">
+          {product.description && (
+            <p className="text-[11px] text-slate-500 mt-1 leading-snug line-clamp-2" title={product.description}>
+              {product.description}
+            </p>
+          )}
+          <div className="text-[11px] text-slate-400 mt-1">
             GST {product.gst_percent}% · HSN {product.hsn_code || '—'}
           </div>
         </div>
