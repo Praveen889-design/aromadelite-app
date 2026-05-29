@@ -4,6 +4,7 @@ import api from '../utils/api';
 import { useQuoteBuilder } from '../context/QuoteBuilderContext';
 import { useToast } from '../components/Toast';
 import { SkeletonCards } from '../components/Skeleton';
+import { calcPackPrice } from '../components/quote/ProductCard';
 
 const CATEGORY_EMOJI = {
   'Chemical Cleaners': '🧪',
@@ -57,7 +58,7 @@ function ProductCard({ product, inCart, cartQty, onAddToQuote, onQtyChange }) {
   const packs = product.packs || [];
   const variants = product.variants || [];
   const activePack = packs[0] || {};
-  const price = activePack.price || product.base_price || 0;
+  const price = calcPackPrice(activePack.size, product.base_price, product.unit);
 
   const formatINR = (n) =>
     new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n || 0);
@@ -230,7 +231,7 @@ export default function Products() {
       product_name: product.name,
       category_name: product.category_name,
       pack_size: pack?.size || pack?.label || '',
-      unit_price: pack?.price || product.base_price || 0,
+      unit_price: calcPackPrice(pack?.size, product.base_price, product.unit),
       gst_rate: product.gst_rate || 18,
       qty: 1,
     });

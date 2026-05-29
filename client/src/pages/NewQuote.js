@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import { useQuoteBuilder } from '../context/QuoteBuilderContext';
 import { useToast } from '../components/Toast';
-import ProductCard from '../components/quote/ProductCard';
+import ProductCard, { calcPackPrice } from '../components/quote/ProductCard';
 import CartItem from '../components/quote/CartItem';
 import ClientModal from '../components/quote/ClientModal';
 import EmptyState from '../components/EmptyState';
@@ -97,7 +97,7 @@ export default function NewQuote() {
         variant:       firstVariant,
         pack_size:     sizeKey,
         quantity:      1,
-        unit_price:    (firstSize?.price) || (p.base_price || 0),
+        unit_price:    calcPackPrice(firstSize?.size, p.base_price, p.unit),
         gst_percent:   p.gst_percent,
         hsn_code:      p.hsn_code,
       });

@@ -3,12 +3,55 @@ import React, { useMemo, useState } from 'react';
 const formatINR = (n) =>
   new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n || 0);
 
+/**
+ * Calculate the pack price from the size label and the per-unit base_price.
+ *
+ * Rules (unit-aware — only multiply when the pack unit matches the product unit):
+ *   unit=ltr  + size has "ltr/litre/L"  →  qty × base_price
+ *   unit=kg   + size has "kg/KG"        →  qty × base_price
+ *   unit=kg   + size has "gms/gm/g"     →  (qty/1000) × base_price
+ *   anything else                        →  base_price (no multiplier)
+ *
+ * Examples:
+ *   "5ltr"   unit=ltr  base=40  → 5 × 40 = ₹200
+ *   "10 KG"  unit=kg   base=120 → 10 × 120 = ₹1200
+ *   "500gms" unit=kg   base=250 → 0.5 × 250 = ₹125
+ *   "400 GMS" unit=BOX base=180 → ₹180  (unit mismatch – keep base)
+ *   "50 GMS"  unit=1   base=48  → ₹48   (unit mismatch – keep base)
+ */
+export function calcPackPrice(sizeLabel, basePrice, unit) {
+  const base = Number(basePrice) || 0;
+  const lbl  = (sizeLabel || '').toLowerCase().trim();
+  const u    = (unit    || '').toLowerCase().trim();
+
+  // Litres
+  if ((u === 'ltr' || u === 'litre' || u === 'l') && /ltr|litre/i.test(lbl)) {
+    const qty = parseFloat(lbl);
+    if (qty > 0) return Math.round(qty * base);
+  }
+
+  // Kilograms
+  if (u === 'kg') {
+    if (/\bkg\b/i.test(lbl)) {
+      const qty = parseFloat(lbl);
+      if (qty > 0) return Math.round(qty * base);
+    }
+    if (/\bgms?\b|\bgram(me)?s?\b/i.test(lbl)) {
+      const qty = parseFloat(lbl);
+      if (qty > 0) return Math.round((qty / 1000) * base);
+    }
+  }
+
+  // No matching multiplier → return base price
+  return base;
+}
+
 export default function ProductCard({ product, inCart, onAdd }) {
   const variants = product.variants || [];
-  const sizes = product.pack_sizes || [];
-  const [variant, setVariant] = useState(variants[0] || null);
-  const [sizeIdx, setSizeIdx] = useState(0);
-  const [qty, setQty] = useState(1);
+  const sizes    = product.pack_sizes || [];
+  const [variant,  setVariant]  = useState(variants[0] || null);
+  const [sizeIdx,  setSizeIdx]  = useState(0);
+  const [qty,      setQty]      = useState(1);
 
   const selectedSize = sizes[sizeIdx];
 
@@ -18,22 +61,24 @@ export default function ProductCard({ product, inCart, onAdd }) {
   );
   const alreadyAdded = inCart.has(lineKey);
 
-  // Effective price: pack price if set, else fall back to product base_price
-  const effectivePrice = selectedSize?.price || product.base_price || 0;
+  // Price for the currently selected pack (or base_price for unit-sold products)
+  const effectivePrice = selectedSize
+    ? calcPackPrice(selectedSize.size, product.base_price, product.unit)
+    : (product.base_price || 0);
 
   const onClickAdd = () => {
     onAdd({
-      product_id: product.id,
-      product_name: product.name,
-      description: product.description || null,
-      category_id: product.category_id,
+      product_id:    product.id,
+      product_name:  product.name,
+      description:   product.description || null,
+      category_id:   product.category_id,
       category_name: product.category_name,
-      variant: variant || null,
-      pack_size: selectedSize?.size || '',
-      quantity: Math.max(1, Number(qty) || 1),
-      unit_price: effectivePrice,
-      gst_percent: product.gst_percent,
-      hsn_code: product.hsn_code,
+      variant:       variant || null,
+      pack_size:     selectedSize?.size || '',
+      quantity:      Math.max(1, Number(qty) || 1),
+      unit_price:    effectivePrice,
+      gst_percent:   product.gst_percent,
+      hsn_code:      product.hsn_code,
     });
   };
 
@@ -90,7 +135,7 @@ export default function ProductCard({ product, inCart, onAdd }) {
             >
               {sizes.map((s, i) => (
                 <option key={`${s.size}-${i}`} value={i}>
-                  {s.size} — {formatINR(s.price || product.base_price)}
+                  {s.size} — {formatINR(calcPackPrice(s.size, product.base_price, product.unit))}
                 </option>
               ))}
             </select>
