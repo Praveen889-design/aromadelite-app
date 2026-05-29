@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import { useQuoteBuilder } from '../context/QuoteBuilderContext';
 import { useToast } from '../components/Toast';
-import ProductCard, { calcPackPrice, baseUnitLabel } from '../components/quote/ProductCard';
+import ProductCard from '../components/quote/ProductCard';
 import CartItem from '../components/quote/CartItem';
 import ClientModal from '../components/quote/ClientModal';
 import EmptyState from '../components/EmptyState';
