@@ -2131,6 +2131,11 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
                               {' '}· {[it.variant, it.pack_size].filter(Boolean).join(', ')}
                             </span>
                           )}
+                          {it.description && (
+                            <div style={{ fontSize: 9.5, color: '#64748b', fontWeight: 400, marginTop: 2, lineHeight: 1.35 }}>
+                              {it.description}
+                            </div>
+                          )}
                         </TD>
                         <TD style={{ textAlign: 'center', color: '#64748b', fontSize: 10 }}>{it.hsn_code || '—'}</TD>
                         <TD style={{ textAlign: 'right', fontWeight: 600 }}>{fmtNum(it.quantity, 0)}</TD>

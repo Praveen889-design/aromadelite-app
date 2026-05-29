@@ -23,6 +23,7 @@ export default function ProductCard({ product, inCart, onAdd }) {
     onAdd({
       product_id: product.id,
       product_name: product.name,
+      description: product.description || null,
       category_id: product.category_id,
       category_name: product.category_name,
       variant: variant || null,

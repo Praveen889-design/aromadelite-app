@@ -216,6 +216,11 @@ export default function QuoteApproval() {
                           {[it.variant, it.pack_size].filter(Boolean).join(' · ')}
                         </div>
                       )}
+                      {it.description && (
+                        <div style={{ fontSize: 11, color: '#64748b', marginTop: 2, lineHeight: 1.4 }}>
+                          {it.description}
+                        </div>
+                      )}
                     </td>
                     <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 700, fontSize: 13 }}>{it.quantity}</td>
                     <td style={{ padding: '9px 12px', fontSize: 12, color: '#64748b' }}>{it.unit}</td>

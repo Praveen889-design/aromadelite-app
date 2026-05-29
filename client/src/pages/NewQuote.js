@@ -91,6 +91,7 @@ export default function NewQuote() {
       addItem({
         product_id:    p.id,
         product_name:  p.name,
+        description:   p.description || null,
         category_id:   p.category_id,
         category_name: p.category_name,
         variant:       firstVariant,
