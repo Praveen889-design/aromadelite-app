@@ -47,7 +47,7 @@ export default function NewQuote() {
         ]);
         if (cancelled) return;
         setProducts(pRes.data.products || []);
-        setCategories(cRes.data.categories || []);
+        setCategories((cRes.data.categories || []).filter(c => Number(c.product_count) > 0));
       } catch (e) {
         if (!cancelled) setLoadError(e?.response?.data?.error || 'Failed to load catalog');
       } finally {

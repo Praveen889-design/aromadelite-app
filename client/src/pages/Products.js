@@ -202,7 +202,7 @@ export default function Products() {
           api.get('/api/products/categories'),
         ]);
         setProducts(pRes.data.products || []);
-        setCategories(cRes.data.categories || []);
+        setCategories((cRes.data.categories || []).filter(c => Number(c.product_count) > 0));
       } catch (e) {
         setLoadError(e?.response?.data?.error || 'Failed to load catalog');
       } finally {

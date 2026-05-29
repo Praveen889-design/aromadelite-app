@@ -42,7 +42,7 @@ export default function ProductsTab() {
         api.get('/api/products/categories'),
       ]);
       setProducts(pRes.data.products || []);
-      setCategories(cRes.data.categories || []);
+      setCategories((cRes.data.categories || []).filter(c => Number(c.product_count) > 0));
     } finally { setLoading(false); }
   }, []);
   useEffect(() => { load(); }, [load]);
