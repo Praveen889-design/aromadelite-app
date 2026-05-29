@@ -57,10 +57,15 @@ function ProductCard({ product, inCart, cartQty, onAddToQuote, onQtyChange }) {
   const emoji = CATEGORY_EMOJI[product.category_name] || '📦';
   const rawPacks = product.packs || [];
   const variants = product.variants || [];
-  // Always show "1 Unit/Ltr/Kg" as default first option
+  // Same logic as ProductCard: move existing 1-unit pack to front, or prepend virtual one
   const baseLabel = baseUnitLabel(product.unit);
+  const isOneUnit = (s) => Math.abs(calcPackPrice(s.size, 1, product.unit) - 1) < 0.01;
+  const oneUnitPacks = rawPacks.filter(isOneUnit);
+  const bulkPacks    = rawPacks.filter(s => !isOneUnit(s));
   const packs = rawPacks.length > 0
-    ? [{ size: baseLabel, price: 0, isBase: true }, ...rawPacks]
+    ? oneUnitPacks.length > 0
+      ? [...oneUnitPacks, ...bulkPacks]
+      : [{ size: baseLabel, price: 0, isBase: true }, ...rawPacks]
     : [];
   const activePack = packs[0] || {};
   const price = calcPackPrice(activePack.size, product.base_price, product.unit);

@@ -22,11 +22,13 @@ export function calcPackPrice(sizeLabel, basePrice, unit) {
     if (qty > 0) return Math.round(qty * base);
   }
   if (u === 'kg') {
+    // Match "1 KG", "10kg", "1KG" etc.
     if (/\bkg\b/i.test(lbl)) {
       const qty = parseFloat(lbl);
       if (qty > 0) return Math.round(qty * base);
     }
-    if (/\bgms?\b|\bgram(me)?s?\b/i.test(lbl)) {
+    // Match "500gms", "500 gms", "500gm", "500 grams" — no leading \b needed
+    if (/gms?\b|grams?\b/i.test(lbl)) {
       const qty = parseFloat(lbl);
       if (qty > 0) return Math.round((qty / 1000) * base);
     }
@@ -48,10 +50,17 @@ export default function ProductCard({ product, inCart, onAdd }) {
   const variants = product.variants || [];
   const rawSizes = product.pack_sizes || [];
 
-  // Always prepend "1 Unit/Ltr/Kg/..." as the default first option
+  // Build size list:
+  // - If a stored size already equals 1× base unit (e.g. "1 KG"), move it to front.
+  // - Otherwise prepend a virtual "1 Ltr / 1 Kg / 1 Unit" option.
   const baseLabel = baseUnitLabel(product.unit);
-  const allSizes  = rawSizes.length > 0
-    ? [{ size: baseLabel, price: 0, isBase: true }, ...rawSizes]
+  const isOneUnit = (s) => Math.abs(calcPackPrice(s.size, 1, product.unit) - 1) < 0.01;
+  const oneUnitSizes = rawSizes.filter(isOneUnit);
+  const bulkSizes    = rawSizes.filter(s => !isOneUnit(s));
+  const allSizes = rawSizes.length > 0
+    ? oneUnitSizes.length > 0
+      ? [...oneUnitSizes, ...bulkSizes]                               // existing 1-unit first
+      : [{ size: baseLabel, price: 0, isBase: true }, ...rawSizes]   // prepend virtual 1-unit
     : [];
 
   const [variant, setVariant] = useState(variants[0] || null);
