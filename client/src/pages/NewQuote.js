@@ -97,7 +97,7 @@ export default function NewQuote() {
         variant:       firstVariant,
         pack_size:     sizeKey,
         quantity:      1,
-        unit_price:    firstSize ? firstSize.price : (p.base_price || 0),
+        unit_price:    (firstSize?.price) || (p.base_price || 0),
         gst_percent:   p.gst_percent,
         hsn_code:      p.hsn_code,
       });

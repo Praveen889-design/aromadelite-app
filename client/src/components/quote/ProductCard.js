@@ -18,8 +18,10 @@ export default function ProductCard({ product, inCart, onAdd }) {
   );
   const alreadyAdded = inCart.has(lineKey);
 
+  // Effective price: pack price if set, else fall back to product base_price
+  const effectivePrice = selectedSize?.price || product.base_price || 0;
+
   const onClickAdd = () => {
-    if (!selectedSize) return;
     onAdd({
       product_id: product.id,
       product_name: product.name,
@@ -27,9 +29,9 @@ export default function ProductCard({ product, inCart, onAdd }) {
       category_id: product.category_id,
       category_name: product.category_name,
       variant: variant || null,
-      pack_size: selectedSize.size,
+      pack_size: selectedSize?.size || '',
       quantity: Math.max(1, Number(qty) || 1),
-      unit_price: selectedSize.price,
+      unit_price: effectivePrice,
       gst_percent: product.gst_percent,
       hsn_code: product.hsn_code,
     });
@@ -73,20 +75,29 @@ export default function ProductCard({ product, inCart, onAdd }) {
       )}
 
       <div className="mt-3 grid grid-cols-5 gap-2">
-        <label className="col-span-3 text-xs text-slate-600">
-          <div className="mb-1">Pack size</div>
-          <select
-            value={sizeIdx}
-            onChange={(e) => setSizeIdx(Number(e.target.value))}
-            className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
-          >
-            {sizes.map((s, i) => (
-              <option key={`${s.size}-${i}`} value={i}>
-                {s.size} — {formatINR(s.price)}
-              </option>
-            ))}
-          </select>
-        </label>
+        {sizes.length > 0 ? (
+          <label className="col-span-3 text-xs text-slate-600">
+            <div className="mb-1">Pack size</div>
+            <select
+              value={sizeIdx}
+              onChange={(e) => setSizeIdx(Number(e.target.value))}
+              className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
+            >
+              {sizes.map((s, i) => (
+                <option key={`${s.size}-${i}`} value={i}>
+                  {s.size} — {formatINR(s.price || product.base_price)}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : (
+          <div className="col-span-3 text-xs text-slate-600">
+            <div className="mb-1">Unit price</div>
+            <div className="border border-slate-200 rounded-md px-2 py-1.5 bg-slate-50 text-sm font-medium text-slate-700">
+              {formatINR(product.base_price)}
+            </div>
+          </div>
+        )}
         <label className="col-span-2 text-xs text-slate-600">
           <div className="mb-1">Qty</div>
           <input
