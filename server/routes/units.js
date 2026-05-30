@@ -3,7 +3,6 @@ const pool    = require('../database/db');
 const { requireAuth, requireRole } = require('../middleware/auth');
 
 const router = express.Router();
-router.use(requireAuth, requireRole('admin'));
 
 /* ─── helpers ───────────────────────────────────────────────── */
 const parseJSON = (v, fallback = []) => {
@@ -16,7 +15,7 @@ const parseJSON = (v, fallback = []) => {
 ═══════════════════════════════════════════════════════════════ */
 
 /* GET /api/units  — all active units + stock summary */
-router.get('/', async (req, res) => {
+router.get('/', requireAuth, requireRole('admin'), async (req, res) => {
   try {
     const { rows } = await pool.query(`
       SELECT
@@ -41,7 +40,7 @@ router.get('/', async (req, res) => {
 });
 
 /* POST /api/units  — create a unit */
-router.post('/', async (req, res) => {
+router.post('/', requireAuth, requireRole('admin'), async (req, res) => {
   try {
     const { name, region, address, contact_person, contact_phone } = req.body || {};
     if (!name || !region) return res.status(400).json({ error: 'name and region required' });
@@ -58,7 +57,7 @@ router.post('/', async (req, res) => {
 });
 
 /* PATCH /api/units/:id  — update unit details */
-router.patch('/:id', async (req, res) => {
+router.patch('/:id', requireAuth, requireRole('admin'), async (req, res) => {
   try {
     const { name, region, address, contact_person, contact_phone } = req.body || {};
     const { rows } = await pool.query(`
@@ -80,7 +79,7 @@ router.patch('/:id', async (req, res) => {
 });
 
 /* DELETE /api/units/:id  — soft-delete */
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireAuth, requireRole('admin'), async (req, res) => {
   try {
     await pool.query('UPDATE units SET is_active = false, updated_at = NOW() WHERE id = $1', [req.params.id]);
     res.json({ ok: true });
@@ -100,7 +99,7 @@ router.delete('/:id', async (req, res) => {
    Must be declared BEFORE /:id routes to avoid "region-stock"
    being matched as an :id param.
 */
-router.get('/region-stock', async (req, res) => {
+router.get('/region-stock', requireAuth, async (req, res) => {
   try {
     const region = (req.query.region || '').trim();
 
@@ -142,7 +141,7 @@ router.get('/region-stock', async (req, res) => {
 });
 
 /* GET /api/units/:id/stock  — current stock + recent adjustments */
-router.get('/:id/stock', async (req, res) => {
+router.get('/:id/stock', requireAuth, requireRole('admin'), async (req, res) => {
   try {
     const unitId = req.params.id;
 
@@ -181,7 +180,7 @@ router.get('/:id/stock', async (req, res) => {
 /* POST /api/units/:id/deploy
    Body: { note, items: [{ product_id?, product_name, quantity, unit_price, gst_percent }] }
 */
-router.post('/:id/deploy', async (req, res) => {
+router.post('/:id/deploy', requireAuth, requireRole('admin'), async (req, res) => {
   const client = await pool.connect();
   try {
     const unitId = Number(req.params.id);
@@ -266,7 +265,7 @@ router.post('/:id/deploy', async (req, res) => {
 ═══════════════════════════════════════════════════════════════ */
 
 /* GET /api/units/:id/deployments */
-router.get('/:id/deployments', async (req, res) => {
+router.get('/:id/deployments', requireAuth, requireRole('admin'), async (req, res) => {
   try {
     const depRes = await pool.query(`
       SELECT d.*, e.name AS deployed_by_name
