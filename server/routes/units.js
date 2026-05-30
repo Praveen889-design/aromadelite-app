@@ -93,6 +93,38 @@ router.delete('/:id', async (req, res) => {
    STOCK
 ═══════════════════════════════════════════════════════════════ */
 
+/* GET /api/units/region-stock?region=Nizamabad
+   Returns aggregated available qty per product across all active
+   units in the given region — used by the quote builder to show
+   in-stock / no-stock status on every product card.
+   Must be declared BEFORE /:id routes to avoid "region-stock"
+   being matched as an :id param.
+*/
+router.get('/region-stock', async (req, res) => {
+  try {
+    const region = (req.query.region || '').trim();
+    if (!region) return res.status(400).json({ error: 'region query param required' });
+
+    const { rows } = await pool.query(`
+      SELECT
+        s.product_id,
+        s.product_name,
+        SUM(s.quantity)::numeric AS available_qty
+      FROM unit_stock s
+      JOIN units u ON u.id = s.unit_id
+      WHERE u.region = $1
+        AND u.is_active = true
+        AND s.quantity > 0
+      GROUP BY s.product_id, s.product_name
+      ORDER BY s.product_name
+    `, [region]);
+
+    res.json({ region, stock: rows });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 /* GET /api/units/:id/stock  — current stock + recent adjustments */
 router.get('/:id/stock', async (req, res) => {
   try {

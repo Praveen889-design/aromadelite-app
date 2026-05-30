@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import { useQuoteBuilder } from '../context/QuoteBuilderContext';
 import { useToast } from '../components/Toast';
+import { useAuth } from '../context/AuthContext';
 import ProductCard from '../components/quote/ProductCard';
 import CartItem from '../components/quote/CartItem';
 import ClientModal from '../components/quote/ClientModal';
@@ -14,6 +15,7 @@ const formatINR = (n) =>
 export default function NewQuote() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user } = useAuth();
   const { items, totals, addItem, updateItem, removeItem, clearCart, client, setClient } = useQuoteBuilder();
 
   const [products, setProducts] = useState([]);
@@ -22,6 +24,9 @@ export default function NewQuote() {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
+  // stockMap: product_id (number) → available qty; product_name (lowercase) → available qty
+  // null means stock data not available (no units in region)
+  const [stockMap, setStockMap] = useState(null);
 
   const [gstMode, setGstMode] = useState('with_gst');
   const [modalOpen, setModalOpen] = useState(false);
@@ -41,13 +46,26 @@ export default function NewQuote() {
     let cancelled = false;
     (async () => {
       try {
-        const [pRes, cRes] = await Promise.all([
+        const region = user?.region;
+        const requests = [
           api.get('/api/products'),
           api.get('/api/products/categories'),
-        ]);
+          region ? api.get(`/api/units/region-stock?region=${encodeURIComponent(region)}`) : Promise.resolve(null),
+        ];
+        const [pRes, cRes, sRes] = await Promise.all(requests);
         if (cancelled) return;
         setProducts(pRes.data.products || []);
         setCategories((cRes.data.categories || []).filter(c => Number(c.product_count) > 0));
+        // Build dual-key lookup: product_id → qty AND lowercase name → qty
+        if (sRes?.data?.stock) {
+          const map = {};
+          for (const s of sRes.data.stock) {
+            const qty = Number(s.available_qty) || 0;
+            if (s.product_id) map[`id:${s.product_id}`] = qty;
+            map[`name:${(s.product_name || '').toLowerCase().trim()}`] = qty;
+          }
+          setStockMap(map);
+        }
       } catch (e) {
         if (!cancelled) setLoadError(e?.response?.data?.error || 'Failed to load catalog');
       } finally {
@@ -55,7 +73,7 @@ export default function NewQuote() {
       }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [user?.region]);
 
   const cartKeys = useMemo(() => {
     const s = new Set();
@@ -254,7 +272,19 @@ export default function NewQuote() {
         ) : (
           <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
             {filtered.map((p) => (
-              <ProductCard key={p.id} product={p} inCart={cartKeys} onAdd={addItem} />
+              <ProductCard
+                key={p.id}
+                product={p}
+                inCart={cartKeys}
+                onAdd={addItem}
+                stockQty={
+                  stockMap === null
+                    ? null  // no stock data for this region
+                    : (stockMap[`id:${p.id}`] ??
+                       stockMap[`name:${(p.name || '').toLowerCase().trim()}`] ??
+                       0)
+                }
+              />
             ))}
           </div>
         )}

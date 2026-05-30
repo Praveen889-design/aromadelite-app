@@ -46,7 +46,20 @@ export function baseUnitLabel(unit) {
   return '1 Unit';
 }
 
-export default function ProductCard({ product, inCart, onAdd }) {
+export default function ProductCard({ product, inCart, onAdd, stockQty = null }) {
+  // stockQty: null = no stock tracking for this region
+  //           0    = out of stock
+  //           n>0  = n units available
+  const hasStock    = stockQty === null || stockQty > 0;
+  const stockLabel  = stockQty === null  ? null
+                    : stockQty === 0     ? 'No Stock'
+                    : stockQty <= 10     ? `Low: ${stockQty} left`
+                    : `In Stock: ${stockQty}`;
+  const stockColor  = stockQty === null  ? null
+                    : stockQty === 0     ? { bg: '#fef2f2', text: '#b91c1c', border: '#fca5a5' }
+                    : stockQty <= 10     ? { bg: '#fffbeb', text: '#b45309', border: '#fcd34d' }
+                    : { bg: '#f0fdf4', text: '#15803d', border: '#86efac' };
+
   const variants = product.variants || [];
   const rawSizes = product.pack_sizes || [];
 
@@ -97,13 +110,31 @@ export default function ProductCard({ product, inCart, onAdd }) {
   };
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl p-4 hover:shadow-md transition-shadow flex flex-col">
+    <div className={[
+      'border rounded-xl p-4 transition-shadow flex flex-col',
+      stockQty === 0
+        ? 'bg-slate-50 border-slate-200 opacity-75'
+        : 'bg-white border-slate-200 hover:shadow-md',
+    ].join(' ')}>
       <div className="flex items-start gap-2">
         <span className="text-xl leading-none">{product.category_icon}</span>
         <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-slate-900 text-sm leading-tight" title={product.name}>
-            {product.name}
-          </h3>
+          <div className="flex items-start justify-between gap-2">
+            <h3 className="font-semibold text-slate-900 text-sm leading-tight" title={product.name}>
+              {product.name}
+            </h3>
+            {stockLabel && (
+              <span style={{
+                flexShrink: 0,
+                fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 99,
+                background: stockColor.bg, color: stockColor.text,
+                border: `1px solid ${stockColor.border}`,
+                whiteSpace: 'nowrap',
+              }}>
+                {stockLabel}
+              </span>
+            )}
+          </div>
           {product.description && (
             <p className="text-[11px] text-slate-500 mt-1 leading-snug line-clamp-2" title={product.description}>
               {product.description}
@@ -166,15 +197,18 @@ export default function ProductCard({ product, inCart, onAdd }) {
         </label>
       </div>
 
-      <button type="button" onClick={onClickAdd}
+      <button type="button"
+        onClick={hasStock ? onClickAdd : undefined}
         className={[
           'mt-3 w-full text-sm font-semibold rounded-lg py-2 transition-colors',
           alreadyAdded
             ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-            : 'bg-cyan-600 hover:bg-cyan-700 text-white',
+            : !hasStock
+              ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
+              : 'bg-cyan-600 hover:bg-cyan-700 text-white cursor-pointer',
         ].join(' ')}
       >
-        {alreadyAdded ? '✓ Added' : 'Add to Quote'}
+        {alreadyAdded ? '✓ Added' : !hasStock ? '✕ No Stock' : 'Add to Quote'}
       </button>
     </div>
   );
