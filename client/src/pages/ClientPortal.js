@@ -4,6 +4,21 @@ import axios from 'axios';
 
 const api = axios.create({ baseURL: '' });
 
+/* Mirrors ProductCard logic — calculates pack price from size label + base per-unit price */
+const calcPackPrice = (sizeLabel, basePrice, unit) => {
+  const base = Number(basePrice) || 0;
+  const lbl  = (sizeLabel || '').toLowerCase().trim();
+  const u    = (unit || '').toLowerCase().trim();
+  if ((u === 'ltr' || u === 'litre' || u === 'l') && /ltr|litre/i.test(lbl)) {
+    const qty = parseFloat(lbl); if (qty > 0) return Math.round(qty * base);
+  }
+  if (u === 'kg') {
+    if (/\bkg\b/i.test(lbl)) { const qty = parseFloat(lbl); if (qty > 0) return Math.round(qty * base); }
+    if (/gms?\b|grams?\b/i.test(lbl)) { const qty = parseFloat(lbl); if (qty > 0) return Math.round((qty / 1000) * base); }
+  }
+  return base;
+};
+
 const fmtINR = (n) =>
   new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n || 0);
 
@@ -138,8 +153,9 @@ export default function ClientPortal() {
 
   const cartItems = Object.values(cart);
   const cartTotal = cartItems.reduce((s, it) => {
-    const base = it.qty * it.unit_price;
-    return s + (gst_mode === 'without_gst' ? base : base * (1 + it.gst_percent / 100));
+    const base       = it.qty * it.unit_price;
+    const gstFactor  = gst_mode === 'without_gst' ? 1 : (1 + (it.gst_percent || 0) / 100);
+    return s + Math.round(base * gstFactor);
   }, 0);
   const cartCount = cartItems.reduce((s, it) => s + it.qty, 0);
 
@@ -384,13 +400,19 @@ export default function ClientPortal() {
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {grp.items.map(p => {
+                    // Use first pack size if available; calculate pack-level base price
+                    const firstSize     = p.pack_sizes?.[0]?.size || null;
+                    const packBasePrice = firstSize
+                      ? calcPackPrice(firstSize, p.display_price || p.base_price, p.unit)
+                      : (p.display_price || p.base_price || 0);
+                    const enriched = { ...p, unit_price: packBasePrice, pack_size: firstSize };
                     const qty = getQty(p);
                     return (
                       <ProductRow
                         key={p.id}
-                        product={p}
+                        product={enriched}
                         qty={qty}
-                        onQtyChange={(q) => setQty(p, q)}
+                        onQtyChange={(q) => setQty(enriched, q)}
                         gst_mode={gst_mode}
                         isNegotiated={!!p.negotiated_price}
                       />
@@ -464,10 +486,12 @@ export default function ClientPortal() {
 
 /* ── Product Row Component ── */
 function ProductRow({ product, qty, onQtyChange, gst_mode, isNegotiated }) {
-  const price      = product.unit_price ?? product.display_price ?? product.negotiated_price ?? 0;
-  const lineTotal  = qty > 0
-    ? qty * price * (gst_mode === 'without_gst' ? 1 : (1 + (product.gst_percent || 0) / 100))
-    : 0;
+  const basePrice  = product.unit_price ?? product.display_price ?? product.negotiated_price ?? 0;
+  const gstFactor  = gst_mode === 'without_gst' ? 1 : (1 + (product.gst_percent || 0) / 100);
+  // Show GST-inclusive price to client
+  const displayPrice = Math.round(basePrice * gstFactor);
+  const lineTotal    = qty > 0 ? qty * displayPrice : 0;
+  const unitLabel    = product.pack_size || product.unit || 'Nos';
 
   return (
     <div style={{
@@ -482,20 +506,19 @@ function ProductRow({ product, qty, onQtyChange, gst_mode, isNegotiated }) {
         <div style={{ fontWeight: 700, fontSize: 13, color: '#1e293b', lineHeight: 1.3 }}>
           {product.name}
           {product.variant && <span style={{ fontWeight: 400, color: '#64748b' }}> · {product.variant}</span>}
-          {product.pack_size && <span style={{ fontWeight: 400, color: '#64748b' }}> [{product.pack_size}]</span>}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3, flexWrap: 'wrap' }}>
           <span style={{ fontWeight: 800, fontSize: 14, color: isNegotiated ? '#059669' : '#0f766e' }}>
-            ₹{new Intl.NumberFormat('en-IN').format(price)}
+            ₹{new Intl.NumberFormat('en-IN').format(displayPrice)}
           </span>
-          <span style={{ fontSize: 10, color: '#94a3b8' }}>/ {product.pack_size || product.unit || 'Nos'}</span>
+          <span style={{ fontSize: 10, color: '#94a3b8' }}>/ {unitLabel}</span>
           {isNegotiated && (
             <span style={{ fontSize: 9, fontWeight: 700, background: '#dcfce7', color: '#15803d', padding: '1px 6px', borderRadius: 99 }}>
               YOUR PRICE
             </span>
           )}
           {gst_mode !== 'without_gst' && product.gst_percent > 0 && (
-            <span style={{ fontSize: 9, color: '#94a3b8' }}>+{product.gst_percent}% GST</span>
+            <span style={{ fontSize: 9, color: '#94a3b8' }}>incl. {product.gst_percent}% GST</span>
           )}
         </div>
         {qty > 0 && (
