@@ -256,28 +256,45 @@ router.get('/:id/deployments', async (req, res) => {
 ═══════════════════════════════════════════════════════════════ */
 const deductStockForQuote = async (dbClient, quoteId, employeeId, items) => {
   try {
+    // ── Idempotency guard: skip if this quote was already deducted ──────────
+    const already = await dbClient.query(
+      `SELECT 1 FROM unit_stock_adjustments WHERE quote_id = $1 AND reason = 'sale' LIMIT 1`,
+      [quoteId]
+    );
+    if (already.rows.length > 0) {
+      console.log(`[unit-stock-deduct] quote ${quoteId} already deducted — skipping`);
+      return;
+    }
+
     // Get the associate's region
     const empRes = await dbClient.query(
       'SELECT region FROM employees WHERE id = $1', [employeeId]
     );
     const region = empRes.rows[0]?.region;
-    if (!region) return;
+    if (!region) {
+      console.log(`[unit-stock-deduct] employee ${employeeId} has no region — skipping`);
+      return;
+    }
 
     // Find active units in that region
     const unitRes = await dbClient.query(
       'SELECT id FROM units WHERE region = $1 AND is_active = true ORDER BY id', [region]
     );
-    if (!unitRes.rows.length) return;
+    if (!unitRes.rows.length) {
+      console.log(`[unit-stock-deduct] no active units in region "${region}" — skipping`);
+      return;
+    }
 
     const unitIds = unitRes.rows.map((r) => r.id);
+    let deductedCount = 0;
 
     for (const it of items) {
-      const qty    = Number(it.quantity) || 0;
+      const qty   = Number(it.quantity) || 0;
       if (qty <= 0) continue;
-      const pname  = (it.product_name || it.name || '').trim();
-      const pid    = it.product_id ? Number(it.product_id) : null;
+      const pname = (it.product_name || it.name || '').trim();
+      const pid   = it.product_id ? Number(it.product_id) : null;
 
-      // Find which unit has stock of this product (most stock first)
+      // Find which unit has stock of this product
       let stockRow = null;
       for (const uid of unitIds) {
         let q;
@@ -297,7 +314,10 @@ const deductStockForQuote = async (dbClient, quoteId, employeeId, items) => {
         if (q.rows[0]) { stockRow = q.rows[0]; break; }
       }
 
-      if (!stockRow) continue; // product not in any unit stock — skip silently
+      if (!stockRow) {
+        console.log(`[unit-stock-deduct] "${pname}" not found in any ${region} unit — skipped`);
+        continue;
+      }
 
       const deduct = Math.min(qty, Number(stockRow.quantity));
 
@@ -311,7 +331,11 @@ const deductStockForQuote = async (dbClient, quoteId, employeeId, items) => {
           (unit_id, product_id, product_name, quantity_delta, reason, quote_id, adjusted_by)
         VALUES ($1,$2,$3,$4,'sale',$5,$6)
       `, [stockRow.unit_id, pid, pname, -deduct, quoteId, employeeId]);
+
+      deductedCount++;
     }
+
+    console.log(`[unit-stock-deduct] quote ${quoteId}: deducted ${deductedCount}/${items.length} products from region "${region}"`);
   } catch (e) {
     // Best-effort — do not bubble up to fail the quote acceptance
     console.error('[unit-stock-deduct]', e.message);

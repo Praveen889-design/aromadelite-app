@@ -5,6 +5,7 @@
  */
 const express = require('express');
 const pool    = require('../database/db');
+const { deductStockForQuote } = require('./units');
 
 const router = express.Router();
 
@@ -253,6 +254,9 @@ router.post('/:token/order', async (req, res) => {
     ]);
 
     await dbClient.query('COMMIT');
+
+    // Auto-deduct stock from the unit in the associate's region (best-effort, after commit)
+    await deductStockForQuote(dbClient, quote_id, employee_id, items);
 
     res.status(201).json({
       success:      true,
