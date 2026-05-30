@@ -152,21 +152,55 @@ function UnitModal({ open, unit, onClose, onSaved }) {
 }
 
 /* ════════════════════════════════════════════════════════════════
-   DEPLOY STOCK MODAL
+   DEPLOY STOCK MODAL  (with CSV bulk import)
 ════════════════════════════════════════════════════════════════ */
 const EMPTY_ITEM = () => ({ product_name: '', quantity: '', unit_price: '', gst_percent: '18' });
 
+/** Parse a simple CSV string → array of objects keyed by header row */
+function parseCSV(text) {
+  const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n').filter((l) => l.trim());
+  if (lines.length < 2) return { rows: [], errors: ['CSV has no data rows.'] };
+
+  const headers = lines[0].split(',').map((h) => h.trim().toLowerCase().replace(/\s+/g, '_'));
+  const rows    = [];
+  const errors  = [];
+
+  for (let i = 1; i < lines.length; i++) {
+    const cols = lines[i].split(',').map((c) => c.trim().replace(/^"|"$/g, ''));
+    const obj  = {};
+    headers.forEach((h, idx) => { obj[h] = cols[idx] ?? ''; });
+    // Must have a product name and a quantity > 0
+    const name = (obj['product_name'] || '').trim();
+    const qty  = parseFloat(obj['quantity'] || '');
+    if (!name)     { errors.push(`Row ${i}: product_name is empty — skipped`); continue; }
+    if (!(qty > 0)){ errors.push(`Row ${i} (${name}): quantity must be > 0 — skipped`); continue; }
+    rows.push({
+      product_name: name,
+      quantity:     String(qty),
+      unit_price:   obj['unit_price'] ? String(parseFloat(obj['unit_price'])) : '',
+      gst_percent:  obj['gst_percent'] ? String(parseFloat(obj['gst_percent'])) : '18',
+    });
+  }
+  return { rows, errors };
+}
+
 function DeployModal({ open, unit, onClose, onDeployed }) {
-  const { toast } = useToast();
-  const [note, setNote]   = useState('');
-  const [rows, setRows]   = useState([EMPTY_ITEM()]);
-  const [products, setProducts] = useState([]);
-  const [busy, setBusy]   = useState(false);
+  const { toast }  = useToast();
+  const fileRef    = React.useRef(null);
+
+  const [note, setNote]           = useState('');
+  const [rows, setRows]           = useState([EMPTY_ITEM()]);
+  const [products, setProducts]   = useState([]);
+  const [busy, setBusy]           = useState(false);
+  const [csvErrors, setCsvErrors] = useState([]);
+  const [csvMode, setCsvMode]     = useState(false); // true = uploaded via CSV
 
   useEffect(() => {
     if (open) {
       setNote('');
       setRows([EMPTY_ITEM()]);
+      setCsvErrors([]);
+      setCsvMode(false);
       api.get('/api/products?limit=500').then((r) => setProducts(r.data.products || [])).catch(() => {});
     }
   }, [open]);
@@ -178,8 +212,8 @@ function DeployModal({ open, unit, onClose, onDeployed }) {
   const delRow = (i) => setRows((s) => s.filter((_, idx) => idx !== i));
 
   const rowTotal = (r) => {
-    const qty = Number(r.quantity) || 0;
-    const pr  = Number(r.unit_price) || 0;
+    const qty = Number(r.quantity)    || 0;
+    const pr  = Number(r.unit_price)  || 0;
     const g   = Number(r.gst_percent) || 0;
     return qty * pr * (1 + g / 100);
   };
@@ -188,13 +222,67 @@ function DeployModal({ open, unit, onClose, onDeployed }) {
   const inp = { border: '1px solid #e2e8f0', borderRadius: 6, padding: '6px 8px', fontSize: 12,
     width: '100%', boxSizing: 'border-box' };
 
+  /* ── Download CSV template pre-filled with catalog ── */
+  const downloadTemplate = () => {
+    const header = 'product_name,quantity,unit_price,gst_percent';
+    const dataRows = products.length
+      ? products.map((p) =>
+          `"${p.name.replace(/"/g, '""')}","",${p.base_price || ''},${p.gst_percent ?? 18}`
+        )
+      : [`"Sample Product Name","10","100","18"`];
+    const csv = [header, ...dataRows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `stock_template_${unit.name.replace(/\s+/g, '_')}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  /* ── Handle CSV file upload ── */
+  const handleFile = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith('.csv')) {
+      toast('Please upload a .csv file', { kind: 'error' }); return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const { rows: parsed, errors } = parseCSV(ev.target.result);
+      setCsvErrors(errors);
+      if (parsed.length === 0) {
+        toast(errors[0] || 'No valid rows found in CSV.', { kind: 'error' });
+      } else {
+        // Auto-fill unit_price from catalog if blank
+        const enriched = parsed.map((r) => {
+          if (!r.unit_price) {
+            const match = products.find(
+              (p) => p.name.toLowerCase() === r.product_name.toLowerCase()
+            );
+            if (match) return { ...r, unit_price: String(match.base_price || '') };
+          }
+          return r;
+        });
+        setRows(enriched);
+        setCsvMode(true);
+        toast(`${parsed.length} product${parsed.length > 1 ? 's' : ''} loaded from CSV${errors.length ? ` (${errors.length} row${errors.length > 1 ? 's' : ''} skipped)` : ''}.`,
+          { kind: errors.length ? 'warning' : 'success' });
+      }
+    };
+    reader.readAsText(file);
+    // Reset so same file can be re-uploaded
+    e.target.value = '';
+  };
+
+  /* ── Submit ── */
   const save = async () => {
     const items = rows.filter((r) => r.product_name.trim() && Number(r.quantity) > 0 && Number(r.unit_price) > 0);
-    if (!items.length) { toast('Add at least one valid item', { kind: 'error' }); return; }
+    if (!items.length) { toast('Add at least one valid item (name + qty + price)', { kind: 'error' }); return; }
     setBusy(true);
     try {
       const payload = items.map((r) => {
-        const prod = products.find((p) => p.name === r.product_name);
+        const prod = products.find((p) => p.name.toLowerCase() === r.product_name.toLowerCase());
         return {
           product_id:   prod?.id || null,
           product_name: r.product_name,
@@ -204,7 +292,7 @@ function DeployModal({ open, unit, onClose, onDeployed }) {
         };
       });
       await api.post(`/api/units/${unit.id}/deploy`, { note, items: payload });
-      toast(`Stock deployed to ${unit.name}.`, { kind: 'success' });
+      toast(`${items.length} product${items.length > 1 ? 's' : ''} deployed to ${unit.name}.`, { kind: 'success' });
       onDeployed();
       onClose();
     } catch (e) {
@@ -212,77 +300,145 @@ function DeployModal({ open, unit, onClose, onDeployed }) {
     } finally { setBusy(false); }
   };
 
+  const validCount = rows.filter((r) => r.product_name.trim() && Number(r.quantity) > 0 && Number(r.unit_price) > 0).length;
+
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 55, display: 'flex', alignItems: 'flex-start',
       justifyContent: 'center', background: 'rgba(15,23,42,0.5)', padding: '24px 16px', overflowY: 'auto' }}
       onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div style={{ background: '#fff', borderRadius: 16, width: '100%', maxWidth: 860,
-        boxShadow: '0 20px 60px rgba(0,0,0,0.25)' }}>
-        {/* Header */}
+      <div style={{ background: '#fff', borderRadius: 16, width: '100%', maxWidth: 900,
+        boxShadow: '0 20px 60px rgba(0,0,0,0.25)', marginBottom: 24 }}>
+
+        {/* ── Header ── */}
         <div style={{ padding: '14px 20px', borderBottom: '1px solid #f1f5f9',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
-            <div style={{ fontWeight: 700, fontSize: 15 }}>Deploy Stock</div>
+            <div style={{ fontWeight: 700, fontSize: 15 }}>📦 Deploy Stock</div>
             <div style={{ fontSize: 12, color: '#64748b' }}>{unit.name} · {unit.region}</div>
           </div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 22,
             cursor: 'pointer', color: '#94a3b8', lineHeight: 1 }}>×</button>
         </div>
 
-        {/* Note */}
-        <div style={{ padding: '14px 20px 0' }}>
-          <input style={{ ...inp, padding: '8px 12px', fontSize: 13 }}
+        {/* ── Note + CSV toolbar ── */}
+        <div style={{ padding: '14px 20px 0', display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+          <input style={{ ...inp, padding: '8px 12px', fontSize: 13, flex: '1 1 240px' }}
             placeholder="Deployment note (optional, e.g. 'May batch – truck #3')"
             value={note} onChange={(e) => setNote(e.target.value)} />
+
+          {/* CSV actions */}
+          <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+            <button onClick={downloadTemplate}
+              title="Download a pre-filled template with all catalog products"
+              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 14px',
+                fontSize: 12, fontWeight: 600, borderRadius: 8, border: '1px solid #bae6fd',
+                background: '#f0f9ff', color: '#0369a1', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+              ⬇ Download Template
+            </button>
+            <button onClick={() => fileRef.current?.click()}
+              title="Upload a filled CSV to bulk-add rows"
+              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 14px',
+                fontSize: 12, fontWeight: 600, borderRadius: 8, border: '1px solid #bbf7d0',
+                background: '#f0fdf4', color: '#15803d', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+              ⬆ Upload CSV
+            </button>
+            <input ref={fileRef} type="file" accept=".csv" style={{ display: 'none' }}
+              onChange={handleFile} />
+          </div>
         </div>
 
-        {/* Table */}
+        {/* ── CSV parse error notices ── */}
+        {csvErrors.length > 0 && (
+          <div style={{ margin: '10px 20px 0', background: '#fffbeb', border: '1px solid #fcd34d',
+            borderRadius: 8, padding: '8px 12px' }}>
+            <div style={{ fontWeight: 600, fontSize: 11, color: '#92400e', marginBottom: 4 }}>
+              ⚠ {csvErrors.length} row{csvErrors.length > 1 ? 's' : ''} skipped during import:
+            </div>
+            {csvErrors.map((e, i) => (
+              <div key={i} style={{ fontSize: 11, color: '#b45309' }}>• {e}</div>
+            ))}
+          </div>
+        )}
+
+        {/* ── CSV mode banner ── */}
+        {csvMode && (
+          <div style={{ margin: '10px 20px 0', background: '#f0fdf4', border: '1px solid #86efac',
+            borderRadius: 8, padding: '7px 12px', display: 'flex', alignItems: 'center',
+            justifyContent: 'space-between' }}>
+            <span style={{ fontSize: 12, color: '#15803d', fontWeight: 600 }}>
+              ✓ {rows.length} product{rows.length > 1 ? 's' : ''} loaded from CSV — review below, then deploy.
+            </span>
+            <button onClick={() => { setRows([EMPTY_ITEM()]); setCsvMode(false); setCsvErrors([]); }}
+              style={{ fontSize: 11, color: '#64748b', background: 'none', border: 'none',
+                cursor: 'pointer', textDecoration: 'underline' }}>
+              Clear & start over
+            </button>
+          </div>
+        )}
+
+        {/* ── Table ── */}
         <div style={{ padding: 20, overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
             <thead>
               <tr style={{ background: '#f8fafc' }}>
-                {['#', 'Product Name', 'Qty', 'Unit Price (₹)', 'GST %', 'Total', ''].map((h) => (
+                {['#', 'Product Name', 'Qty', 'Unit Price (₹)', 'GST %', 'Total (incl. GST)', ''].map((h) => (
                   <th key={h} style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 600,
                     color: '#475569', fontSize: 11, borderBottom: '1px solid #e2e8f0', whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {rows.map((r, i) => (
-                <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                  <td style={{ padding: '6px 10px', color: '#94a3b8', width: 28 }}>{i + 1}</td>
-                  <td style={{ padding: '6px 6px', minWidth: 180 }}>
-                    <input list={`prod-list-${i}`} style={inp} placeholder="Product name"
-                      value={r.product_name} onChange={(e) => updRow(i, { product_name: e.target.value })} />
-                    <datalist id={`prod-list-${i}`}>
-                      {products.map((p) => <option key={p.id} value={p.name} />)}
-                    </datalist>
-                  </td>
-                  <td style={{ padding: '6px 6px', width: 80 }}>
-                    <input style={inp} type="number" min="0" placeholder="0"
-                      value={r.quantity} onChange={(e) => updRow(i, { quantity: e.target.value })} />
-                  </td>
-                  <td style={{ padding: '6px 6px', width: 110 }}>
-                    <input style={inp} type="number" min="0" placeholder="0.00"
-                      value={r.unit_price} onChange={(e) => updRow(i, { unit_price: e.target.value })} />
-                  </td>
-                  <td style={{ padding: '6px 6px', width: 70 }}>
-                    <input style={inp} type="number" min="0" max="100" placeholder="18"
-                      value={r.gst_percent} onChange={(e) => updRow(i, { gst_percent: e.target.value })} />
-                  </td>
-                  <td style={{ padding: '6px 10px', fontWeight: 600, color: '#0f172a',
-                    textAlign: 'right', whiteSpace: 'nowrap', width: 100 }}>
-                    {rowTotal(r) > 0 ? formatINR(rowTotal(r)) : '—'}
-                  </td>
-                  <td style={{ padding: '6px 6px', width: 32 }}>
-                    {rows.length > 1 && (
-                      <button onClick={() => delRow(i)}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer',
-                          color: '#f43f5e', fontSize: 16, lineHeight: 1, padding: 2 }}>×</button>
-                    )}
-                  </td>
-                </tr>
-              ))}
+              {rows.map((r, i) => {
+                const missingPrice = r.product_name.trim() && Number(r.quantity) > 0 && !Number(r.unit_price);
+                return (
+                  <tr key={i} style={{ borderBottom: '1px solid #f1f5f9',
+                    background: missingPrice ? '#fffbeb' : 'transparent' }}>
+                    <td style={{ padding: '6px 10px', color: '#94a3b8', width: 28 }}>{i + 1}</td>
+                    <td style={{ padding: '6px 6px', minWidth: 200 }}>
+                      <input list={`prod-list-${i}`} style={inp} placeholder="Product name"
+                        value={r.product_name}
+                        onChange={(e) => {
+                          const name = e.target.value;
+                          const prod = products.find((p) => p.name === name);
+                          updRow(i, {
+                            product_name: name,
+                            ...(prod && !r.unit_price ? { unit_price: String(prod.base_price || ''), gst_percent: String(prod.gst_percent ?? 18) } : {}),
+                          });
+                        }} />
+                      <datalist id={`prod-list-${i}`}>
+                        {products.map((p) => <option key={p.id} value={p.name} />)}
+                      </datalist>
+                    </td>
+                    <td style={{ padding: '6px 6px', width: 80 }}>
+                      <input style={{ ...inp, borderColor: (!r.quantity || Number(r.quantity) <= 0) && r.product_name ? '#fca5a5' : '#e2e8f0' }}
+                        type="number" min="0" placeholder="0"
+                        value={r.quantity} onChange={(e) => updRow(i, { quantity: e.target.value })} />
+                    </td>
+                    <td style={{ padding: '6px 6px', width: 120 }}>
+                      <input style={{ ...inp, borderColor: missingPrice ? '#fbbf24' : '#e2e8f0' }}
+                        type="number" min="0" placeholder="0.00"
+                        value={r.unit_price} onChange={(e) => updRow(i, { unit_price: e.target.value })} />
+                    </td>
+                    <td style={{ padding: '6px 6px', width: 70 }}>
+                      <select style={inp} value={r.gst_percent}
+                        onChange={(e) => updRow(i, { gst_percent: e.target.value })}>
+                        {[0, 3, 5, 12, 18, 28].map((g) => <option key={g} value={g}>{g}%</option>)}
+                      </select>
+                    </td>
+                    <td style={{ padding: '6px 10px', fontWeight: 600, color: '#0f172a',
+                      textAlign: 'right', whiteSpace: 'nowrap', width: 110 }}>
+                      {rowTotal(r) > 0 ? formatINR(rowTotal(r)) : '—'}
+                    </td>
+                    <td style={{ padding: '6px 6px', width: 32 }}>
+                      {rows.length > 1 && (
+                        <button onClick={() => delRow(i)}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer',
+                            color: '#f43f5e', fontSize: 16, lineHeight: 1, padding: 2 }}>×</button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
           <button onClick={addRow}
@@ -292,22 +448,27 @@ function DeployModal({ open, unit, onClose, onDeployed }) {
           </button>
         </div>
 
-        {/* Footer */}
+        {/* ── Footer ── */}
         <div style={{ padding: '12px 20px', borderTop: '1px solid #f1f5f9',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ fontSize: 14 }}>
-            Grand Total: <strong style={{ color: '#0891b2', fontSize: 16 }}>{formatINR(grandTotal)}</strong>
-            <span style={{ color: '#94a3b8', fontSize: 11, marginLeft: 6 }}>(incl. GST)</span>
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+          <div style={{ fontSize: 13 }}>
+            <strong style={{ color: '#0891b2', fontSize: 16 }}>{formatINR(grandTotal)}</strong>
+            <span style={{ color: '#94a3b8', fontSize: 11, marginLeft: 6 }}>grand total (incl. GST)</span>
+            {validCount > 0 && (
+              <span style={{ marginLeft: 10, fontSize: 11, color: '#64748b' }}>
+                · {validCount} product{validCount > 1 ? 's' : ''} ready
+              </span>
+            )}
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={onClose}
               style={{ padding: '8px 18px', fontSize: 13, borderRadius: 8, border: '1px solid #cbd5e1',
                 background: '#fff', cursor: 'pointer', color: '#475569' }}>Cancel</button>
-            <button onClick={save} disabled={busy}
+            <button onClick={save} disabled={busy || validCount === 0}
               style={{ padding: '8px 22px', fontSize: 13, borderRadius: 8, border: 'none',
-                background: busy ? '#94a3b8' : '#16a34a', color: '#fff', fontWeight: 700,
-                cursor: busy ? 'default' : 'pointer' }}>
-              {busy ? 'Deploying…' : '✓ Deploy Stock'}
+                background: busy || validCount === 0 ? '#94a3b8' : '#16a34a', color: '#fff', fontWeight: 700,
+                cursor: busy || validCount === 0 ? 'default' : 'pointer' }}>
+              {busy ? 'Deploying…' : `✓ Deploy ${validCount > 0 ? validCount + ' Products' : 'Stock'}`}
             </button>
           </div>
         </div>
