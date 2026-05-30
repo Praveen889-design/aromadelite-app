@@ -50,9 +50,7 @@ export default function ProductCard({ product, inCart, onAdd, stockQty = null })
   // stockQty: null = no stock tracking for this region
   //           0    = out of stock
   //           n>0  = n units available
-  // Always allow adding — stock badge is informational only
-  const hasStock    = true;
-  const stockLabel  = stockQty === null  ? null
+  const stockLabel  =stockQty === null  ? null
                     : stockQty === 0     ? 'No Stock'
                     : stockQty <= 10     ? `Low: ${stockQty} left`
                     : `In Stock: ${stockQty}`;
