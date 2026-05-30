@@ -488,7 +488,7 @@ function ProductRow({ product, qty, onQtyChange, gst_mode, isNegotiated }) {
           <span style={{ fontWeight: 800, fontSize: 14, color: isNegotiated ? '#059669' : '#0f766e' }}>
             ₹{new Intl.NumberFormat('en-IN').format(price)}
           </span>
-          <span style={{ fontSize: 10, color: '#94a3b8' }}>/ {product.unit || 'Nos'}</span>
+          <span style={{ fontSize: 10, color: '#94a3b8' }}>/ {product.pack_size || product.unit || 'Nos'}</span>
           {isNegotiated && (
             <span style={{ fontSize: 9, fontWeight: 700, background: '#dcfce7', color: '#15803d', padding: '1px 6px', borderRadius: 99 }}>
               YOUR PRICE
