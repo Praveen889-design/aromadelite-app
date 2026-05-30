@@ -46,18 +46,18 @@ export default function NewQuote() {
     let cancelled = false;
     (async () => {
       try {
-        // Use user's region; admins with no region get all-units aggregate
-        const region = user?.region || 'ALL';
+        // Only fetch stock for regional employees (not admins)
+        const region = user?.region;
         const requests = [
           api.get('/api/products'),
           api.get('/api/products/categories'),
-          api.get(`/api/units/region-stock?region=${encodeURIComponent(region)}`),
+          region ? api.get(`/api/units/region-stock?region=${encodeURIComponent(region)}`) : Promise.resolve(null),
         ];
         const [pRes, cRes, sRes] = await Promise.all(requests);
         if (cancelled) return;
         setProducts(pRes.data.products || []);
         setCategories((cRes.data.categories || []).filter(c => Number(c.product_count) > 0));
-        // Build dual-key lookup: product_id → qty AND lowercase name → qty
+        // Build dual-key lookup only for regional employees
         if (sRes?.data?.stock) {
           const map = {};
           for (const s of sRes.data.stock) {
