@@ -111,15 +111,16 @@ export default function ClientPortal() {
       // Find matching catalog product for fresh price
       const prod = catalog.find(p => p.id === it.product_id);
       return {
-        product_id:  it.product_id,
-        name:        it.product_name || it.name,
-        unit_price:  (prod?.negotiated_price ?? prod?.display_price ?? Number(it.unit_price)) || 0,
-        gst_percent: (prod?.gst_percent ?? Number(it.gst_percent)) || 0,
-        unit:        it.unit || 'Nos',
-        hsn_code:    it.hsn_code || prod?.hsn_code || '',
+        product_id:   it.product_id,
+        name:         it.product_name || it.name,
+        description:  prod?.description || it.description || null,
+        unit_price:   (prod?.negotiated_price ?? prod?.display_price ?? Number(it.unit_price)) || 0,
+        gst_percent:  (prod?.gst_percent ?? Number(it.gst_percent)) || 0,
+        unit:         it.unit || 'Nos',
+        hsn_code:     it.hsn_code || prod?.hsn_code || '',
         category_name: it.category_name || prod?.category_name || '',
-        variant:     it.variant || '',
-        pack_size:   it.pack_size || '',
+        variant:      it.variant || '',
+        pack_size:    it.pack_size || '',
       };
     });
   }, [past_orders, catalog]);
@@ -508,6 +509,11 @@ function ProductRow({ product, qty, onQtyChange, gst_mode, isNegotiated }) {
           {product.name}
           {product.variant && <span style={{ fontWeight: 400, color: '#64748b' }}> · {product.variant}</span>}
         </div>
+        {product.description && (
+          <div style={{ fontSize: 11, color: '#64748b', marginTop: 2, lineHeight: 1.4 }}>
+            {product.description}
+          </div>
+        )}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3, flexWrap: 'wrap' }}>
           <span style={{ fontWeight: 800, fontSize: 14, color: isNegotiated ? '#059669' : '#0f766e' }}>
             ₹{new Intl.NumberFormat('en-IN').format(displayPrice)}
