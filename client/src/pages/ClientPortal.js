@@ -400,15 +400,12 @@ export default function ClientPortal() {
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {grp.items.map(p => {
-                    // Use first pack size if available; calculate pack-level base price.
-                    // IMPORTANT: negotiated_price is already pack-level (stored from past order),
-                    // so only run calcPackPrice against raw base_price when no negotiated price exists.
+                    // Full Catalog always shows current system price — never stale past-quote prices.
+                    // base_price is per-unit (per ltr/kg); calcPackPrice converts to pack level.
                     const firstSize     = p.pack_sizes?.[0]?.size || null;
-                    const packBasePrice = p.negotiated_price
-                      ? p.negotiated_price   // already the agreed pack price — don't multiply again
-                      : firstSize
-                        ? calcPackPrice(firstSize, p.base_price, p.unit)
-                        : (p.base_price || 0);
+                    const packBasePrice = firstSize
+                      ? calcPackPrice(firstSize, p.base_price, p.unit)
+                      : (p.base_price || 0);
                     const enriched = { ...p, unit_price: packBasePrice, pack_size: firstSize };
                     const qty = getQty(p);
                     return (
@@ -418,7 +415,7 @@ export default function ClientPortal() {
                         qty={qty}
                         onQtyChange={(q) => setQty(enriched, q)}
                         gst_mode={gst_mode}
-                        isNegotiated={!!p.negotiated_price}
+                        isNegotiated={false}
                       />
                     );
                   })}
