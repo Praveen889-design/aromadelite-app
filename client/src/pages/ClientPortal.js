@@ -152,10 +152,10 @@ export default function ClientPortal() {
   const getQty = (p, variant = '', pack_size = '') => cart[cartKey(p, variant, pack_size)]?.qty || 0;
 
   const cartItems = Object.values(cart);
+  // Cart total always includes GST — portal always shows what client will pay
   const cartTotal = cartItems.reduce((s, it) => {
-    const base       = it.qty * it.unit_price;
-    const gstFactor  = gst_mode === 'without_gst' ? 1 : (1 + (it.gst_percent || 0) / 100);
-    return s + Math.round(base * gstFactor);
+    const gstFactor = 1 + (it.gst_percent || 0) / 100;
+    return s + Math.round(it.qty * it.unit_price * gstFactor);
   }, 0);
   const cartCount = cartItems.reduce((s, it) => s + it.qty, 0);
 
@@ -488,8 +488,8 @@ export default function ClientPortal() {
 /* ── Product Row Component ── */
 function ProductRow({ product, qty, onQtyChange, gst_mode, isNegotiated }) {
   const basePrice  = product.unit_price ?? product.display_price ?? product.negotiated_price ?? 0;
-  const gstFactor  = gst_mode === 'without_gst' ? 1 : (1 + (product.gst_percent || 0) / 100);
-  // Show GST-inclusive price to client
+  // Always show GST-inclusive price — gst_mode only affects quote PDF format, not what client pays
+  const gstFactor    = 1 + (product.gst_percent || 0) / 100;
   const displayPrice = Math.round(basePrice * gstFactor);
   const lineTotal    = qty > 0 ? qty * displayPrice : 0;
   const unitLabel    = product.pack_size || product.unit || 'Nos';
