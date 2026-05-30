@@ -496,6 +496,9 @@ router.patch('/:id/status', async (req, res) => {
         'UPDATE quotes SET status = $1, order_delivered_at = NOW() WHERE id = $2',
         [status, req.params.id]
       );
+      // Deduct stock from the unit when order is marked delivered
+      const quoteItems = parseJSON(rows[0].items, []);
+      await deductStockForQuote(client, Number(req.params.id), rows[0].employee_id, quoteItems);
     } else {
       await client.query('UPDATE quotes SET status = $1 WHERE id = $2', [status, req.params.id]);
     }
@@ -505,9 +508,6 @@ router.patch('/:id/status', async (req, res) => {
         "UPDATE leads SET status = 'converted', updated_at = NOW() WHERE quote_id = $1",
         [req.params.id]
       );
-      // Auto-deduct stock from the unit in this associate's region (best-effort)
-      const quoteItems = parseJSON(rows[0].items, []);
-      await deductStockForQuote(client, Number(req.params.id), rows[0].employee_id, quoteItems);
     } else if (status === 'rejected') {
       await client.query(
         "UPDATE leads SET status = 'lost', updated_at = NOW() WHERE quote_id = $1",
