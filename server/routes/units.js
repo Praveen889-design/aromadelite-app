@@ -103,23 +103,39 @@ router.delete('/:id', async (req, res) => {
 router.get('/region-stock', async (req, res) => {
   try {
     const region = (req.query.region || '').trim();
-    if (!region) return res.status(400).json({ error: 'region query param required' });
 
-    const { rows } = await pool.query(`
-      SELECT
-        s.product_id,
-        s.product_name,
-        SUM(s.quantity)::numeric AS available_qty
-      FROM unit_stock s
-      JOIN units u ON u.id = s.unit_id
-      WHERE u.region = $1
-        AND u.is_active = true
-        AND s.quantity > 0
-      GROUP BY s.product_id, s.product_name
-      ORDER BY s.product_name
-    `, [region]);
+    // If region is omitted or 'ALL', aggregate across every active unit
+    let rows;
+    if (!region || region === 'ALL') {
+      ({ rows } = await pool.query(`
+        SELECT
+          s.product_id,
+          s.product_name,
+          SUM(s.quantity)::numeric AS available_qty
+        FROM unit_stock s
+        JOIN units u ON u.id = s.unit_id
+        WHERE u.is_active = true
+          AND s.quantity > 0
+        GROUP BY s.product_id, s.product_name
+        ORDER BY s.product_name
+      `));
+    } else {
+      ({ rows } = await pool.query(`
+        SELECT
+          s.product_id,
+          s.product_name,
+          SUM(s.quantity)::numeric AS available_qty
+        FROM unit_stock s
+        JOIN units u ON u.id = s.unit_id
+        WHERE u.region = $1
+          AND u.is_active = true
+          AND s.quantity > 0
+        GROUP BY s.product_id, s.product_name
+        ORDER BY s.product_name
+      `, [region]));
+    }
 
-    res.json({ region, stock: rows });
+    res.json({ region: region || 'ALL', stock: rows });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

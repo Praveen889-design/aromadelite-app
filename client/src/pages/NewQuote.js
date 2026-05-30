@@ -46,11 +46,12 @@ export default function NewQuote() {
     let cancelled = false;
     (async () => {
       try {
-        const region = user?.region;
+        // Use user's region; admins with no region get all-units aggregate
+        const region = user?.region || 'ALL';
         const requests = [
           api.get('/api/products'),
           api.get('/api/products/categories'),
-          region ? api.get(`/api/units/region-stock?region=${encodeURIComponent(region)}`) : Promise.resolve(null),
+          api.get(`/api/units/region-stock?region=${encodeURIComponent(region)}`),
         ];
         const [pRes, cRes, sRes] = await Promise.all(requests);
         if (cancelled) return;
@@ -73,7 +74,8 @@ export default function NewQuote() {
       }
     })();
     return () => { cancelled = true; };
-  }, [user?.region]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const cartKeys = useMemo(() => {
     const s = new Set();
