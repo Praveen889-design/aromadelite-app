@@ -50,7 +50,8 @@ export default function ProductCard({ product, inCart, onAdd, stockQty = null })
   // stockQty: null = no stock tracking for this region
   //           0    = out of stock
   //           n>0  = n units available
-  const hasStock    = stockQty === null || stockQty > 0;
+  // Always allow adding — stock badge is informational only
+  const hasStock    = true;
   const stockLabel  = stockQty === null  ? null
                     : stockQty === 0     ? 'No Stock'
                     : stockQty <= 10     ? `Low: ${stockQty} left`
@@ -110,12 +111,7 @@ export default function ProductCard({ product, inCart, onAdd, stockQty = null })
   };
 
   return (
-    <div className={[
-      'border rounded-xl p-4 transition-shadow flex flex-col',
-      stockQty === 0
-        ? 'bg-slate-50 border-slate-200 opacity-75'
-        : 'bg-white border-slate-200 hover:shadow-md',
-    ].join(' ')}>
+    <div className="border rounded-xl p-4 transition-shadow flex flex-col bg-white border-slate-200 hover:shadow-md">
       <div className="flex items-start gap-2">
         <span className="text-xl leading-none">{product.category_icon}</span>
         <div className="flex-1 min-w-0">
@@ -198,17 +194,15 @@ export default function ProductCard({ product, inCart, onAdd, stockQty = null })
       </div>
 
       <button type="button"
-        onClick={hasStock ? onClickAdd : undefined}
+        onClick={onClickAdd}
         className={[
-          'mt-3 w-full text-sm font-semibold rounded-lg py-2 transition-colors',
+          'mt-3 w-full text-sm font-semibold rounded-lg py-2 transition-colors cursor-pointer',
           alreadyAdded
             ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-            : !hasStock
-              ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
-              : 'bg-cyan-600 hover:bg-cyan-700 text-white cursor-pointer',
+            : 'bg-cyan-600 hover:bg-cyan-700 text-white',
         ].join(' ')}
       >
-        {alreadyAdded ? '✓ Added' : !hasStock ? '✕ No Stock' : 'Add to Quote'}
+        {alreadyAdded ? '✓ Added' : 'Add to Quote'}
       </button>
     </div>
   );
