@@ -102,9 +102,29 @@ router.get('/summary', async (req, res) => {
   }
 });
 
+/**
+ * Pack-size multiplier: same logic as client-side calcPackPrice.
+ * Converts per-unit manufacturing cost → per-pack cost so COGS is accurate.
+ * e.g. pack_size="5 Ltr", mfgCost=₹10/ltr, unit="ltr" → ₹50 per pack
+ */
+const calcPackCost = (packSize, costPerUnit, productUnit) => {
+  const cost = Number(costPerUnit) || 0;
+  const lbl  = (packSize     || '').toLowerCase().trim();
+  const u    = (productUnit  || '').toLowerCase().trim();
+
+  if ((u === 'ltr' || u === 'litre' || u === 'l') && /ltr|litre/i.test(lbl)) {
+    const n = parseFloat(lbl); if (n > 0) return n * cost;
+  }
+  if (u === 'kg') {
+    if (/\bkg\b/i.test(lbl))            { const n = parseFloat(lbl); if (n > 0) return n * cost; }
+    if (/gms?\b|grams?\b/i.test(lbl))   { const n = parseFloat(lbl); if (n > 0) return (n / 1000) * cost; }
+  }
+  return cost; // fallback: treat cost as per-item already
+};
+
 // P&L breakdown — sourced from actual BILLS (invoiced revenue)
 // Revenue = qty × unit_price × (1 + gst%) from bill line items (matches total billed amount)
-// COGS    = qty × manufacturing_cost from product catalog
+// COGS    = qty × calcPackCost(pack_size, manufacturing_cost/unit, product_unit)
 router.get('/pnl', async (req, res) => {
   try {
     const { from, to } = req.query;
@@ -147,7 +167,7 @@ router.get('/pnl', async (req, res) => {
       const ids = [...productIdSet];
       const ph  = ids.map((_, i) => `$${vals.length + i + 1}`).join(',');
       const prodRes = await pool.query(`
-        SELECT p.id, p.name AS product_name, p.manufacturing_cost,
+        SELECT p.id, p.name AS product_name, p.manufacturing_cost, p.unit,
                c.name AS category_name
         FROM products p JOIN product_categories c ON c.id = p.category_id
         WHERE p.id IN (${ph})
@@ -174,11 +194,15 @@ router.get('/pnl', async (req, res) => {
         const qty    = Number(it.quantity)   || 0;
         const price  = Number(it.unit_price) || 0;
         const gstPct = Number(it.gst_percent) || 0;
-        const prod   = productMap[it.product_id] || {};
-        const mfg    = Number(prod.manufacturing_cost) || 0;
+        const prod      = productMap[it.product_id] || {};
+        const mfgPerUnit = Number(prod.manufacturing_cost) || 0;
+        // Apply pack-size multiplier so COGS reflects actual material used
+        // e.g. 2 packs × 5 Ltr @ ₹10/ltr = ₹100 COGS, not ₹20
+        const packSize  = it.pack_size || it.unit || '';
+        const mfgPerPack = calcPackCost(packSize, mfgPerUnit, prod.unit || '');
         // Revenue = GST-inclusive line amount (matches what's actually billed)
         const gstFactor = bill.gst_mode === 'without_gst' ? 1 : (1 + gstPct / 100);
-        const delta  = { revenue: qty * price * gstFactor, cogs: qty * mfg };
+        const delta  = { revenue: qty * price * gstFactor, cogs: qty * mfgPerPack };
 
         const cat   = prod.category_name || it.category_name || 'Uncategorized';
         const pname = prod.product_name  || it.product_name  || `Product #${it.product_id}`;
