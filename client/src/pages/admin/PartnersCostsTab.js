@@ -553,16 +553,19 @@ export default function PartnersCostsTab() {
           {/* KPI cards */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(180px,1fr))', gap: 12 }}>
             {[
-              { label: 'Total Revenue',  value: fmt(summary.revenue),     bg: '#f0fdf4', color: '#16a34a', icon: '📈' },
-              { label: 'Cash Collected', value: fmt(summary.collected),   bg: '#eff6ff', color: '#2563eb', icon: '💵' },
-              { label: 'Total Costs',    value: fmt(summary.total_costs), bg: '#fff1f2', color: '#dc2626', icon: '💸' },
-              { label: 'Net Profit',     value: fmt(summary.net_profit),  bg: summary.net_profit >= 0 ? '#f0fdf4' : '#fff1f2',
+              { label: 'Total Revenue',    value: fmt(summary.revenue),     bg: '#f0fdf4', color: '#16a34a', icon: '📈' },
+              { label: 'Cash Collected',   value: fmt(summary.collected),   bg: '#eff6ff', color: '#2563eb', icon: '💵' },
+              { label: 'Operating Costs',  value: fmt(summary.total_costs), bg: '#fff1f2', color: '#dc2626', icon: '💸' },
+              { label: 'Net Profit',       value: fmt(summary.net_profit),
+                subtitle: 'Revenue − Costs',
+                bg: summary.net_profit >= 0 ? '#f0fdf4' : '#fff1f2',
                 color: summary.net_profit >= 0 ? '#16a34a' : '#dc2626', icon: summary.net_profit >= 0 ? '✅' : '⚠️' },
             ].map(k => (
               <div key={k.label} style={{ background: k.bg, borderRadius: 12, padding: '14px 16px' }}>
                 <div style={{ fontSize: 20, marginBottom: 6 }}>{k.icon}</div>
                 <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600, marginBottom: 3 }}>{k.label}</div>
                 <div style={{ fontSize: 18, fontWeight: 800, color: k.color }}>{k.value}</div>
+                {k.subtitle && <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 2 }}>{k.subtitle}</div>}
               </div>
             ))}
           </div>

@@ -58,7 +58,9 @@ router.get('/summary', async (req, res) => {
 
     const revenue   = parseFloat(revenueRes.rows[0].revenue)   || 0;
     const collected = parseFloat(revenueRes.rows[0].collected) || 0;
-    const netProfit = collected - totalCosts;
+    // Net profit = revenue billed this month minus all operating costs
+    // (Not cash-collected, since bills may not be marked paid yet)
+    const netProfit = revenue - totalCosts;
 
     // Partner profit split
     const partners = partnersRes.rows;
