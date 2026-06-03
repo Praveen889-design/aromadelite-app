@@ -129,7 +129,7 @@ router.get('/', async (req, res) => {
 
     const { rows } = await pool.query(`
       SELECT
-        LOWER(TRIM(COALESCE(q.client_phone,'')))        AS phone_key,
+        LOWER(TRIM(COALESCE(q.client_phone,'')))         AS phone_key,
         LOWER(TRIM(COALESCE(q.client_business_name,''))) AS biz_key,
         MAX(q.client_name)            AS contact_name,
         MAX(q.client_business_name)   AS business_name,
@@ -141,18 +141,33 @@ router.get('/', async (req, res) => {
         COALESCE(SUM(q.total_amount), 0) AS total_quoted,
         MAX(q.created_at)             AS last_quote_at,
         MIN(q.created_at)             AS first_quote_at,
-        COUNT(DISTINCT b.id)          AS bill_count,
-        COALESCE(SUM(b.total_amount), 0)  AS total_billed,
-        COALESCE(SUM(CASE WHEN b.payment_status = 'completed' THEN b.total_amount ELSE b.amount_paid END), 0) AS total_paid,
-        COUNT(DISTINCT CASE WHEN b.payment_status='completed' THEN b.id END) AS paid_bills,
-        COUNT(DISTINCT CASE WHEN b.payment_status='partial'   THEN b.id END) AS partial_bills,
-        COUNT(DISTINCT CASE WHEN b.payment_status='pending'   THEN b.id END) AS pending_bills,
+        -- Bill totals come from a pre-aggregated subquery so multiple quotes
+        -- don't multiply bill amounts (fan-out bug fix)
+        COALESCE(MAX(bs.bill_count),   0) AS bill_count,
+        COALESCE(MAX(bs.total_billed), 0) AS total_billed,
+        COALESCE(MAX(bs.total_paid),   0) AS total_paid,
+        COALESCE(MAX(bs.paid_bills),   0) AS paid_bills,
+        COALESCE(MAX(bs.partial_bills),0) AS partial_bills,
+        COALESCE(MAX(bs.pending_bills),0) AS pending_bills,
         c.id                          AS client_id,
         c.notes                       AS client_notes,
         c.portal_token                AS portal_token
       FROM quotes q
-      LEFT JOIN bills b ON b.client_phone = q.client_phone
-        AND LOWER(TRIM(COALESCE(b.client_business_name,''))) = LOWER(TRIM(COALESCE(q.client_business_name,'')))
+      -- Pre-aggregate bills per client to avoid fan-out when client has multiple quotes
+      LEFT JOIN (
+        SELECT
+          LOWER(TRIM(COALESCE(client_phone,'')))         AS bphone,
+          LOWER(TRIM(COALESCE(client_business_name,''))) AS bbiz,
+          COUNT(*)           AS bill_count,
+          SUM(total_amount)  AS total_billed,
+          SUM(CASE WHEN payment_status='completed' THEN total_amount ELSE amount_paid END) AS total_paid,
+          COUNT(CASE WHEN payment_status='completed' THEN 1 END) AS paid_bills,
+          COUNT(CASE WHEN payment_status='partial'   THEN 1 END) AS partial_bills,
+          COUNT(CASE WHEN payment_status='pending'   THEN 1 END) AS pending_bills
+        FROM bills
+        GROUP BY bphone, bbiz
+      ) bs ON bs.bphone = LOWER(TRIM(COALESCE(q.client_phone,'')))
+           AND bs.bbiz   = LOWER(TRIM(COALESCE(q.client_business_name,'')))
       LEFT JOIN clients c ON
         LOWER(TRIM(COALESCE(c.phone,''))) = LOWER(TRIM(COALESCE(q.client_phone,'')))
         AND LOWER(TRIM(COALESCE(c.business_name,''))) = LOWER(TRIM(COALESCE(q.client_business_name,'')))
