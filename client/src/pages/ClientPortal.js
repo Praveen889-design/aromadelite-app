@@ -140,7 +140,7 @@ export default function ClientPortal() {
           name:        p.name,
           unit_price:  p.unit_price ?? p.display_price ?? p.negotiated_price ?? 0,
           gst_percent: p.gst_percent || 0,
-          unit:        p.unit || 'Nos',
+          unit:        pack_size || p.unit || 'Nos',
           hsn_code:    p.hsn_code || '',
           category_name: p.category_name || '',
           variant,

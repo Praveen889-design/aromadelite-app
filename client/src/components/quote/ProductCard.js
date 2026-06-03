@@ -93,6 +93,11 @@ export default function ProductCard({ product, inCart, onAdd, stockQty = null })
     : (product.base_price || 0);
 
   const onClickAdd = () => {
+    // Unit shown on quote: pack size label if a non-base pack is selected (e.g. "5 Ltr"),
+    // otherwise the product's base unit (e.g. "Ltr", "Kg", "Nos")
+    const packSize = selectedSize?.isBase ? '' : (selectedSize?.size || '');
+    const unit     = packSize || product.unit || 'Nos';
+
     onAdd({
       product_id:    product.id,
       product_name:  product.name,
@@ -100,7 +105,8 @@ export default function ProductCard({ product, inCart, onAdd, stockQty = null })
       category_id:   product.category_id,
       category_name: product.category_name,
       variant:       variant || null,
-      pack_size:     selectedSize?.isBase ? '' : (selectedSize?.size || ''),
+      pack_size:     packSize,
+      unit,
       quantity:      Math.max(1, Number(qty) || 1),
       unit_price:    effectivePrice,
       gst_percent:   product.gst_percent,
