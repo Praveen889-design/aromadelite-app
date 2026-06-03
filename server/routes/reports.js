@@ -102,47 +102,50 @@ router.get('/summary', async (req, res) => {
   }
 });
 
-// P&L breakdown — converted leads only
+// P&L breakdown — sourced from actual BILLS (invoiced revenue)
+// Revenue = qty × unit_price × (1 + gst%) from bill line items (matches total billed amount)
+// COGS    = qty × manufacturing_cost from product catalog
 router.get('/pnl', async (req, res) => {
   try {
     const { from, to } = req.query;
     const vals = [];
     const $v = (v) => { vals.push(v); return `$${vals.length}`; };
-    const where = [`l.status = 'converted'`, `l.quote_id IS NOT NULL`];
-    if (from) where.push(`l.created_at::date >= ${$v(from)}::date`);
-    if (to)   where.push(`l.created_at::date <= ${$v(to)}::date`);
+    const where = [`b.status != 'cancelled'`];
+    if (from) where.push(`b.created_at::date >= ${$v(from)}::date`);
+    if (to)   where.push(`b.created_at::date <= ${$v(to)}::date`);
     const whereSql = 'WHERE ' + where.join(' AND ');
 
-    // Fetch converted leads with quote items + associate + city
-    const leadsRes = await pool.query(`
-      SELECT l.id, e.name AS associate_name,
-             q.client_city, q.items
-      FROM leads l
-      JOIN employees e ON e.id = l.employee_id
-      JOIN quotes q ON q.id = l.quote_id
+    // Fetch all non-cancelled bills with their items + associate + city
+    const billsRes = await pool.query(`
+      SELECT b.id,
+             COALESCE(e.name, 'Unknown') AS associate_name,
+             COALESCE(b.client_city, q.client_city, '')  AS client_city,
+             b.items,
+             b.gst_mode
+      FROM bills b
+      LEFT JOIN employees e ON e.id = b.employee_id
+      LEFT JOIN quotes    q ON q.id = b.quote_id
       ${whereSql}
     `, vals);
 
-    if (!leadsRes.rows.length) {
+    if (!billsRes.rows.length) {
       return res.json({ by_category: [], by_product: [], by_associate: [], by_city: [] });
     }
 
-    // Collect all product ids
+    // Collect all product ids for COGS lookup
     const productIdSet = new Set();
-    const parsedLeads = leadsRes.rows.map((row) => {
-      let items = [];
-      try { items = JSON.parse(row.items) || []; } catch {/* */}
-      if (Array.isArray(items)) {
-        for (const it of items) if (it.product_id) productIdSet.add(it.product_id);
-      }
-      return { ...row, items: Array.isArray(items) ? items : [] };
+    const parsedBills = billsRes.rows.map((row) => {
+      // bills.items is JSONB — already parsed by pg driver
+      const items = Array.isArray(row.items) ? row.items : [];
+      for (const it of items) if (it.product_id) productIdSet.add(it.product_id);
+      return { ...row, items };
     });
 
     // Fetch product details: name, category, manufacturing_cost
     let productMap = {};
     if (productIdSet.size) {
       const ids = [...productIdSet];
-      const ph = ids.map((_, i) => `$${vals.length + i + 1}`).join(',');
+      const ph  = ids.map((_, i) => `$${vals.length + i + 1}`).join(',');
       const prodRes = await pool.query(`
         SELECT p.id, p.name AS product_name, p.manufacturing_cost,
                c.name AS category_name
@@ -153,36 +156,37 @@ router.get('/pnl', async (req, res) => {
     }
 
     // Aggregate P&L
-    const catAgg      = new Map(); // key: category name
-    const prodAgg     = new Map(); // key: product name → stores category too
-    const assocAgg    = new Map();
-    const cityAgg     = new Map();
+    const catAgg   = new Map();
+    const prodAgg  = new Map();
+    const assocAgg = new Map();
+    const cityAgg  = new Map();
 
     const upsert = (map, key, delta, extra = {}) => {
       const cur = map.get(key) || { revenue: 0, cogs: 0, ...extra };
       cur.revenue += delta.revenue;
       cur.cogs    += delta.cogs;
-      Object.assign(cur, extra); // keep latest meta
+      Object.assign(cur, extra);
       map.set(key, cur);
     };
 
-    for (const lead of parsedLeads) {
-      for (const it of lead.items) {
-        const qty   = Number(it.quantity) || 0;
-        const price = Number(it.unit_price) || 0;
-        const prod  = productMap[it.product_id] || {};
-        const mfg   = Number(prod.manufacturing_cost) || 0;
-        const delta = { revenue: qty * price, cogs: qty * mfg };
+    for (const bill of parsedBills) {
+      for (const it of bill.items) {
+        const qty    = Number(it.quantity)   || 0;
+        const price  = Number(it.unit_price) || 0;
+        const gstPct = Number(it.gst_percent) || 0;
+        const prod   = productMap[it.product_id] || {};
+        const mfg    = Number(prod.manufacturing_cost) || 0;
+        // Revenue = GST-inclusive line amount (matches what's actually billed)
+        const gstFactor = bill.gst_mode === 'without_gst' ? 1 : (1 + gstPct / 100);
+        const delta  = { revenue: qty * price * gstFactor, cogs: qty * mfg };
 
-        const cat   = prod.category_name || 'Uncategorized';
-        const pname = prod.product_name || it.product_name || `Product #${it.product_id}`;
-        const city  = lead.client_city || 'Unknown';
-        const assoc = lead.associate_name || 'Unknown';
+        const cat   = prod.category_name || it.category_name || 'Uncategorized';
+        const pname = prod.product_name  || it.product_name  || `Product #${it.product_id}`;
 
         upsert(catAgg,   cat,   delta);
         upsert(prodAgg,  pname, delta, { category: cat });
-        upsert(assocAgg, assoc, delta);
-        upsert(cityAgg,  city,  delta);
+        upsert(assocAgg, bill.associate_name, delta);
+        upsert(cityAgg,  bill.client_city || 'Unknown', delta);
       }
     }
 

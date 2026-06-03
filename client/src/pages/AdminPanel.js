@@ -948,7 +948,7 @@ const PnlDashboard = ({ pnl }) => {
             background: '#dcfce7', color: '#15803d', fontWeight: 700, fontSize: 10,
             padding: '3px 10px', borderRadius: 20, letterSpacing: '.06em', textTransform: 'uppercase',
             border: '1px solid #86efac',
-          }}>Converted Leads Only</span>
+          }}>Actual Billed Revenue</span>
         </div>
         <button
           onClick={() => exportPnlCsv(pnl)}
