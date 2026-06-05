@@ -51,14 +51,16 @@ function PageHeader({ categoryName, categoryIcon }) {
       padding: '14px 24px',
       marginBottom: 0,
     }}>
-      {/* Logo */}
-      <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10, width: 180 }}>
-        <img
-          src="/aromadelite-logo.png"
-          alt="Aromadelite"
-          style={{ height: 48, objectFit: 'contain', filter: 'brightness(0) invert(1)' }}
-          onError={e => { e.target.style.display='none'; }}
-        />
+      {/* Logo — white-background pill so it's visible on blue header */}
+      <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', width: 180 }}>
+        <div style={{ background: '#fff', borderRadius: 8, padding: '4px 10px', display: 'inline-flex', alignItems: 'center' }}>
+          <img
+            src="/aromadelite-logo.png"
+            alt="Aromadelite"
+            style={{ height: 40, objectFit: 'contain' }}
+            onError={e => { e.target.parentElement.innerHTML = '<span style="font-weight:900;color:#1565C0;font-size:13px;letter-spacing:-0.02em">aromadelite</span>'; }}
+          />
+        </div>
       </div>
 
       {/* Centred title */}
@@ -211,7 +213,7 @@ export default function CatalogPage() {
   if (loading) return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: B.blueLight }}>
       <div style={{ textAlign: 'center' }}>
-        <img src="/aromadelite-logo.png" alt="Aromadelite" style={{ height: 64, objectFit: 'contain' }} onError={e => { e.target.style.display='none'; }} />
+        <img src="/aromadelite-logo.png" alt="Aromadelite" style={{ height: 64, objectFit: 'contain', display: 'block', margin: '0 auto' }} onError={e => { e.target.style.display='none'; }} />
         <div style={{ marginTop: 16, color: B.blue, fontWeight: 700, fontSize: 15 }}>Loading catalog…</div>
       </div>
     </div>
@@ -233,7 +235,9 @@ export default function CatalogPage() {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <img src="/aromadelite-logo.png" alt="Aromadelite" style={{ height: 40, objectFit: 'contain', filter: 'brightness(0) invert(1)' }} onError={e => { e.target.style.display='none'; }} />
+          <div style={{ background: '#fff', borderRadius: 7, padding: '3px 8px' }}>
+            <img src="/aromadelite-logo.png" alt="Aromadelite" style={{ height: 34, objectFit: 'contain', display: 'block' }} onError={e => { e.target.style.display='none'; }} />
+          </div>
           <div>
             <div style={{ fontWeight: 900, fontSize: 16, color: B.white }}>Product Catalogue</div>
             <div style={{ fontSize: 11, color: '#90CAF9' }}>{filtered.reduce((s, c) => s + c.products.length, 0)} products · {filtered.length} categories</div>
@@ -287,6 +291,7 @@ export default function CatalogPage() {
               boxShadow: '0 2px 16px rgba(21,101,192,0.10)',
               display: 'flex',
               flexDirection: 'column',
+              breakInside: 'avoid',
             }}
           >
             {/* Page header — repeats on every page in print */}
@@ -332,22 +337,20 @@ export default function CatalogPage() {
             background: white !important;
           }
 
-          /* Each catalog-page fills one A4 page */
+          /* Each catalog-page starts on a fresh page.
+             Only use page-break-BEFORE — never after, which creates ghost blank pages. */
           .catalog-page {
             page-break-before: always !important;
-            page-break-after: always !important;
-            page-break-inside: avoid !important;
             break-before: page !important;
-            break-after: page !important;
+            page-break-inside: avoid !important;
             border-radius: 0 !important;
             border: none !important;
             box-shadow: none !important;
             margin: 0 !important;
-            min-height: 100vh !important;
             width: 100% !important;
           }
 
-          /* First page: no leading page break */
+          /* First category: no leading break */
           .catalog-page:first-child {
             page-break-before: avoid !important;
             break-before: avoid !important;
