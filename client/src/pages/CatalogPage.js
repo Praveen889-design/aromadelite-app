@@ -20,11 +20,18 @@ const displayPrice = (basePrice, gstPct) =>
 
 /** Unit label for 1 base unit */
 const unitLabel = (unit) => {
-  const u = (unit || '').toLowerCase().trim();
-  if (u === 'ltr' || u === 'litre' || u === 'l') return '1 Ltr';
-  if (u === 'kg')                                  return '1 Kg';
-  if (u === 'box')                                 return '1 Box';
-  return '1 ' + (unit || 'Unit');
+  const u = String(unit || '').toLowerCase().trim();
+  if (!u || u === '1' || u === '0') return '1 Unit';   // catch numeric/blank DB values
+  if (u === 'ltr' || u === 'litre' || u === 'l')       return '1 Ltr';
+  if (u === 'kg')                                       return '1 Kg';
+  if (u === 'box')                                      return '1 Box';
+  if (u === 'no' || u === 'nos' || u === 'piece'
+   || u === 'pcs' || u === 'pc')                        return '1 Pc';
+  if (u === 'pair' || u === 'pairs')                    return '1 Pair';
+  if (u === 'pack' || u === 'pkt')                      return '1 Pack';
+  if (u === 'roll')                                     return '1 Roll';
+  if (u === 'set')                                      return '1 Set';
+  return '1 ' + unit;
 };
 
 export default function CatalogPage() {
