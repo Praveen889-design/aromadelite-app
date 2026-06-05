@@ -16,6 +16,7 @@ import AssociatePerformanceTab from './admin/AssociatePerformanceTab';
 import DiscountApprovalTab from './admin/DiscountApprovalTab';
 import AiInsightsTab from './admin/AiInsightsTab';
 import PartnersCostsTab from './admin/PartnersCostsTab';
+import CatalogSharesTab from './admin/CatalogSharesTab';
 import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
 import { useToast } from '../components/Toast';
@@ -2016,6 +2017,7 @@ const TABS = [
   { id: 'settings',    label: '⚙️ Settings'   },
   { id: 'ai',          label: '🤖 AI Insights' },
   { id: 'partners',    label: '👥 Partners & Costs' },
+  { id: 'catalog',     label: '📋 Catalogue Shared' },
 ];
 
 export default function AdminPanel() {
@@ -2156,6 +2158,7 @@ export default function AdminPanel() {
         {tab === 'settings'    && <SettingsTab />}
         {tab === 'ai'          && <AiInsightsTab />}
         {tab === 'partners'    && <PartnersCostsTab />}
+        {tab === 'catalog'     && <CatalogSharesTab />}
       </div>
     </div>
   );

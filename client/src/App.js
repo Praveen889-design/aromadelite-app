@@ -30,6 +30,7 @@ export default function App() {
         <Route path="/login" element={<Login />} />
         {/* Public — no auth required */}
         <Route path="/home"             element={<LandingPage />} />
+        <Route path="/catalog/:token"   element={<CatalogPage />} />
         <Route path="/catalog"          element={<CatalogPage />} />
         <Route path="/q/:token"         element={<QuoteApproval />} />
         <Route path="/portal/:token"    element={<ClientPortal />} />
