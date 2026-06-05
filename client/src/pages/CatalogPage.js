@@ -6,7 +6,7 @@
  *
  * Associates generate a personalised link via the "Share Catalog" modal.
  */
-import React, { useEffect, useState, useContext } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
 
@@ -134,59 +134,6 @@ function ShareModal({ onClose, onCreated }) {
             </button>
           </div>
         </form>
-      </div>
-    </div>
-  );
-}
-
-/* ═══════════════════════════════════════════════════════════
-   CLIENT INFO BAND — shown at top of personalised catalog
-═══════════════════════════════════════════════════════════ */
-function ClientInfoBand({ share }) {
-  if (!share) return null;
-  return (
-    <div style={{
-      background: 'linear-gradient(135deg, #F0F4FF 0%, #E8EAF6 100%)',
-      border: '1.5px solid #C5CAE9',
-      borderRadius: 12,
-      padding: '16px 28px',
-      marginBottom: 20,
-      display: 'grid',
-      gridTemplateColumns: '1fr 1fr',
-      gap: '10px 24px',
-    }}>
-      {/* Left: client details */}
-      <div>
-        <div style={{ fontSize: 9, fontWeight: 700, color: '#7986CB', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6 }}>
-          📋 Catalogue Prepared For
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 12px', alignItems: 'baseline' }}>
-          {[
-            ['🏢', 'Business', share.business_name],
-            ['👤', 'POC',      share.poc_name],
-            ['📞', 'Contact',  share.contact],
-            ['📍', 'Location', share.location],
-          ].filter(([, , v]) => v).map(([icon, label, val]) => (
-            <React.Fragment key={label}>
-              <span style={{ fontSize: 10, color: '#9FA8DA', fontWeight: 600 }}>{icon} {label}</span>
-              <span style={{ fontSize: 12, fontWeight: 700, color: '#0D2B6B' }}>{val}</span>
-            </React.Fragment>
-          ))}
-        </div>
-      </div>
-
-      {/* Right: associate */}
-      <div style={{ borderLeft: '1.5px solid #C5CAE9', paddingLeft: 24 }}>
-        <div style={{ fontSize: 9, fontWeight: 700, color: '#7986CB', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6 }}>
-          👔 Catalogue Prepared By
-        </div>
-        <div style={{ fontSize: 15, fontWeight: 900, color: '#0D2B6B' }}>{share.associate_name || '—'}</div>
-        {share.associate_phone && (
-          <div style={{ fontSize: 12, color: '#1565C0', fontWeight: 600, marginTop: 3 }}>📞 {share.associate_phone}</div>
-        )}
-        <div style={{ fontSize: 10, color: '#78909C', marginTop: 4 }}>
-          Shared on {new Date(share.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })}
-        </div>
       </div>
     </div>
   );
