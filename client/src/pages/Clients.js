@@ -4,6 +4,7 @@ import api from '../utils/api';
 import { SkeletonCards } from '../components/Skeleton';
 import { useToast } from '../components/Toast';
 import { CLIENT_TYPES } from '../components/quote/ClientModal';
+import ShareCatalogModal from '../components/ShareCatalogModal';
 
 const CITIES = ['Hyderabad', 'Nizamabad', 'Warangal', 'Karimnagar',
                 'Vijayawada', 'Guntur', 'Medak', 'Siddipet'];
@@ -327,7 +328,9 @@ export default function Clients() {
   const [debouncedQ, setDQ]       = useState('');
   const [sortBy, setSortBy]       = useState('last_quote_at');
   const [error, setError]         = useState('');
-  const [showOnboard, setShowOnboard] = useState(false);
+  const [showOnboard,      setShowOnboard]      = useState(false);
+  const [showShareCatalog, setShowShareCatalog] = useState(false);
+  const [catalogLinkCopied, setCatalogLinkCopied] = useState(false);
 
   useEffect(() => {
     const t = setTimeout(() => setDQ(search), 300);
@@ -373,6 +376,17 @@ export default function Clients() {
         onSaved={fetchClients}
       />
 
+      {showShareCatalog && (
+        <ShareCatalogModal
+          onClose={() => setShowShareCatalog(false)}
+          onCreated={(url) => {
+            setShowShareCatalog(false);
+            setCatalogLinkCopied(true);
+            setTimeout(() => setCatalogLinkCopied(false), 4000);
+          }}
+        />
+      )}
+
       {/* Header */}
       <div className="bg-white rounded-xl border border-slate-200 p-5">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -393,20 +407,22 @@ export default function Clients() {
               <div className="text-lg font-bold text-purple-700">{fmtINR(totalRevenue)}</div>
               <div className="text-[10px] font-semibold uppercase text-purple-500">Total Billed</div>
             </div>
+            {catalogLinkCopied && (
+              <span style={{ fontSize: 12, fontWeight: 700, color: '#2E7D32', background: '#E8F5E9', padding: '6px 14px', borderRadius: 20 }}>
+                ✓ Catalogue link copied!
+              </span>
+            )}
             <button
-              onClick={() => {
-                const url = `${window.location.origin}/catalog`;
-                navigator.clipboard.writeText(url).then(() => alert('Catalog link copied! Share it with your client.'));
-              }}
+              onClick={() => setShowShareCatalog(true)}
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 6,
                 padding: '9px 16px', borderRadius: 10, fontSize: 13, fontWeight: 700,
-                background: 'linear-gradient(135deg, #0f766e, #0d9488)',
+                background: 'linear-gradient(135deg, #0D2B6B, #1565C0)',
                 color: '#fff', border: 'none', cursor: 'pointer',
-                boxShadow: '0 2px 8px rgba(15,118,110,0.3)',
+                boxShadow: '0 2px 8px rgba(13,43,107,0.3)',
               }}
             >
-              📋 Share Catalog
+              📋 Share Catalogue
             </button>
             <button
               onClick={() => setShowOnboard(true)}
