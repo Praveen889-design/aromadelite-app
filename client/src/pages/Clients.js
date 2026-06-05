@@ -394,6 +394,21 @@ export default function Clients() {
               <div className="text-[10px] font-semibold uppercase text-purple-500">Total Billed</div>
             </div>
             <button
+              onClick={() => {
+                const url = `${window.location.origin}/catalog`;
+                navigator.clipboard.writeText(url).then(() => alert('Catalog link copied! Share it with your client.'));
+              }}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                padding: '9px 16px', borderRadius: 10, fontSize: 13, fontWeight: 700,
+                background: 'linear-gradient(135deg, #0f766e, #0d9488)',
+                color: '#fff', border: 'none', cursor: 'pointer',
+                boxShadow: '0 2px 8px rgba(15,118,110,0.3)',
+              }}
+            >
+              📋 Share Catalog
+            </button>
+            <button
               onClick={() => setShowOnboard(true)}
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 6,

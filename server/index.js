@@ -32,6 +32,7 @@ const notificationRoutes      = require('./routes/notifications');
 const publicQuoteRoutes       = require('./routes/publicQuotes');
 const whatsappRoutes          = require('./routes/whatsapp');
 const portalRoutes            = require('./routes/portal');
+const catalogRoutes           = require('./routes/catalog');
 const aiInsightsRoutes        = require('./routes/aiInsights');
 const partnersRoutes          = require('./routes/partners');
 const businessCostsRoutes     = require('./routes/businessCosts');
@@ -80,6 +81,7 @@ app.use('/api/clients',       clientRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/public',        publicQuoteRoutes);   // no auth — client-facing
 app.use('/api/portal',        portalRoutes);         // no auth — client order portal
+app.use('/api/catalog',       catalogRoutes);        // no auth — public price list
 app.use('/api/whatsapp',      whatsappRoutes);
 app.use('/api/ai-insights',    aiInsightsRoutes);
 app.use('/api/partners',       partnersRoutes);
