@@ -455,6 +455,114 @@ function OnboardedClientsView({ search }) {
   );
 }
 
+/* ── Shared Catalogues view (visible to associates too) ──────── */
+function SharedCataloguesView({ search, refreshKey }) {
+  const { toast } = useToast();
+  const [shares,  setShares]  = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error,   setError]   = useState('');
+  const [copied,  setCopied]  = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    api.get('/api/catalog/shares')
+      .then(({ data }) => { if (!cancelled) setShares(data.shares || []); })
+      .catch((e) => { if (!cancelled) setError(e?.response?.data?.error || 'Failed to load shared catalogues'); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [refreshKey]);
+
+  const q = (search || '').trim().toLowerCase();
+  const filtered = q
+    ? shares.filter((s) =>
+        (s.business_name || '').toLowerCase().includes(q) ||
+        (s.poc_name      || '').toLowerCase().includes(q) ||
+        (s.contact       || '').includes(q) ||
+        (s.location      || '').toLowerCase().includes(q))
+    : shares;
+
+  const copyLink = (token) => {
+    const url = `${window.location.origin}/catalog/${token}`;
+    navigator.clipboard?.writeText(url).then(() => {
+      setCopied(token);
+      setTimeout(() => setCopied(null), 2500);
+      toast('🔗 Catalogue link copied!', { kind: 'success' });
+    }).catch(() => {});
+  };
+
+  if (loading) return <SkeletonCards count={4} height={70} />;
+  if (error)   return <div className="bg-rose-50 text-rose-700 border border-rose-200 rounded-xl p-4 text-sm">{error}</div>;
+
+  if (filtered.length === 0) {
+    return (
+      <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
+        <div className="text-4xl mb-3">📋</div>
+        <div className="font-bold text-slate-700">No catalogues shared yet</div>
+        <div className="text-sm text-slate-500 mt-1">
+          {q ? 'No shared catalogues match your search.'
+             : 'Click "📋 Share Catalogue" above to generate a personalised catalogue link for a client.'}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm" style={{ borderCollapse: 'collapse' }}>
+          <thead>
+            <tr className="bg-slate-50 border-b border-slate-200">
+              {['Business Name', 'POC Name', 'Contact', 'Location', 'Shared By', 'Date Shared', 'Actions'].map((h) => (
+                <th key={h} className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((s) => (
+              <tr key={s.id} className="border-b border-slate-100 hover:bg-slate-50/60">
+                <td className="px-4 py-3 font-bold text-slate-900">{s.business_name || '—'}</td>
+                <td className="px-4 py-3 text-slate-700">{s.poc_name || '—'}</td>
+                <td className="px-4 py-3 text-slate-600 text-xs">{s.contact || '—'}</td>
+                <td className="px-4 py-3 text-slate-600 text-xs">{s.location || '—'}</td>
+                <td className="px-4 py-3">
+                  <div className="text-xs font-semibold text-slate-700">{s.associate_name || '—'}</div>
+                  {s.associate_phone && <div className="text-[11px] text-slate-400">{s.associate_phone}</div>}
+                </td>
+                <td className="px-4 py-3 text-slate-500 text-xs whitespace-nowrap">{fmtDate(s.created_at)}</td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => window.open(`/catalog/${s.token}`, '_blank')}
+                      className="whitespace-nowrap text-xs font-semibold px-3 py-1.5 rounded-lg border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100"
+                      style={{ cursor: 'pointer' }}
+                    >
+                      👁️ View
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => copyLink(s.token)}
+                      className={`whitespace-nowrap text-xs font-semibold px-3 py-1.5 rounded-lg border ${
+                        copied === s.token
+                          ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                          : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-100'
+                      }`}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      {copied === s.token ? '✓ Copied!' : '🔗 Copy Link'}
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 /* ── Main page ───────────────────────────────────────────────── */
 export default function Clients() {
   const [clients, setClients]     = useState([]);
@@ -466,7 +574,8 @@ export default function Clients() {
   const [showOnboard,      setShowOnboard]      = useState(false);
   const [showShareCatalog, setShowShareCatalog] = useState(false);
   const [catalogLinkCopied, setCatalogLinkCopied] = useState(false);
-  const [view, setView] = useState('all'); // 'all' | 'onboarded'
+  const [view, setView] = useState('all'); // 'all' | 'onboarded' | 'catalogues'
+  const [catalogRefreshKey, setCatalogRefreshKey] = useState(0);
 
   useEffect(() => {
     const t = setTimeout(() => setDQ(search), 300);
@@ -519,6 +628,9 @@ export default function Clients() {
             setShowShareCatalog(false);
             setCatalogLinkCopied(true);
             setTimeout(() => setCatalogLinkCopied(false), 4000);
+            // Show the new share immediately in the Catalogues view
+            setCatalogRefreshKey((k) => k + 1);
+            setView('catalogues');
           }}
         />
       )}
@@ -597,6 +709,15 @@ export default function Clients() {
           >
             ✅ Onboarded
           </button>
+          <button
+            type="button"
+            onClick={() => setView('catalogues')}
+            className={view === 'catalogues'
+              ? 'px-4 py-2.5 bg-blue-700 text-white'
+              : 'px-4 py-2.5 text-slate-600 hover:bg-slate-50 border-l border-slate-300'}
+          >
+            📋 Catalogues
+          </button>
         </div>
         <input
           type="text"
@@ -620,7 +741,9 @@ export default function Clients() {
 
       {error && <div className="bg-rose-50 text-rose-700 border border-rose-200 rounded-xl p-4 text-sm">{error}</div>}
 
-      {view === 'onboarded' ? (
+      {view === 'catalogues' ? (
+        <SharedCataloguesView search={search} refreshKey={catalogRefreshKey} />
+      ) : view === 'onboarded' ? (
         <OnboardedClientsView search={search} />
       ) : loading ? (
         <SkeletonCards count={6} height={130} />
