@@ -2001,29 +2001,32 @@ function OverviewTab() {
 }
 
 // ─── Main panel ──────────────────────────────────────────────
-const TABS = [
-  { id: 'overview',     label: 'Overview'        },
-  { id: 'payment',     label: '⏳ Payments'     },
-  { id: 'followups',   label: '🔔 Follow-ups'   },
-  { id: 'performance', label: '🏆 Performance'  },
-  { id: 'team',        label: 'Team'            },
-  { id: 'products',   label: 'Products'   },
-  { id: 'quotes',     label: 'All Quotes' },
-  { id: 'leads',      label: 'All Leads'  },
-  { id: 'units',       label: '🏭 Units'       },
-  { id: 'discounts',   label: '💸 Discounts'   },
-  { id: 'commissions', label: '💰 Commissions' },
-  { id: 'reports',     label: 'Reports'        },
-  { id: 'settings',    label: '⚙️ Settings'   },
-  { id: 'ai',          label: '🤖 AI Insights' },
-  { id: 'partners',    label: '👥 Partners & Costs' },
-  { id: 'catalog',     label: '📋 Catalogue Shared' },
+const ALL_TABS = [
+  { id: 'overview',     label: 'Overview',              roles: ['admin'] },
+  { id: 'payment',     label: '⏳ Payments',            roles: ['admin', 'central_office'] },
+  { id: 'followups',   label: '🔔 Follow-ups',         roles: ['admin', 'central_office'] },
+  { id: 'performance', label: '🏆 Performance',        roles: ['admin', 'central_office'] },
+  { id: 'team',        label: 'Team',                  roles: ['admin'] },
+  { id: 'products',    label: 'Products',              roles: ['admin', 'central_office'] },
+  { id: 'quotes',      label: 'All Quotes',            roles: ['admin', 'central_office'] },
+  { id: 'leads',       label: 'All Leads',             roles: ['admin', 'central_office'] },
+  { id: 'units',       label: '🏭 Units',              roles: ['admin'] },
+  { id: 'discounts',   label: '💸 Discounts',          roles: ['admin', 'central_office'] },
+  { id: 'commissions', label: '💰 Commissions',        roles: ['admin'] },
+  { id: 'reports',     label: 'Reports',               roles: ['admin'] },
+  { id: 'settings',    label: '⚙️ Settings',          roles: ['admin'] },
+  { id: 'ai',          label: '🤖 AI Insights',        roles: ['admin'] },
+  { id: 'partners',    label: '👥 Partners & Costs',   roles: ['admin'] },
+  { id: 'catalog',     label: '📋 Catalogue Shared',   roles: ['admin', 'central_office'] },
 ];
 
 export default function AdminPanel() {
   const { user } = useAuth();
+  const isCentralOffice = user?.role === 'central_office';
+  const TABS = ALL_TABS.filter((t) => t.roles.includes(user?.role));
   const { search } = useLocation();
-  const initialTab = new URLSearchParams(search).get('tab') || 'overview';
+  const rawTab = new URLSearchParams(search).get('tab') || (isCentralOffice ? 'discounts' : 'overview');
+  const initialTab = TABS.find((t) => t.id === rawTab) ? rawTab : TABS[0]?.id || 'discounts';
   const [tab, setTab] = useState(initialTab);
   const [tabFilters, setTabFilters] = useState({});
   const [pendingModCount, setPendingModCount]         = useState(0);
@@ -2073,20 +2076,20 @@ export default function AdminPanel() {
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
             <h2 style={{ margin: 0, fontSize: 22, fontWeight: 900, color: '#f1f5f9', letterSpacing: '-0.02em' }}>
-              Admin Console
+              {isCentralOffice ? 'Central Office' : 'Admin Console'}
             </h2>
             <span style={{
               display: 'inline-flex', alignItems: 'center', gap: 3,
-              background: '#ef4444', color: '#fff',
+              background: isCentralOffice ? '#0d9488' : '#ef4444', color: '#fff',
               fontSize: 9, fontWeight: 800, padding: '3px 8px', borderRadius: 5,
               letterSpacing: '.1em', textTransform: 'uppercase',
             }}>
-              {Ic.shield} ADMIN
+              {Ic.shield} {isCentralOffice ? 'CENTRAL OFFICE' : 'ADMIN'}
             </span>
           </div>
           <div style={{ fontSize: 13, color: '#94a3b8' }}>
             Welcome back, <span style={{ color: '#e2e8f0', fontWeight: 600 }}>{user?.name?.split(' ')[0]}</span>
-            {' '}— here's your business overview
+            {' '}— {isCentralOffice ? 'manage leads, discounts & products' : "here's your business overview"}
           </div>
         </div>
         <div style={{ textAlign: 'right' }}>

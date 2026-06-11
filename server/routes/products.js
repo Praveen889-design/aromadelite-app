@@ -67,8 +67,8 @@ router.get('/category/:categoryId', async (req, res) => {
   }
 });
 
-// Admin — list all products (active + inactive) — must come before /:id
-router.get('/admin/all', requireRole('admin'), async (req, res) => {
+// Admin/Central Office — list all products (active + inactive) — must come before /:id
+router.get('/admin/all', requireRole('admin', 'central_office'), async (req, res) => {
   try {
     const { rows } = await pool.query(`
       SELECT p.*, c.name AS category_name, c.icon_emoji AS category_icon
@@ -182,7 +182,7 @@ router.post('/', requireRole('admin'), async (req, res) => {
   }
 });
 
-router.patch('/:id', requireRole('admin'), async (req, res) => {
+router.patch('/:id', requireRole('admin', 'central_office'), async (req, res) => {
   try {
     const existing = await pool.query('SELECT * FROM products WHERE id = $1', [req.params.id]);
     if (!existing.rows[0]) return res.status(404).json({ error: 'Product not found' });

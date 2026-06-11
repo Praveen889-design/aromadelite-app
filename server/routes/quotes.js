@@ -173,7 +173,7 @@ router.post('/', async (req, res) => {
 // GET /api/quotes
 router.get('/', async (req, res) => {
   try {
-    const isAdmin = req.user.role === 'admin';
+    const isAdmin = ['admin', 'central_office'].includes(req.user.role);
     const { rows } = isAdmin
       ? await pool.query(`
           SELECT q.*, e.name AS employee_name, e.employee_id AS employee_code, e.region,
@@ -198,9 +198,9 @@ router.get('/', async (req, res) => {
   }
 });
 
-// GET /api/quotes/aging  — admin-only, quotes ≥7 days old still in draft/sent
+// GET /api/quotes/aging  — admin + central_office, quotes ≥7 days old still in draft/sent
 router.get('/aging', async (req, res) => {
-  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
+  if (!['admin', 'central_office'].includes(req.user.role)) return res.status(403).json({ error: 'Forbidden' });
   try {
     const threshold = Math.max(1, Number(req.query.threshold) || 7);
     // Detect optional columns added by migration (safe fallback to NULL if missing)
@@ -255,9 +255,9 @@ router.get('/aging', async (req, res) => {
   }
 });
 
-// GET /api/quotes/pending-discount-approval — admin: quotes awaiting discount approval
+// GET /api/quotes/pending-discount-approval — admin + central_office: quotes awaiting discount approval
 router.get('/pending-discount-approval', async (req, res) => {
-  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
+  if (!['admin', 'central_office'].includes(req.user.role)) return res.status(403).json({ error: 'Forbidden' });
   try {
     const { rows } = await pool.query(`
       SELECT q.*, e.name AS employee_name, e.employee_id AS employee_code, e.region
@@ -271,9 +271,9 @@ router.get('/pending-discount-approval', async (req, res) => {
   }
 });
 
-// POST /api/quotes/:id/discount-approval — admin approves or rejects
+// POST /api/quotes/:id/discount-approval — admin + central_office approves or rejects
 router.post('/:id/discount-approval', async (req, res) => {
-  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
+  if (!['admin', 'central_office'].includes(req.user.role)) return res.status(403).json({ error: 'Forbidden' });
   try {
     const { action, note } = req.body || {};
     if (!['approve', 'reject'].includes(action)) {
@@ -438,7 +438,7 @@ router.get('/:id', async (req, res) => {
       WHERE q.id = $1
     `, [req.params.id]);
     if (!rows[0]) return res.status(404).json({ error: 'Quote not found' });
-    if (req.user.role !== 'admin' && rows[0].employee_id !== req.user.id) {
+    if (!['admin', 'central_office'].includes(req.user.role) && rows[0].employee_id !== req.user.id) {
       return res.status(403).json({ error: 'Forbidden' });
     }
     res.json({ quote: hydrate(rows[0]) });

@@ -13,7 +13,7 @@ router.get('/', async (req, res) => {
     const $v = (v) => { vals.push(v); return `$${vals.length}`; };
     const where = [];
 
-    if (req.user.role !== 'admin') where.push(`l.employee_id = ${$v(req.user.id)}`);
+    if (!['admin', 'central_office'].includes(req.user.role)) where.push(`l.employee_id = ${$v(req.user.id)}`);
     if (status)      where.push(`l.status = ${$v(status)}`);
     if (client_type) where.push(`l.client_type = ${$v(client_type)}`);
     if (region)      where.push(`e.region = ${$v(region)}`);
@@ -38,7 +38,7 @@ router.get('/', async (req, res) => {
 // GET /api/leads/summary
 router.get('/summary', async (req, res) => {
   try {
-    const isAdmin = req.user.role === 'admin';
+    const isAdmin = ['admin', 'central_office'].includes(req.user.role);
     const { rows } = isAdmin
       ? await pool.query('SELECT status, COUNT(*) AS count FROM leads GROUP BY status')
       : await pool.query('SELECT status, COUNT(*) AS count FROM leads WHERE employee_id = $1 GROUP BY status', [req.user.id]);
@@ -59,7 +59,7 @@ router.get('/summary', async (req, res) => {
 // NOTE: must be before /:id to avoid route conflict
 router.get('/followups/due', async (req, res) => {
   try {
-    const isAdmin = req.user.role === 'admin';
+    const isAdmin = ['admin', 'central_office'].includes(req.user.role);
     const { rows } = isAdmin
       ? await pool.query(`
           SELECT l.*, e.name AS employee_name, e.employee_id AS employee_code, e.region,
@@ -102,7 +102,7 @@ router.get('/:id', async (req, res) => {
       WHERE l.id = $1
     `, [req.params.id]);
     if (!rows[0]) return res.status(404).json({ error: 'Lead not found' });
-    if (req.user.role !== 'admin' && rows[0].employee_id !== req.user.id) {
+    if (!['admin', 'central_office'].includes(req.user.role) && rows[0].employee_id !== req.user.id) {
       return res.status(403).json({ error: 'Forbidden' });
     }
     res.json({ lead: rows[0] });
@@ -115,7 +115,7 @@ router.patch('/:id', async (req, res) => {
   try {
     const { rows: existing } = await pool.query('SELECT * FROM leads WHERE id = $1', [req.params.id]);
     if (!existing[0]) return res.status(404).json({ error: 'Lead not found' });
-    if (req.user.role !== 'admin' && existing[0].employee_id !== req.user.id) {
+    if (!['admin', 'central_office'].includes(req.user.role) && existing[0].employee_id !== req.user.id) {
       return res.status(403).json({ error: 'Forbidden' });
     }
 
@@ -124,8 +124,8 @@ router.patch('/:id', async (req, res) => {
     if (status && !validStatuses.includes(status)) {
       return res.status(400).json({ error: 'Invalid status' });
     }
-    if (employee_id !== undefined && req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Only admins can reassign leads' });
+    if (employee_id !== undefined && !['admin', 'central_office'].includes(req.user.role)) {
+      return res.status(403).json({ error: 'Only admin or central office can reassign leads' });
     }
 
     const vals = [];

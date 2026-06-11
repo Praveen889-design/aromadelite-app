@@ -67,8 +67,10 @@ export default function TeamTab({ onSwitchTab }) {
                   <td className="px-3 py-2 text-xs">{e.region || '—'}</td>
                   <td className="px-3 py-2">
                     <span className={`text-[10px] uppercase font-semibold px-2 py-0.5 rounded-full ${
-                      e.role === 'admin' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-700'
-                    }`}>{e.role}</span>
+                      e.role === 'admin' ? 'bg-rose-100 text-rose-700'
+                      : e.role === 'central_office' ? 'bg-teal-100 text-teal-700'
+                      : 'bg-slate-100 text-slate-700'
+                    }`}>{e.role === 'central_office' ? 'Central Office' : e.role}</span>
                   </td>
                   <td className="px-3 py-2 text-right">{e.quotes_count}</td>
                   <td className="px-3 py-2 text-right font-medium">{formatINR(e.quote_value)}</td>

@@ -42,7 +42,7 @@ const navItems = [
   { to: '/products',   label: 'Products Catalog',  icon: PackageIcon },
   { to: '/leads',      label: 'Leads',             icon: UsersIcon },
   { to: '/clients',    label: 'Clients',           icon: BuildingIcon },
-  { to: '/admin',      label: 'Admin Panel',       icon: ShieldIcon, adminOnly: true },
+  { to: '/admin',      label: 'Admin Panel',       icon: ShieldIcon, adminOnly: true, coLabel: 'Office Panel' },
 ];
 
 const initials = (name = '') =>
@@ -52,7 +52,8 @@ const initials = (name = '') =>
 export default function Sidebar({ open, onClose }) {
   const { user, logout } = useAuth();
   const isAdmin = user?.role === 'admin';
-  const visible = navItems.filter((i) => !i.adminOnly || isAdmin);
+  const isCentralOffice = user?.role === 'central_office';
+  const visible = navItems.filter((i) => !i.adminOnly || isAdmin || isCentralOffice);
 
   return (
     <>
@@ -133,7 +134,7 @@ export default function Sidebar({ open, onClose }) {
 
         {/* Nav */}
         <nav className="flex-1 px-3 space-y-0.5 overflow-y-auto">
-          {visible.map(({ to, label, icon: Icon, primary }) => (
+          {visible.map(({ to, label, coLabel, icon: Icon, primary }) => (
             <NavLink
               key={to}
               to={to}
@@ -166,7 +167,7 @@ export default function Sidebar({ open, onClose }) {
               }}
             >
               <Icon />
-              <span>{label}</span>
+              <span>{isCentralOffice && coLabel ? coLabel : label}</span>
             </NavLink>
           ))}
         </nav>

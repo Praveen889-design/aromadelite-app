@@ -121,7 +121,7 @@ router.post('/', async (req, res) => {
 // GET /api/bills
 router.get('/', async (req, res) => {
   try {
-    const isAdmin = req.user.role === 'admin';
+    const isAdmin = ['admin', 'central_office'].includes(req.user.role);
     const { rows } = isAdmin
       ? await pool.query(`
           SELECT b.*, e.name AS employee_name, e.employee_id AS employee_code, e.region
@@ -140,11 +140,11 @@ router.get('/', async (req, res) => {
   }
 });
 
-// GET /api/bills/payment-pending  — pending + partial bills (admin sees all, associate sees own)
+// GET /api/bills/payment-pending  — pending + partial bills (admin + central_office see all, associate sees own)
 // NOTE: must be declared BEFORE /:id to avoid "payment-pending" being parsed as an integer id
 router.get('/payment-pending', async (req, res) => {
   try {
-    const isAdmin = req.user.role === 'admin';
+    const isAdmin = ['admin', 'central_office'].includes(req.user.role);
     const { rows } = isAdmin
       ? await pool.query(`
           SELECT b.*, e.name AS employee_name, e.employee_id AS employee_code, e.region

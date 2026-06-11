@@ -37,6 +37,29 @@ const aiInsightsRoutes        = require('./routes/aiInsights');
 const partnersRoutes          = require('./routes/partners');
 const businessCostsRoutes     = require('./routes/businessCosts');
 
+const pool = require('./database/db');
+
+// Migrate: add 'central_office' to employees.role constraint if not present
+(async () => {
+  try {
+    const client = await pool.connect();
+    try {
+      // Drop old constraint (ignore if named differently or missing) and recreate with new values
+      await client.query(`
+        ALTER TABLE employees
+          DROP CONSTRAINT IF EXISTS employees_role_check;
+        ALTER TABLE employees
+          ADD CONSTRAINT employees_role_check
+          CHECK (role IN ('associate', 'admin', 'central_office'));
+      `);
+    } finally {
+      client.release();
+    }
+  } catch (e) {
+    console.warn('[migration] role constraint update skipped:', e.message);
+  }
+})();
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 const IS_PROD = process.env.NODE_ENV === 'production';

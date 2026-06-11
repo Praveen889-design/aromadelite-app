@@ -10,7 +10,7 @@ export default function RequireAuth({ adminOnly = false, children }) {
   if (!user || !hasToken) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }
-  if (adminOnly && user.role !== 'admin') {
+  if (adminOnly && !['admin', 'central_office'].includes(user.role)) {
     return <Navigate to="/" replace />;
   }
   return children;

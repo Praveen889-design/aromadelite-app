@@ -44,12 +44,13 @@ export default function EmployeeModal({ open, onClose, onCreated }) {
     if (!v.name.trim())          e.name = 'Required';
     if (!v.password || v.password.length < 6) e.password = 'At least 6 characters';
     if (v.role === 'associate' && !v.region) e.region = 'Required';
+    if (!['admin', 'associate', 'central_office'].includes(v.role)) e.role = 'Invalid role';
     setErrors(e);
     if (Object.keys(e).length) return;
 
     setBusy(true);
     try {
-      await api.post('/api/employees', { ...v, region: v.role === 'admin' ? null : v.region });
+      await api.post('/api/employees', { ...v, region: ['admin', 'central_office'].includes(v.role) ? null : v.region });
       toast(`${v.employee_id} added.`, { kind: 'success' });
       onCreated?.();
       onClose();
@@ -77,6 +78,7 @@ export default function EmployeeModal({ open, onClose, onCreated }) {
           <Field label="Role" required>
             <select className={inputCls} value={v.role} onChange={(e) => upd({ role: e.target.value })}>
               <option value="associate">Associate</option>
+              <option value="central_office">Central Office</option>
               <option value="admin">Admin</option>
             </select>
           </Field>
@@ -84,7 +86,7 @@ export default function EmployeeModal({ open, onClose, onCreated }) {
             <input className={inputCls} value={v.name} onChange={(e) => upd({ name: e.target.value })} />
           </Field>
           <Field label="Region" required={v.role === 'associate'} error={errors.region}>
-            <select className={inputCls} value={v.region} disabled={v.role === 'admin'}
+            <select className={inputCls} value={v.region} disabled={['admin', 'central_office'].includes(v.role)}
                     onChange={(e) => upd({ region: e.target.value })}>
               {REGIONS.map((r) => <option key={r}>{r}</option>)}
             </select>

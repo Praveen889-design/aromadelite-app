@@ -138,7 +138,7 @@ router.post('/share', requireAuth, async (req, res) => {
 router.get('/shares', requireAuth, async (req, res) => {
   try {
     await ensureTable();
-    const isAdmin = req.user.role === 'admin';
+    const isAdmin = ['admin', 'central_office'].includes(req.user.role);
     const { rows } = await pool.query(`
       SELECT
         cs.id, cs.token, cs.business_name, cs.poc_name, cs.contact, cs.location, cs.created_at,

@@ -51,7 +51,7 @@ router.post('/', async (req, res) => {
     if (!employee_id || !name || !password || !role) {
       return res.status(400).json({ error: 'employee_id, name, password, and role are required' });
     }
-    if (!['admin', 'associate'].includes(role)) return res.status(400).json({ error: 'Invalid role' });
+    if (!['admin', 'associate', 'central_office'].includes(role)) return res.status(400).json({ error: 'Invalid role' });
     const VALID_REGIONS = ['Hyderabad', 'Nizamabad', 'Warangal', 'Karimnagar', 'Vijayawada', 'Guntur', 'Medak'];
     if (role === 'associate' && region && !VALID_REGIONS.includes(region)) {
       return res.status(400).json({ error: `Invalid region. Must be one of: ${VALID_REGIONS.join(', ')}` });
