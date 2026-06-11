@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import { SkeletonCards } from '../components/Skeleton';
 import { useToast } from '../components/Toast';
 import { CLIENT_TYPES } from '../components/quote/ClientModal';
 import ShareCatalogModal from '../components/ShareCatalogModal';
+import { useQuoteBuilder } from '../context/QuoteBuilderContext';
 
 const CITIES = ['Hyderabad', 'Nizamabad', 'Warangal', 'Karimnagar',
                 'Vijayawada', 'Guntur', 'Medak', 'Siddipet'];
@@ -320,6 +321,140 @@ function PortalLinkBtn({ client, onClientCreated }) {
   );
 }
 
+/* ── Onboarded Clients view ──────────────────────────────────── */
+const fmtDate = (iso) =>
+  iso ? new Date(iso).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+
+function OnboardedClientsView({ search }) {
+  const navigate = useNavigate();
+  const { setClient, clearCart } = useQuoteBuilder();
+  const { toast } = useToast();
+  const [clients, setClients] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error,   setError]   = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    api.get('/api/clients/onboarded')
+      .then(({ data }) => { if (!cancelled) setClients(data.clients || []); })
+      .catch((e) => { if (!cancelled) setError(e?.response?.data?.error || 'Failed to load onboarded clients'); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
+
+  const q = (search || '').trim().toLowerCase();
+  const filtered = q
+    ? clients.filter((c) =>
+        (c.business_name || '').toLowerCase().includes(q) ||
+        (c.contact_name  || '').toLowerCase().includes(q) ||
+        (c.phone         || '').includes(q))
+    : clients;
+
+  // Pre-fill the quote builder with this client and jump to the builder.
+  // The builder then fetches their billed-price history automatically.
+  const startNewOrder = (c) => {
+    clearCart();
+    setClient({
+      client_name:          c.contact_name  || '',
+      client_business_name: c.business_name || '',
+      client_type:          c.client_type   || '',
+      client_phone:         c.phone         || '',
+      client_email:         c.email         || '',
+      client_city:          c.city          || '',
+      requirement_type:     '',
+      notes:                '',
+      validity_days:        7,
+    });
+    toast(`🔒 Repeat order for ${c.business_name || c.contact_name} — previous prices will apply.`, { kind: 'success' });
+    navigate('/quotes/new');
+  };
+
+  if (loading) return <SkeletonCards count={4} height={80} />;
+  if (error)   return <div className="bg-rose-50 text-rose-700 border border-rose-200 rounded-xl p-4 text-sm">{error}</div>;
+
+  if (filtered.length === 0) {
+    return (
+      <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
+        <div className="text-4xl mb-3">✅</div>
+        <div className="font-bold text-slate-700">No onboarded clients yet</div>
+        <div className="text-sm text-slate-500 mt-1">
+          {q ? 'No onboarded clients match your search.' : 'Clients appear here once their first bill is generated.'}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm" style={{ borderCollapse: 'collapse' }}>
+          <thead>
+            <tr className="bg-slate-50 border-b border-slate-200">
+              {['Client', 'City', 'Onboarded Since', 'Orders', 'Total Billed', 'Outstanding', 'Last Order', 'Actions'].map((h) => (
+                <th key={h} className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((c, i) => {
+              const tc = typeColor(c.client_type);
+              return (
+                <tr key={i} className="border-b border-slate-100 hover:bg-slate-50/60">
+                  <td className="px-4 py-3">
+                    <div className="font-bold text-slate-900">{c.business_name || c.contact_name}</div>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      {c.business_name && c.contact_name && (
+                        <span className="text-xs text-slate-500">{c.contact_name}</span>
+                      )}
+                      {c.client_type && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full capitalize"
+                              style={{ background: tc.bg, color: tc.text }}>{c.client_type}</span>
+                      )}
+                    </div>
+                    {c.phone && <div className="text-[11px] text-slate-400 mt-0.5">📞 {c.phone}</div>}
+                  </td>
+                  <td className="px-4 py-3 text-slate-600 text-xs">{c.city || '—'}</td>
+                  <td className="px-4 py-3 text-slate-600 text-xs whitespace-nowrap">{fmtDate(c.onboarded_at)}</td>
+                  <td className="px-4 py-3 font-semibold text-slate-800">{c.order_count}</td>
+                  <td className="px-4 py-3 font-bold text-slate-900 whitespace-nowrap">{fmtINR(c.total_billed)}</td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    {c.outstanding > 0
+                      ? <span className="font-bold text-rose-600">{fmtINR(c.outstanding)}</span>
+                      : <span className="text-[11px] font-bold text-emerald-600">✓ Cleared</span>}
+                  </td>
+                  <td className="px-4 py-3 text-slate-500 text-xs whitespace-nowrap">{fmtDate(c.last_order_at)}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => startNewOrder(c)}
+                        title="Start a repeat order — their previous billed prices apply automatically"
+                        className="whitespace-nowrap text-xs font-bold px-3 py-1.5 rounded-lg text-white"
+                        style={{ background: 'linear-gradient(135deg, #059669, #047857)', border: 'none', cursor: 'pointer' }}
+                      >
+                        🔒 New Order
+                      </button>
+                      {c.client_id && (
+                        <Link
+                          to={`/clients/${c.client_id}`}
+                          className="whitespace-nowrap text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-100"
+                          style={{ textDecoration: 'none' }}
+                        >
+                          View
+                        </Link>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 /* ── Main page ───────────────────────────────────────────────── */
 export default function Clients() {
   const [clients, setClients]     = useState([]);
@@ -331,6 +466,7 @@ export default function Clients() {
   const [showOnboard,      setShowOnboard]      = useState(false);
   const [showShareCatalog, setShowShareCatalog] = useState(false);
   const [catalogLinkCopied, setCatalogLinkCopied] = useState(false);
+  const [view, setView] = useState('all'); // 'all' | 'onboarded'
 
   useEffect(() => {
     const t = setTimeout(() => setDQ(search), 300);
@@ -440,8 +576,28 @@ export default function Clients() {
         </div>
       </div>
 
-      {/* Search + sort bar */}
-      <div className="flex gap-2 flex-wrap">
+      {/* View toggle + search + sort bar */}
+      <div className="flex gap-2 flex-wrap items-center">
+        <div className="flex rounded-xl border border-slate-300 overflow-hidden bg-white text-sm font-semibold">
+          <button
+            type="button"
+            onClick={() => setView('all')}
+            className={view === 'all'
+              ? 'px-4 py-2.5 bg-cyan-600 text-white'
+              : 'px-4 py-2.5 text-slate-600 hover:bg-slate-50'}
+          >
+            All Clients
+          </button>
+          <button
+            type="button"
+            onClick={() => setView('onboarded')}
+            className={view === 'onboarded'
+              ? 'px-4 py-2.5 bg-emerald-600 text-white'
+              : 'px-4 py-2.5 text-slate-600 hover:bg-slate-50 border-l border-slate-300'}
+          >
+            ✅ Onboarded
+          </button>
+        </div>
         <input
           type="text"
           value={search}
@@ -449,20 +605,24 @@ export default function Clients() {
           placeholder="Search by name, business, phone…"
           className="flex-1 min-w-[200px] border border-slate-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 bg-white"
         />
-        <select
-          value={sortBy}
-          onChange={(e) => setSortBy(e.target.value)}
-          className="border border-slate-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none bg-white text-slate-700 font-medium"
-        >
-          <option value="last_quote_at">Sort: Recent</option>
-          <option value="total_billed">Sort: Revenue</option>
-          <option value="quote_count">Sort: Orders</option>
-        </select>
+        {view === 'all' && (
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            className="border border-slate-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none bg-white text-slate-700 font-medium"
+          >
+            <option value="last_quote_at">Sort: Recent</option>
+            <option value="total_billed">Sort: Revenue</option>
+            <option value="quote_count">Sort: Orders</option>
+          </select>
+        )}
       </div>
 
       {error && <div className="bg-rose-50 text-rose-700 border border-rose-200 rounded-xl p-4 text-sm">{error}</div>}
 
-      {loading ? (
+      {view === 'onboarded' ? (
+        <OnboardedClientsView search={search} />
+      ) : loading ? (
         <SkeletonCards count={6} height={130} />
       ) : sorted.length === 0 ? (
         <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">

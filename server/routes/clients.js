@@ -182,6 +182,105 @@ router.get('/', async (req, res) => {
   }
 });
 
+// ── GET /api/clients/onboarded ────────────────────────────────
+// Clients with at least one bill (actually purchased/delivered).
+// NOTE: must be declared BEFORE /:id so "onboarded" isn't parsed as an id.
+router.get('/onboarded', async (req, res) => {
+  try {
+    const isAdmin = ['admin', 'central_office'].includes(req.user.role);
+    const vals = [];
+    const $v = (v) => { vals.push(v); return `$${vals.length}`; };
+    const empClause = isAdmin ? '' : `AND b.employee_id = ${$v(req.user.id)}`;
+
+    const { rows } = await pool.query(`
+      SELECT
+        LOWER(TRIM(COALESCE(b.client_phone,'')))         AS phone_key,
+        LOWER(TRIM(COALESCE(b.client_business_name,''))) AS biz_key,
+        MAX(b.client_name)            AS contact_name,
+        MAX(b.client_business_name)   AS business_name,
+        MAX(b.client_phone)           AS phone,
+        MAX(b.client_email)           AS email,
+        MAX(b.client_city)            AS city,
+        MAX(b.client_type)            AS client_type,
+        COUNT(*)                      AS order_count,
+        MIN(b.created_at)             AS onboarded_at,
+        MAX(b.created_at)             AS last_order_at,
+        COALESCE(SUM(b.total_amount), 0) AS total_billed,
+        COALESCE(SUM(CASE WHEN b.payment_status = 'completed' THEN b.total_amount ELSE b.amount_paid END), 0) AS total_paid,
+        MAX(e.name)                   AS employee_name,
+        MAX(c.id::text)               AS client_id,
+        MAX(c.portal_token::text)     AS portal_token
+      FROM bills b
+      JOIN employees e ON e.id = b.employee_id
+      LEFT JOIN clients c ON
+        LOWER(TRIM(COALESCE(c.phone,''))) = LOWER(TRIM(COALESCE(b.client_phone,'')))
+        AND LOWER(TRIM(COALESCE(c.business_name,''))) = LOWER(TRIM(COALESCE(b.client_business_name,'')))
+      WHERE b.status != 'cancelled' ${empClause}
+      GROUP BY phone_key, biz_key
+      ORDER BY last_order_at DESC
+    `, vals);
+
+    const clients = rows.map((r) => ({
+      ...r,
+      order_count:  Number(r.order_count),
+      total_billed: +Number(r.total_billed).toFixed(2),
+      total_paid:   +Number(r.total_paid).toFixed(2),
+      outstanding:  +(Number(r.total_billed) - Number(r.total_paid)).toFixed(2),
+    }));
+
+    res.json({ clients });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── GET /api/clients/client-prices?phone=…&business=… ────────
+// Price map for an onboarded client: most recent billed unit price per
+// product + pack size. Used by the quote builder to lock repeat-order pricing.
+// NOTE: must be declared BEFORE /:id.
+router.get('/client-prices', async (req, res) => {
+  try {
+    const { phone, business } = req.query;
+    if (!phone && !business) return res.json({ prices: {}, onboarded: false });
+
+    const { rows: bills } = await pool.query(`
+      SELECT items, gst_mode, created_at
+      FROM bills
+      WHERE LOWER(TRIM(COALESCE(client_phone,'')))         = LOWER(TRIM($1))
+        AND LOWER(TRIM(COALESCE(client_business_name,''))) = LOWER(TRIM($2))
+        AND status != 'cancelled'
+      ORDER BY created_at DESC
+    `, [phone || '', business || '']);
+
+    if (!bills.length) return res.json({ prices: {}, onboarded: false });
+
+    // Walk bills newest-first; first time we see a product+pack combo wins
+    // (= most recent billed price). Normalise to BASE price (GST exclusive).
+    const prices = {};
+    for (const b of bills) {
+      let items = b.items;
+      if (typeof items === 'string') { try { items = JSON.parse(items); } catch { items = []; } }
+      if (!Array.isArray(items)) continue;
+      for (const it of items) {
+        if (!it.product_id) continue;
+        const key = `${it.product_id}::${(it.pack_size || it.unit || '').trim()}`;
+        if (prices[key] !== undefined) continue;
+        let base = Number(it.unit_price) || 0;
+        // 'without_gst' bills store GST-inclusive unit prices — strip GST back out
+        if (b.gst_mode === 'without_gst') {
+          const gst = Number(it.gst_percent) || 0;
+          if (gst > 0) base = +(base / (1 + gst / 100)).toFixed(2);
+        }
+        if (base > 0) prices[key] = base;
+      }
+    }
+
+    res.json({ prices, onboarded: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── GET /api/clients/:id ──────────────────────────────────────
 // Get single client record + full stats
 router.get('/:id', async (req, res) => {

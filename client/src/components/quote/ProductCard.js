@@ -46,7 +46,23 @@ export function baseUnitLabel(unit) {
   return '1 Unit';
 }
 
-export default function ProductCard({ product, inCart, onAdd, stockQty = null }) {
+/**
+ * Look up a client's last-billed price for product + pack size combo.
+ * Map keys mirror the server: `${product_id}::${pack_size || unit || ''}`.
+ * Returns null when the client never bought this combo.
+ */
+export function lookupClientPrice(clientPrices, productId, packSize, unit) {
+  if (!clientPrices) return null;
+  const tryKeys = packSize
+    ? [`${productId}::${packSize.trim()}`]
+    : [`${productId}::${(unit || '').trim()}`, `${productId}::`];
+  for (const k of tryKeys) {
+    if (clientPrices[k] !== undefined) return Number(clientPrices[k]);
+  }
+  return null;
+}
+
+export default function ProductCard({ product, inCart, onAdd, stockQty = null, clientPrices = null }) {
   // stockQty: null = no stock tracking for this region
   //           0    = out of stock
   //           n>0  = n units available
@@ -87,15 +103,22 @@ export default function ProductCard({ product, inCart, onAdd, stockQty = null })
   );
   const alreadyAdded = inCart.has(lineKey);
 
-  // Price for the selected pack option
-  const effectivePrice = selectedSize
+  // Price for the selected pack option (current system price)
+  const systemPrice = selectedSize
     ? calcPackPrice(selectedSize.size, product.base_price, product.unit)
     : (product.base_price || 0);
+
+  // Onboarded client: lock to their last billed price for this product+pack —
+  // but never charge more than the current system price (lower of the two wins).
+  const selPackSize  = selectedSize?.isBase ? '' : (selectedSize?.size || '');
+  const clientPrice  = lookupClientPrice(clientPrices, product.id, selPackSize, product.unit);
+  const hasClientPrice = clientPrice !== null && clientPrice > 0;
+  const effectivePrice = hasClientPrice ? Math.min(clientPrice, systemPrice) : systemPrice;
 
   const onClickAdd = () => {
     // Unit shown on quote: pack size label if a non-base pack is selected (e.g. "5 Ltr"),
     // otherwise the product's base unit (e.g. "Ltr", "Kg", "Nos")
-    const packSize = selectedSize?.isBase ? '' : (selectedSize?.size || '');
+    const packSize = selPackSize;
     const unit     = packSize || product.unit || 'Nos';
 
     onAdd({
@@ -109,6 +132,9 @@ export default function ProductCard({ product, inCart, onAdd, stockQty = null })
       unit,
       quantity:      Math.max(1, Number(qty) || 1),
       unit_price:    effectivePrice,
+      // Client price is already an approved billed price — using it as system_price
+      // avoids re-triggering discount approval for established repeat-order pricing
+      system_price:  hasClientPrice ? effectivePrice : systemPrice,
       gst_percent:   product.gst_percent,
       hsn_code:      product.hsn_code,
     });
@@ -143,6 +169,17 @@ export default function ProductCard({ product, inCart, onAdd, stockQty = null })
           <div className="text-[11px] text-slate-400 mt-1">
             GST {product.gst_percent}% · HSN {product.hsn_code || '—'}
           </div>
+          {hasClientPrice && (
+            <div className="mt-1 inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full"
+                 style={{ background: '#eef2ff', color: '#4338ca', border: '1px solid #c7d2fe' }}>
+              🔒 Client Price {formatINR(effectivePrice)}
+              {effectivePrice < systemPrice && (
+                <span style={{ color: '#94a3b8', fontWeight: 500, textDecoration: 'line-through' }}>
+                  {formatINR(systemPrice)}
+                </span>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -183,7 +220,7 @@ export default function ProductCard({ product, inCart, onAdd, stockQty = null })
           <div className="col-span-3 text-xs text-slate-600">
             <div className="mb-1">Unit price</div>
             <div className="border border-slate-200 rounded-md px-2 py-1.5 bg-slate-50 text-sm font-medium text-slate-700">
-              {formatINR(product.base_price)}
+              {formatINR(effectivePrice)}
             </div>
           </div>
         )}

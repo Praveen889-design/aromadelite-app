@@ -4,7 +4,7 @@ import api from '../utils/api';
 import { useQuoteBuilder } from '../context/QuoteBuilderContext';
 import { useToast } from '../components/Toast';
 import { useAuth } from '../context/AuthContext';
-import ProductCard from '../components/quote/ProductCard';
+import ProductCard, { lookupClientPrice } from '../components/quote/ProductCard';
 import CartItem from '../components/quote/CartItem';
 import ClientModal from '../components/quote/ClientModal';
 import EmptyState from '../components/EmptyState';
@@ -27,6 +27,10 @@ export default function NewQuote() {
   // stockMap: product_id (number) → available qty; product_name (lowercase) → available qty
   // null means stock data not available (no units in region)
   const [stockMap, setStockMap] = useState(null);
+
+  // Onboarded-client price map: `${product_id}::${pack_size}` → last billed base price.
+  // null = client not onboarded (or no client selected yet) → system prices apply.
+  const [clientPrices, setClientPrices] = useState(null);
 
   const [gstMode, setGstMode] = useState('with_gst');
   const [modalOpen, setModalOpen] = useState(false);
@@ -77,6 +81,21 @@ export default function NewQuote() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Fetch the client's billed-price history whenever the selected client changes.
+  // Only onboarded clients (≥1 bill) return a price map; everyone else gets null.
+  useEffect(() => {
+    const phone = (client?.client_phone || '').trim();
+    const biz   = (client?.client_business_name || '').trim();
+    if (!phone && !biz) { setClientPrices(null); return; }
+    let cancelled = false;
+    api.get('/api/clients/client-prices', { params: { phone, business: biz } })
+      .then(({ data }) => {
+        if (!cancelled) setClientPrices(data.onboarded && Object.keys(data.prices || {}).length ? data.prices : null);
+      })
+      .catch(() => { if (!cancelled) setClientPrices(null); });
+    return () => { cancelled = true; };
+  }, [client?.client_phone, client?.client_business_name]);
+
   const cartKeys = useMemo(() => {
     const s = new Set();
     for (const it of items) s.add(`${it.product_id}|${it.variant || ''}|${it.pack_size || ''}`);
@@ -98,12 +117,17 @@ export default function NewQuote() {
     return !cartKeys.has(`${p.id}|${firstVariant || ''}|`);
   }).length, [filtered, cartKeys]);
 
-  // Add all visible products at 1-unit (base_price) — Select All defaults to per-unit pricing
+  // Add all visible products at 1-unit (base_price) — Select All defaults to per-unit pricing.
+  // Onboarded clients get their last billed price (lower of billed vs system).
   const addAllVisible = useCallback(() => {
     let added = 0;
     for (const p of filtered) {
       const firstVariant = (p.variants || [])[0] || null;
       if (cartKeys.has(`${p.id}|${firstVariant || ''}|`)) continue;
+      const sysPrice    = p.base_price || 0;
+      const cliPrice    = lookupClientPrice(clientPrices, p.id, '', p.unit);
+      const hasCliPrice = cliPrice !== null && cliPrice > 0;
+      const price       = hasCliPrice ? Math.min(cliPrice, sysPrice) : sysPrice;
       addItem({
         product_id:    p.id,
         product_name:  p.name,
@@ -113,7 +137,8 @@ export default function NewQuote() {
         variant:       firstVariant,
         pack_size:     '',          // base unit — no bulk pack size
         quantity:      1,
-        unit_price:    p.base_price || 0,
+        unit_price:    price,
+        system_price:  hasCliPrice ? price : sysPrice,
         gst_percent:   p.gst_percent,
         hsn_code:      p.hsn_code,
       });
@@ -121,7 +146,7 @@ export default function NewQuote() {
     }
     if (added > 0) toast(`Added ${added} product${added !== 1 ? 's' : ''} to quote.`, { kind: 'success' });
     else toast('All visible products are already in the quote.', { kind: 'info' });
-  }, [filtered, cartKeys, addItem, toast]);
+  }, [filtered, cartKeys, addItem, toast, clientPrices]);
 
   // GST breakdown — dynamic, supports all GST rates (0, 3, 5, 12, 18, 28%)
   const gstBreakdown = useMemo(() => {
@@ -191,6 +216,18 @@ export default function NewQuote() {
     <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
       {/* LEFT PANEL — Product Browser */}
       <section className="lg:col-span-3 bg-white rounded-xl border border-slate-200 p-4">
+        {/* Onboarded client banner */}
+        {clientPrices && (
+          <div className="mb-3 flex items-center gap-2 rounded-lg px-3 py-2"
+               style={{ background: '#eef2ff', border: '1px solid #c7d2fe' }}>
+            <span style={{ fontSize: 16 }}>🔒</span>
+            <div className="text-xs" style={{ color: '#4338ca' }}>
+              <strong>Onboarded client:</strong>{' '}
+              {client?.client_business_name || client?.client_name} — previously billed prices are applied
+              automatically for repeat products. New products use current system prices.
+            </div>
+          </div>
+        )}
         {/* Search + Add-All bar */}
         <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
           <input
@@ -279,6 +316,7 @@ export default function NewQuote() {
                 product={p}
                 inCart={cartKeys}
                 onAdd={addItem}
+                clientPrices={clientPrices}
                 stockQty={
                   stockMap === null
                     ? null  // no stock data for this region
