@@ -12,6 +12,10 @@ import EmptyState from '../components/EmptyState';
 const formatINR = (n) =>
   new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n || 0);
 
+// Without-GST quotes carry no GST; the base price is uplifted by this flat
+// markup instead. Must mirror the server (quotes.js / bills.js).
+const WITHOUT_GST_MARKUP = 0.05; // +5%
+
 export default function NewQuote() {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -406,7 +410,7 @@ export default function NewQuote() {
             >Without GST</button>
           </div>
           {gstMode === 'without_gst' && (
-            <span className="text-[10px] text-amber-600 italic">prices incl. tax</span>
+            <span className="text-[10px] text-amber-600 italic">+5% applied · no GST</span>
           )}
         </div>
 
@@ -439,16 +443,21 @@ export default function NewQuote() {
                 ))}
             </>
           ) : (
-            <SummaryRow
-              label="GST absorbed in price"
-              value={`+${formatINR(totals.gst_amount)}`}
-              muted
-            />
+            <>
+              <SummaryRow label="Subtotal (base price)" value={formatINR(totals.subtotal)} />
+              <SummaryRow
+                label="Markup (+5%)"
+                value={`+${formatINR(+(totals.subtotal * WITHOUT_GST_MARKUP).toFixed(2))}`}
+                muted
+              />
+            </>
           )}
           <div className="flex items-baseline justify-between pt-2 border-t border-slate-200">
             <span className="text-sm font-medium text-slate-700">Grand Total</span>
             <span className="text-2xl font-bold text-slate-900">
-              {formatINR(totals.total_amount)}
+              {formatINR(gstMode === 'without_gst'
+                ? +(totals.subtotal * (1 + WITHOUT_GST_MARKUP)).toFixed(2)
+                : totals.total_amount)}
             </span>
           </div>
           {/* Discount warning */}

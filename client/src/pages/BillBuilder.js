@@ -6,14 +6,15 @@ import { useToast } from '../components/Toast';
 const formatINR = (n) =>
   new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(n || 0);
 
-/* inclusive price = base × (1 + gst/100) */
-const toInclusive = (base, gst) => +(Number(base) * (1 + Number(gst) / 100)).toFixed(2);
+// Without-GST invoices carry no GST; base subtotal is uplifted by this markup.
+// Must mirror the server (bills.js / quotes.js).
+const WITHOUT_GST_MARKUP = 0.05; // +5%
 
 const computeTotals = (items, gst_mode) => {
   let subtotal = 0, gst_amount = 0;
   if (gst_mode === 'without_gst') {
     for (const it of items) subtotal += (Number(it.quantity) || 0) * (Number(it.unit_price) || 0);
-    return { subtotal: +subtotal.toFixed(2), gst_amount: 0, total_amount: +subtotal.toFixed(2) };
+    return { subtotal: +subtotal.toFixed(2), gst_amount: 0, total_amount: +(subtotal * (1 + WITHOUT_GST_MARKUP)).toFixed(2) };
   }
   for (const it of items) {
     const line = (Number(it.quantity) || 0) * (Number(it.unit_price) || 0);
@@ -130,17 +131,12 @@ export default function BillBuilder() {
     return p.product_name.toLowerCase().includes(q) || p.category_name.toLowerCase().includes(q) || (p.hsn_code || '').includes(q);
   });
 
-  /* ─── GST mode change → recalc all unit prices ─── */
+  /* ─── GST mode change ─── */
+  // unit_price is ALWAYS the base price in both modes. GST (with_gst) or the
+  // flat +5% markup (without_gst) is applied only when totals are computed.
   const handleGstModeChange = (mode) => {
     setGstMode(mode);
-    setItems((prev) =>
-      prev.map((it) => ({
-        ...it,
-        unit_price: mode === 'without_gst'
-          ? toInclusive(it.base_price, it.gst_percent)
-          : it.base_price,
-      }))
-    );
+    setItems((prev) => prev.map((it) => ({ ...it, unit_price: it.base_price })));
   };
 
   /* ─── Item editing ─── */
@@ -149,10 +145,7 @@ export default function BillBuilder() {
       const copy = [...prev];
       const updated = { ...copy[idx], [field]: value };
       if (field === 'unit_price') {
-        // keep base_price in sync
-        updated.base_price = gstMode === 'with_gst'
-          ? Number(value)
-          : +(Number(value) / (1 + (Number(updated.gst_percent) || 0) / 100)).toFixed(2);
+        updated.base_price = Number(value); // unit_price IS the base price
       }
       copy[idx] = updated;
       return copy;
@@ -173,7 +166,7 @@ export default function BillBuilder() {
       pack_size:    prod.pack_size,
       variant:      null,
       quantity:     1,
-      unit_price:   gstMode === 'without_gst' ? toInclusive(baseP, gst) : baseP,
+      unit_price:   baseP,
       base_price:   baseP,
       gst_percent:  gst,
     };
@@ -185,9 +178,7 @@ export default function BillBuilder() {
   const addCustomItem = () => {
     if (!customItem.name.trim()) { toast('Item name is required', { kind: 'error' }); return; }
     if (!customItem.unit_price || Number(customItem.unit_price) <= 0) { toast('Enter a valid price', { kind: 'error' }); return; }
-    const baseP = gstMode === 'without_gst'
-      ? +(Number(customItem.unit_price) / (1 + Number(customItem.gst_percent) / 100)).toFixed(2)
-      : Number(customItem.unit_price);
+    const baseP = Number(customItem.unit_price);
     const newItem = {
       product_id:   null,
       product_name: customItem.name.trim(),
@@ -268,7 +259,7 @@ export default function BillBuilder() {
         <div className="flex gap-3 flex-wrap">
           {[
             { val: 'with_gst',    label: 'With GST',    desc: 'Base price shown; GST calculated separately in Tax Summary.' },
-            { val: 'without_gst', label: 'Without GST', desc: 'Base + GST = Final unit price. No separate GST line.' },
+            { val: 'without_gst', label: 'Without GST', desc: 'No GST. Base price +5% markup. Issued as Vemuri Life Care.' },
           ].map(({ val, label, desc }) => (
             <label key={val}
               className={`flex items-start gap-3 border rounded-xl p-3 cursor-pointer flex-1 min-w-[200px] transition-all ${
@@ -392,9 +383,7 @@ export default function BillBuilder() {
                         </div>
                         <div className="text-right shrink-0">
                           <div className="text-sm font-bold text-[#1F6BC7]">
-                            ₹{new Intl.NumberFormat('en-IN', { maximumFractionDigits: 2 }).format(
-                              gstMode === 'without_gst' ? toInclusive(p.base_price, p.gst_percent) : p.base_price
-                            )}
+                            ₹{new Intl.NumberFormat('en-IN', { maximumFractionDigits: 2 }).format(p.base_price)}
                           </div>
                           <div className="text-xs text-slate-400">per {p.unit}</div>
                         </div>
@@ -432,7 +421,7 @@ export default function BillBuilder() {
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-slate-600 block mb-1">
-                    {gstMode === 'without_gst' ? 'Price incl. GST (₹) *' : 'Base Price (₹) *'}
+                    Base Price (₹) *
                   </label>
                   <input type="number" min="0" step="0.01" placeholder="0.00"
                     value={customItem.unit_price}
@@ -501,7 +490,7 @@ export default function BillBuilder() {
                     </div>
                     <div>
                       <div className="text-xs text-slate-500 mb-1">
-                        {gstMode === 'without_gst' ? 'Price (incl. GST) ₹' : 'Base Price ₹'}
+                        Base Price ₹
                       </div>
                       <input type="number" min="0" step="0.01" value={it.unit_price}
                         onChange={(e) => updateItem(idx, 'unit_price', Number(e.target.value))}
@@ -554,8 +543,9 @@ export default function BillBuilder() {
             </div>
           )}
           {gstMode === 'without_gst' && (
-            <div className="flex justify-between text-xs text-slate-400 italic">
-              <span>GST absorbed in prices</span><span>—</span>
+            <div className="flex justify-between text-slate-600">
+              <span>Markup (+5%)</span>
+              <span className="font-medium">+{formatINR(+(totals.subtotal * WITHOUT_GST_MARKUP).toFixed(2))}</span>
             </div>
           )}
           <div className="flex justify-between font-bold text-slate-800 border-t border-slate-100 pt-2">

@@ -36,20 +36,22 @@ const nextBillNumber = async () => {
  * computeTotals — calculates subtotal/gst/total from items.
  * gst_mode:
  *   'with_gst'    → unit_price is BASE price; GST shown separately
- *   'without_gst' → unit_price is already INCLUSIVE (base + gst absorbed);
- *                    stored as-is, gst_amount = 0, total = subtotal
+ *   'without_gst' → NO GST. Base price uplifted by a flat markup (issued
+ *                    under "Vemuri Life Care", no GST registration).
  */
+const WITHOUT_GST_MARKUP = 0.05; // +5% on base, must mirror quotes.js
+
 const computeTotals = (items, gst_mode) => {
   let subtotal = 0, gst_amount = 0;
   if (gst_mode === 'without_gst') {
-    // Prices already inclusive; no separate GST line
+    // No GST — apply flat markup on the base subtotal instead
     for (const it of items) {
       subtotal += (Number(it.quantity) || 0) * (Number(it.unit_price) || 0);
     }
     return {
       subtotal: +subtotal.toFixed(2),
       gst_amount: 0,
-      total_amount: +subtotal.toFixed(2),
+      total_amount: +(subtotal * (1 + WITHOUT_GST_MARKUP)).toFixed(2),
     };
   }
   // with_gst (default)
@@ -512,9 +514,9 @@ router.get('/:id/pdf-data', async (req, res) => {
             quantity: qty,
             unit_price: price,
             gst_percent: gst,
-            // line_total = GST-inclusive for with_gst; plain for without_gst
+            // without_gst: base × (1 + markup), no GST. with_gst: base + GST.
             line_total: gst_mode === 'without_gst'
-              ? +(qty * price).toFixed(2)
+              ? +(qty * price * (1 + WITHOUT_GST_MARKUP)).toFixed(2)
               : +(qty * price * (1 + gst / 100)).toFixed(2),
           };
         }),

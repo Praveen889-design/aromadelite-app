@@ -30,15 +30,26 @@ const nextQuoteNumber = async () => {
   return `${prefix}${String(next).padStart(4, '0')}`;
 };
 
-// Both modes compute the same totals (base + GST = final amount).
-// 'without_gst' only affects display: GST is absorbed into the quoted price,
-// not shown as a separate line to the client — but the seller still files GST.
-const computeTotals = (items) => {
+// Without-GST quotes/invoices (issued under "Vemuri Life Care", no GST
+// registration) carry NO GST. Instead the base price is uplifted by a flat
+// markup so margin is preserved without charging tax.
+const WITHOUT_GST_MARKUP = 0.05; // +5% on base
+
+// with_gst:    total = subtotal + GST (GST shown separately on the document)
+// without_gst: total = subtotal × (1 + markup), GST = 0 (no GST anywhere)
+const computeTotals = (items, gst_mode = 'with_gst') => {
   let subtotal = 0, gst_amount = 0;
   for (const it of items) {
     const line = (Number(it.quantity) || 0) * (Number(it.unit_price) || 0);
     subtotal += line;
     gst_amount += (line * (Number(it.gst_percent) || 0)) / 100;
+  }
+  if (gst_mode === 'without_gst') {
+    return {
+      subtotal: +subtotal.toFixed(2),
+      gst_amount: 0,
+      total_amount: +(subtotal * (1 + WITHOUT_GST_MARKUP)).toFixed(2),
+    };
   }
   return {
     subtotal: +subtotal.toFixed(2),
@@ -86,7 +97,7 @@ router.post('/', async (req, res) => {
     }
 
     const gst_mode = ['with_gst', 'without_gst'].includes(b.gst_mode) ? b.gst_mode : 'with_gst';
-    const totals = computeTotals(b.items);
+    const totals = computeTotals(b.items, gst_mode);
     const quote_number = await nextQuoteNumber();
     const validity_days = Number(b.validity_days) || 7;
     const estMonthly = b.requirement_type === 'Monthly Contract'
@@ -374,7 +385,7 @@ router.post('/:id/repeat', async (req, res) => {
 
     const quote_number = await nextQuoteNumber();
     const gst_mode     = src.gst_mode || 'with_gst';
-    const totals       = computeTotals(src.items);
+    const totals       = computeTotals(src.items, gst_mode);
     const validity_days = Number(src.validity_days) || 7;
     const estMonthly = src.requirement_type === 'Monthly Contract'
       ? totals.total_amount
@@ -697,7 +708,10 @@ router.get('/:id/pdf-data', async (req, res) => {
         unit_price: price,
         system_price: it.system_price ?? price,
         gst_percent: gst,
-        line_total: +(qty * price * (1 + gst / 100)).toFixed(2),
+        // without_gst: line = base × (1 + markup), no GST. with_gst: base + GST.
+        line_total: gst_mode === 'without_gst'
+          ? +(qty * price * (1 + WITHOUT_GST_MARKUP)).toFixed(2)
+          : +(qty * price * (1 + gst / 100)).toFixed(2),
       };
     });
 
@@ -710,6 +724,9 @@ router.get('/:id/pdf-data', async (req, res) => {
         const line = it.quantity * it.unit_price;
         sub += line;
         gstAmt += (line * it.gst_percent) / 100;
+      }
+      if (gst_mode === 'without_gst') {
+        return { subtotal: +sub.toFixed(2), gst_amount: 0, total_amount: +(sub * (1 + WITHOUT_GST_MARKUP)).toFixed(2) };
       }
       return { subtotal: +sub.toFixed(2), gst_amount: +gstAmt.toFixed(2), total_amount: +(sub + gstAmt).toFixed(2) };
     };
