@@ -49,11 +49,10 @@ export default function BottomNav({ onOpenMenu }) {
         background: '#FFFFFF',
         borderTop: '1px solid #E5E7EB',
         boxShadow: '0 -4px 14px rgba(8,42,56,.06)',
-        display: 'grid',
         gridTemplateColumns: 'repeat(5, 1fr)',
         paddingBottom: 'env(safe-area-inset-bottom, 4px)',
       }}
-      className="lg:hidden"
+      className="grid lg:hidden"
       aria-label="Mobile primary navigation"
     >
       {ITEMS.map(({ to, label, Icon, end }) => (
