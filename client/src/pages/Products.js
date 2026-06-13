@@ -51,152 +51,146 @@ const CheckIcon = () => (
   </svg>
 );
 
-function ProductCard({ product, inCart, cartQty, onAddToQuote, onQtyChange }) {
+const formatINR = (n) =>
+  new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n || 0);
+
+function ProductCard({ product, inCart, onAddToQuote }) {
   const [selVariant, setSelVariant] = useState(0);
+  const [selPack, setSelPack]       = useState(0);
 
-  const emoji = CATEGORY_EMOJI[product.category_name] || '📦';
-  const rawPacks = product.packs || [];
+  const emoji    = product.category_icon || CATEGORY_EMOJI[product.category_name] || '📦';
   const variants = product.variants || [];
-  // Same logic as ProductCard: move existing 1-unit pack to front, or prepend virtual one
-  const baseLabel = baseUnitLabel(product.unit);
-  const isOneUnit = (s) => Math.abs(calcPackPrice(s.size, 1, product.unit) - 1) < 0.01;
-  const oneUnitPacks = rawPacks.filter(isOneUnit);
-  const bulkPacks    = rawPacks.filter(s => !isOneUnit(s));
-  const packs = rawPacks.length > 0
-    ? oneUnitPacks.length > 0
-      ? [...oneUnitPacks, ...bulkPacks]
-      : [{ size: baseLabel, price: 0, isBase: true }, ...rawPacks]
-    : [];
-  const activePack = packs[0] || {};
-  const price = calcPackPrice(activePack.size, product.base_price, product.unit);
+  const rawPacks = product.pack_sizes || [];   // API field is pack_sizes
 
-  const formatINR = (n) =>
-    new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n || 0);
+  // Move an existing 1-unit pack to front, else prepend a virtual base unit
+  const baseLabel    = baseUnitLabel(product.unit);
+  const isOneUnit    = (s) => Math.abs(calcPackPrice(s.size, 1, product.unit) - 1) < 0.01;
+  const oneUnitPacks = rawPacks.filter(isOneUnit);
+  const bulkPacks    = rawPacks.filter((s) => !isOneUnit(s));
+  const packs = rawPacks.length > 0
+    ? (oneUnitPacks.length > 0 ? [...oneUnitPacks, ...bulkPacks] : [{ size: baseLabel, price: 0, isBase: true }, ...rawPacks])
+    : [{ size: baseLabel, price: 0, isBase: true }];
+
+  const activePack = packs[selPack] || packs[0];
+  const price      = calcPackPrice(activePack.size, product.base_price, product.unit);
+  const gst        = Number(product.gst_percent) || 0;
 
   return (
-    <div style={{
-      position: 'relative',
-      background: '#FFFFFF',
-      border: `1px solid ${inCart ? '#059669' : '#A5F3FC'}`,
-      borderRadius: 16,
-      padding: 12,
-      display: 'flex', flexDirection: 'column', gap: 8,
-      boxShadow: inCart ? '0 4px 12px rgba(5,150,105,.12)' : '0 2px 6px rgba(8,42,56,.03)',
-      overflow: 'hidden', minWidth: 0,
+    <div className="prod-card" style={{
+      position: 'relative', background: '#FFFFFF',
+      border: `1px solid ${inCart ? '#34D399' : '#E5EEF2'}`,
+      borderRadius: 16, overflow: 'hidden',
+      display: 'flex', flexDirection: 'column', minWidth: 0,
+      boxShadow: inCart ? '0 6px 18px rgba(5,150,105,.14)' : '0 1px 3px rgba(8,42,56,.06)',
     }}>
-      {/* Added badge */}
-      {inCart && (
-        <div style={{
-          position: 'absolute', top: -6, right: -6,
-          width: 22, height: 22, borderRadius: '50%',
-          background: '#059669', color: '#FFFFFF',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          border: '2px solid #FFFFFF',
-          boxShadow: '0 2px 6px rgba(5,150,105,.40)',
-        }}><CheckIcon /></div>
-      )}
+      {/* ── Image ── */}
+      <div style={{
+        position: 'relative', width: '100%', aspectRatio: '4 / 3',
+        background: 'linear-gradient(135deg, #ECFEFF 0%, #F0FDFA 100%)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+      }}>
+        {product.image_url
+          ? <img src={product.image_url} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          : <span style={{ fontSize: 54, opacity: 0.45 }}>{emoji}</span>}
 
-      {/* Category */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <span style={{ fontSize: 22, lineHeight: 1 }}>{emoji}</span>
+        {/* GST badge */}
         <span style={{
-          fontFamily: "'Source Sans 3', sans-serif", fontWeight: 700, fontSize: 10,
-          color: '#0E7490', letterSpacing: '.08em', textTransform: 'uppercase',
-        }}>{product.category_name || 'Product'}</span>
+          position: 'absolute', top: 8, left: 8,
+          background: 'rgba(255,255,255,0.92)', color: '#0E7490',
+          fontFamily: "'Source Sans 3', sans-serif", fontWeight: 800, fontSize: 9.5,
+          padding: '2px 7px', borderRadius: 99, letterSpacing: '.04em',
+          boxShadow: '0 1px 3px rgba(8,42,56,.12)',
+        }}>{gst}% GST</span>
+
+        {inCart && (
+          <span style={{
+            position: 'absolute', top: 8, right: 8,
+            display: 'inline-flex', alignItems: 'center', gap: 4,
+            background: '#059669', color: '#FFFFFF',
+            fontFamily: "'Nunito', sans-serif", fontWeight: 800, fontSize: 10,
+            padding: '3px 8px', borderRadius: 99,
+            boxShadow: '0 2px 6px rgba(5,150,105,.40)',
+          }}><CheckIcon /> In Quote</span>
+        )}
       </div>
 
-      {/* Name */}
-      <div style={{
-        fontFamily: "'Nunito', sans-serif", fontWeight: 800, fontSize: 15,
-        color: '#164E63', lineHeight: 1.2, letterSpacing: '-.01em',
-        display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
-        overflow: 'hidden', minHeight: 36,
-      }}>{product.name}</div>
+      {/* ── Body ── */}
+      <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 7, flex: 1 }}>
+        <span style={{
+          fontFamily: "'Source Sans 3', sans-serif", fontWeight: 700, fontSize: 9.5,
+          color: '#0E7490', letterSpacing: '.1em', textTransform: 'uppercase',
+        }}>{product.category_name || 'Product'}</span>
 
-      {/* Variants */}
-      {variants.length > 1 && (
-        <div style={{ display: 'flex', gap: 4, flexWrap: 'nowrap', overflow: 'hidden' }}>
-          {variants.slice(0, 3).map((v, i) => (
-            <VariantPill key={i} active={i === selVariant} onClick={() => setSelVariant(i)}>
-              {v}
-            </VariantPill>
-          ))}
-        </div>
-      )}
-
-      {/* Pack/price selector */}
-      {packs.length > 0 && (
         <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          background: '#ECFEFF', border: '1px solid #A5F3FC',
-          borderRadius: 8, padding: '6px 10px', height: 32,
-        }}>
-          <div style={{ fontFamily: "'DM Mono', monospace", fontWeight: 500, fontSize: 12, color: '#164E63' }}>
-            {activePack.size || activePack.label} · <span style={{ fontWeight: 600 }}>{formatINR(price)}</span>
-          </div>
-          {packs.length > 1 && (
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0E7490" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-              <path d="m6 9 6 6 6-6"/>
-            </svg>
-          )}
-        </div>
-      )}
+          fontFamily: "'Nunito', sans-serif", fontWeight: 800, fontSize: 16,
+          color: '#0F2B3A', lineHeight: 1.25, letterSpacing: '-.01em',
+          display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+        }}>{product.name}</div>
 
-      {/* Qty stepper (if in cart) */}
-      {inCart && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        {product.description && (
           <div style={{
-            display: 'inline-flex', alignItems: 'center',
-            border: '1.2px solid #A5F3FC', borderRadius: 8, background: '#FFFFFF', height: 28,
-          }}>
-            <button onClick={() => onQtyChange(product.id, Math.max(1, cartQty - 1))} style={qtyBtn}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round"><path d="M5 12h14"/></svg>
-            </button>
-            <div style={{ width: 28, textAlign: 'center', fontFamily: "'DM Mono', monospace", fontWeight: 500, fontSize: 13, color: '#164E63', borderLeft: '1px solid #ECFEFF', borderRight: '1px solid #ECFEFF', lineHeight: '26px' }}>
-              {cartQty}
-            </div>
-            <button onClick={() => onQtyChange(product.id, cartQty + 1)} style={qtyBtn}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>
-            </button>
-          </div>
-        </div>
-      )}
+            fontFamily: "'Source Sans 3', sans-serif", fontSize: 12, color: '#64748B',
+            lineHeight: 1.45,
+            display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+          }}>{product.description}</div>
+        )}
 
-      {/* Add/Added button */}
-      {inCart ? (
-        <button onClick={() => onAddToQuote(product, activePack)} style={{
-          height: 36, borderRadius: 8,
-          background: '#FFFFFF', border: '1.5px solid #059669', color: '#059669',
-          fontFamily: "'Nunito', sans-serif", fontWeight: 800, fontSize: 13,
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-          cursor: 'pointer',
-        }}>
-          Added <CheckIcon />
-        </button>
-      ) : (
-        <button onClick={() => onAddToQuote(product, activePack)} style={{
-          height: 36, borderRadius: 8,
-          background: '#059669', border: 0, color: '#FFFFFF',
-          fontFamily: "'Nunito', sans-serif", fontWeight: 800, fontSize: 13,
-          cursor: 'pointer',
-          boxShadow: '0 4px 10px rgba(5,150,105,.22)',
-        }}>Add to Quote</button>
-      )}
+        {/* Variants */}
+        {variants.length > 1 && (
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+            {variants.slice(0, 3).map((v, i) => (
+              <VariantPill key={i} active={i === selVariant} onClick={() => setSelVariant(i)}>{v}</VariantPill>
+            ))}
+          </div>
+        )}
+
+        {/* Pack selector */}
+        {packs.length > 1 && (
+          <select value={selPack} onChange={(e) => setSelPack(Number(e.target.value))} style={{
+            border: '1px solid #CBE7EE', borderRadius: 8, padding: '6px 8px', fontSize: 12,
+            color: '#164E63', background: '#F7FCFD', fontFamily: "'Source Sans 3', sans-serif", outline: 'none',
+          }}>
+            {packs.map((p, i) => (
+              <option key={i} value={i}>
+                {p.isBase ? baseLabel : p.size} — {formatINR(calcPackPrice(p.size, product.base_price, product.unit))}
+              </option>
+            ))}
+          </select>
+        )}
+
+        {/* Price + Add */}
+        <div style={{ marginTop: 'auto', paddingTop: 6 }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 8 }}>
+            <span style={{ fontFamily: "'Nunito', sans-serif", fontWeight: 900, fontSize: 21, color: '#0E7490', letterSpacing: '-.02em' }}>
+              {formatINR(price)}
+            </span>
+            <span style={{ fontFamily: "'Source Sans 3', sans-serif", fontSize: 11.5, color: '#94A3B8' }}>
+              / {activePack.isBase ? baseLabel.replace(/^1\s/, '') : activePack.size}
+            </span>
+          </div>
+
+          <button onClick={() => onAddToQuote(product, activePack, variants[selVariant] || null)} style={{
+            width: '100%', height: 40, borderRadius: 10,
+            background: inCart ? '#FFFFFF' : 'linear-gradient(135deg, #059669, #0E7490)',
+            border: inCart ? '1.5px solid #059669' : 0,
+            color: inCart ? '#059669' : '#FFFFFF',
+            fontFamily: "'Nunito', sans-serif", fontWeight: 800, fontSize: 13.5,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            cursor: 'pointer',
+            boxShadow: inCart ? 'none' : '0 4px 12px rgba(5,150,105,.28)',
+          }}>
+            {inCart ? <>Added <CheckIcon /></> : '+ Add to Quote'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
 
-const qtyBtn = {
-  border: 0, background: 'transparent',
-  width: 28, height: 26, color: '#0E7490',
-  display: 'flex', alignItems: 'center', justifyContent: 'center',
-  cursor: 'pointer',
-};
-
 export default function Products() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { items, addItem, updateItem } = useQuoteBuilder();
+  const { items, addItem } = useQuoteBuilder();
 
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -230,32 +224,35 @@ export default function Products() {
     return matchCat && matchSearch;
   });
 
-  const handleAdd = (product, pack) => {
-    const existing = cartMap.get(product.id);
-    if (existing) {
-      toast('Already in quote — adjust qty in cart', 'info');
+  const handleAdd = (product, pack, variant) => {
+    if (cartMap.has(product.id)) {
+      toast('Already in quote — adjust qty in the cart', 'info');
       return;
     }
+    const packSize = pack?.isBase ? '' : (pack?.size || '');
+    const price = calcPackPrice(pack?.size, product.base_price, product.unit);
     addItem({
-      product_id: product.id,
-      product_name: product.name,
+      product_id:    product.id,
+      product_name:  product.name,
+      description:   product.description || null,
+      category_id:   product.category_id,
       category_name: product.category_name,
-      pack_size: (pack?.isBase ? '' : (pack?.size || pack?.label || '')),
-      unit_price: calcPackPrice(pack?.size, product.base_price, product.unit),
-      gst_rate: product.gst_rate || 18,
-      qty: 1,
+      variant:       variant || null,
+      pack_size:     packSize,
+      unit:          packSize || product.unit || 'Nos',
+      quantity:      1,
+      unit_price:    price,
+      system_price:  price,
+      gst_percent:   Number(product.gst_percent) || 0,
+      hsn_code:      product.hsn_code,
     });
     toast(`${product.name} added to quote`, 'success');
   };
 
-  const handleQtyChange = (productId, newQty) => {
-    updateItem(productId, newQty);
-  };
-
   const cartCount = items.length;
-  const cartTotal = items.reduce((s, i) => s + (i.unit_price || 0) * (i.qty || 1), 0);
+  const cartTotal = items.reduce((s, i) => s + (Number(i.unit_price) || 0) * (Number(i.quantity) || 1), 0);
 
-  if (loading) return <div className="space-y-4"><SkeletonCards n={6} /></div>;
+  if (loading) return <div className="space-y-4"><SkeletonCards count={6} /></div>;
 
   return (
     <div style={{ fontFamily: "'Source Sans 3', sans-serif" }}>
@@ -323,7 +320,7 @@ export default function Products() {
       )}
 
       {/* Product grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12, paddingBottom: cartCount > 0 ? 80 : 8 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 16, paddingBottom: cartCount > 0 ? 88 : 8 }}>
         {filtered.length === 0 ? (
           <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '40px 0', color: '#6B7280', fontFamily: "'Source Sans 3', sans-serif" }}>
             No products found{search ? ` for "${search}"` : ''}.
@@ -334,13 +331,17 @@ export default function Products() {
               key={p.id}
               product={p}
               inCart={cartMap.has(p.id)}
-              cartQty={cartMap.get(p.id)?.qty || 1}
               onAddToQuote={handleAdd}
-              onQtyChange={handleQtyChange}
             />
           ))
         )}
       </div>
+
+      {/* Card hover polish */}
+      <style>{`
+        .prod-card { transition: transform .15s ease, box-shadow .15s ease; }
+        .prod-card:hover { transform: translateY(-3px); box-shadow: 0 10px 26px rgba(8,42,56,.12); }
+      `}</style>
 
       {/* Floating cart bar */}
       {cartCount > 0 && (
