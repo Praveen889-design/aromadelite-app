@@ -2187,17 +2187,25 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
                       <tr key={it._idx} data-pdf-row="item" style={{ background: i % 2 === 0 ? '#ffffff' : '#fafbfd' }}>
                         <TD style={{ textAlign: 'center', color: '#94a3b8', fontSize: 10, paddingLeft: 10 }}>{it._idx}</TD>
                         <TD style={{ paddingLeft: 14 }}>
-                          <span style={{ fontWeight: 700, color: '#1e293b' }}>{it.product_name}</span>
-                          {it.variant && (
-                            <span style={{ color: '#94a3b8', fontWeight: 400, fontSize: 10 }}>
-                              {' '}· {it.variant}
-                            </span>
-                          )}
-                          {it.description && (
-                            <div style={{ fontSize: 9.5, color: '#64748b', fontWeight: 400, marginTop: 2, lineHeight: 1.35 }}>
-                              {pdfSafeText(it.description)}
+                          <div style={{ display: 'flex', gap: 9, alignItems: 'flex-start' }}>
+                            {it.image_url && (
+                              <img src={it.image_url} alt="" crossOrigin="anonymous"
+                                style={{ width: 38, height: 38, objectFit: 'cover', borderRadius: 5, border: '1px solid #e2e8f0', flexShrink: 0 }} />
+                            )}
+                            <div style={{ minWidth: 0 }}>
+                              <span style={{ fontWeight: 700, color: '#1e293b' }}>{it.product_name}</span>
+                              {it.variant && (
+                                <span style={{ color: '#94a3b8', fontWeight: 400, fontSize: 10 }}>
+                                  {' '}· {it.variant}
+                                </span>
+                              )}
+                              {it.description && (
+                                <div style={{ fontSize: 9.5, color: '#64748b', fontWeight: 400, marginTop: 2, lineHeight: 1.35 }}>
+                                  {pdfSafeText(it.description)}
+                                </div>
+                              )}
                             </div>
-                          )}
+                          </div>
                         </TD>
                         <TD style={{ textAlign: 'right', fontWeight: 600 }}>{fmtNum(it.quantity, 0)}</TD>
                         <TD style={{ textAlign: 'center', color: '#64748b', fontSize: 10 }}>{it.unit || 'Nos'}</TD>

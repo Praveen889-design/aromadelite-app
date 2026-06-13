@@ -230,17 +230,24 @@ export default function QuoteApproval() {
                   <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
                     <td style={{ padding: '9px 12px', textAlign: 'center', fontSize: 12, color: '#94a3b8' }}>{i + 1}</td>
                     <td style={{ padding: '9px 12px' }}>
-                      <div style={{ fontWeight: 700, fontSize: 13, color: '#0f172a' }}>{it.product_name}</div>
-                      {it.variant && (
-                        <div style={{ fontSize: 11, color: '#94a3b8' }}>
-                          {it.variant}
+                      <div style={{ display: 'flex', gap: 9, alignItems: 'flex-start' }}>
+                        {it.image_url && (
+                          <img src={it.image_url} alt="" style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 6, border: '1px solid #e2e8f0', flexShrink: 0 }} />
+                        )}
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontWeight: 700, fontSize: 13, color: '#0f172a' }}>{it.product_name}</div>
+                          {it.variant && (
+                            <div style={{ fontSize: 11, color: '#94a3b8' }}>
+                              {it.variant}
+                            </div>
+                          )}
+                          {it.description && (
+                            <div style={{ fontSize: 11, color: '#64748b', marginTop: 2, lineHeight: 1.4 }}>
+                              {pdfSafeText(it.description)}
+                            </div>
+                          )}
                         </div>
-                      )}
-                      {it.description && (
-                        <div style={{ fontSize: 11, color: '#64748b', marginTop: 2, lineHeight: 1.4 }}>
-                          {pdfSafeText(it.description)}
-                        </div>
-                      )}
+                      </div>
                     </td>
                     <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 700, fontSize: 13 }}>{it.quantity}</td>
                     <td style={{ padding: '9px 12px', fontSize: 12, color: '#64748b' }}>{it.unit}</td>

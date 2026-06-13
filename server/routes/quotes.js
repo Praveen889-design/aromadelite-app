@@ -673,7 +673,7 @@ router.get('/:id/pdf-data', async (req, res) => {
     if (productIds.length) {
       const placeholders = productIds.map((_, i) => `$${i + 1}`).join(',');
       const catRows = await pool.query(`
-        SELECT p.id, p.hsn_code, p.unit, p.description,
+        SELECT p.id, p.hsn_code, p.unit, p.description, p.image_url,
                c.name AS category_name, c.icon_emoji AS category_icon
         FROM products p JOIN product_categories c ON c.id = p.category_id
         WHERE p.id IN (${placeholders})
@@ -702,6 +702,7 @@ router.get('/:id/pdf-data', async (req, res) => {
         unit: it.unit || cat.unit || 'Nos',
         category_name: cat.category_name || it.category_name || 'Items',
         category_icon: cat.category_icon || it.category_icon || null,
+        image_url: cat.image_url || it.image_url || null,
         variant: it.variant || null,
         pack_size: it.pack_size || it.size || null,
         quantity: qty,

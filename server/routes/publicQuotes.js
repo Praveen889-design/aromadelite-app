@@ -34,14 +34,26 @@ router.get('/quote-approval/:token', async (req, res) => {
     );
     if (!rows[0]) return res.status(404).json({ error: 'Quote link not found or expired.' });
 
-    const q    = rows[0];
-    const items = parseJSON(q.items, []).map((it) => ({
+    const q       = rows[0];
+    const rawItems = parseJSON(q.items, []);
+
+    // Enrich with current product images (snapshots don't store the image)
+    const ids = [...new Set(rawItems.map((i) => i.product_id).filter(Boolean))];
+    let imgMap = {};
+    if (ids.length) {
+      const ph = ids.map((_, i) => `$${i + 1}`).join(',');
+      const r  = await pool.query(`SELECT id, image_url FROM products WHERE id IN (${ph})`, ids);
+      imgMap = Object.fromEntries(r.rows.map((x) => [x.id, x.image_url]));
+    }
+
+    const items = rawItems.map((it) => ({
       product_name: it.product_name || it.name || 'Item',
       variant:      it.variant    || null,
       pack_size:    it.pack_size  || it.size || null,
       hsn_code:     it.hsn_code  || null,
       unit:         it.unit      || 'Nos',
       category_name: it.category_name || 'Items',
+      image_url:    imgMap[it.product_id] || null,
       quantity:     Number(it.quantity)   || 0,
       unit_price:   Number(it.unit_price) || 0,
       gst_percent:  Number(it.gst_percent) || 0,
