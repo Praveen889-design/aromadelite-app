@@ -14,8 +14,9 @@ import ShareCatalogModal from '../components/ShareCatalogModal';
 const api = axios.create({ baseURL: '' });
 
 /* ── helpers ─────────────────────────────────────────────── */
-const fmtINR = (n) =>
-  new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n || 0);
+// Plain number with Indian grouping (prices are whole rupees) — matches Quote PDF
+const fmtNum = (n, dec = 0) =>
+  new Intl.NumberFormat('en-IN', { maximumFractionDigits: dec }).format(n || 0);
 
 // Without-GST catalogues apply a flat markup instead of GST (mirrors quotes/bills)
 const WITHOUT_GST_MARKUP = 0.05; // +5%
@@ -31,6 +32,20 @@ const finalPrice = (basePrice, gstPct, gstMode) =>
 const firmFor = (gstMode) => gstMode === 'without_gst'
   ? { name: 'VEMURI LIFE CARE', gstin: null }
   : { name: 'SRI VEMURI SAI ENTERPRISES', gstin: '36AQJPV7026L2Z5' };
+
+// Table cells — identical styling to the Quote PDF (QuotePreview.js)
+const TH = ({ children, style }) => (
+  <th style={{ padding: '7px 10px', textAlign: 'left', fontWeight: 700, fontSize: 10.5,
+    background: '#1a2b5e', color: '#ffffff', borderRight: '1px solid #2d3f72', letterSpacing: 0.3, ...style }}>
+    {children}
+  </th>
+);
+const TD = ({ children, style }) => (
+  <td style={{ padding: '6px 10px', fontSize: 11, color: '#1e293b',
+    borderBottom: '1px solid #e8edf5', borderRight: '1px solid #eef1f7', ...style }}>
+    {children}
+  </td>
+);
 
 const unitLabel = (unit) => {
   const u = String(unit || '').toLowerCase().trim();
@@ -57,171 +72,168 @@ const today = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'l
 function CatalogPageSheet({ cat, pageNum, totalPages, share, gstMode }) {
   const isWithoutGst = gstMode === 'without_gst';
   const firm = firmFor(gstMode);
+  const headers = isWithoutGst
+    ? ['#', 'Product Name & Description', 'Unit', 'Pack Sizes', 'Price (₹)']
+    : ['#', 'Product Name & Description', 'Unit', 'Pack Sizes', 'Base Price (₹)', 'GST (₹)', 'Price incl. GST (₹)'];
+  const colCount = headers.length;
+
   return (
     <div className="catalog-page">
-      {/* Top accent */}
-      <div style={{ height: 5, background: 'linear-gradient(90deg, #1565C0 0%, #0D47A1 50%, #1565C0 100%)' }} />
+      {/* ══ HEADER BAND — same as Quote PDF ══ */}
+      {/* Top accent stripe */}
+      <div style={{ height: 5, background: 'linear-gradient(90deg, #1a2b5e 0%, #1F6BC7 60%, #38bdf8 100%)' }} />
 
-      {/* Page header */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: '200px 1fr 200px',
-        alignItems: 'center',
-        padding: '12px 28px',
-        borderBottom: '1.5px solid #BBDEFB',
-        background: '#fff',
-      }}>
-        <img src="/aromadelite-logo.png" alt="Aromadelite" style={{ height: 50, objectFit: 'contain' }} />
-
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 9, letterSpacing: '0.18em', color: '#5C6BC0', fontWeight: 700, textTransform: 'uppercase' }}>
+      {/* Company block */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 20, padding: '16px 28px 14px', background: '#ffffff', borderBottom: '1px solid #e2e8f0' }}>
+        {/* Logo */}
+        <div style={{ width: 100, height: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <img src="/aromadelite-logo.png" alt="Aromadelite" style={{ width: 100, height: 'auto', maxHeight: 60, objectFit: 'contain' }} />
+        </div>
+        {/* Company info */}
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 18, fontWeight: 900, color: '#1a2b5e', letterSpacing: 0.5, lineHeight: 1.1 }}>
             {firm.name}
           </div>
-          <div style={{ fontSize: 19, fontWeight: 900, color: '#0D2B6B', letterSpacing: '0.08em', textTransform: 'uppercase', lineHeight: 1.1, marginTop: 2 }}>
-            PRODUCT CATALOGUE
+          <div style={{ fontSize: 10, color: '#64748b', marginTop: 4, letterSpacing: 0.1 }}>
+            SAI NAGAR HNO 8-229/8, NVV NAGAR, CHINTAL, QUTHBULLAPUR, MALKAJGIRI – 500054
           </div>
-          <div style={{ width: 60, height: 2, background: '#1565C0', margin: '4px auto 3px', borderRadius: 2 }} />
-          <div style={{ fontSize: 9, color: '#78909C' }}>
-            {share
-              ? <>Prepared for <strong style={{ color: '#0D2B6B' }}>{share.business_name || share.poc_name}</strong></>
-              : isWithoutGst
-                ? `Valid as of ${today}`
-                : `Prices inclusive of GST · Valid as of ${today}`
-            }
+          <div style={{ display: 'flex', gap: 24, marginTop: 5, fontSize: 10, color: '#475569' }}>
+            <span>📞 +91 63043 82947</span>
+            <span>✉ contact@aromadelite.in</span>
+            <span>🌐 aromadelite.in</span>
           </div>
           {firm.gstin && (
-            <div style={{ fontSize: 8.5, color: '#90A4AE', marginTop: 1 }}>GSTIN: {firm.gstin}</div>
+            <div style={{ display: 'flex', gap: 24, marginTop: 3, fontSize: 10, color: '#475569' }}>
+              <span><strong style={{ color: '#1a2b5e' }}>GSTIN:</strong> {firm.gstin}</span>
+              <span><strong style={{ color: '#1a2b5e' }}>State:</strong> 36-Telangana</span>
+            </div>
           )}
         </div>
-
-        <div style={{ textAlign: 'right' }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: '#E3F2FD', border: '1px solid #90CAF9', borderRadius: 20, padding: '4px 12px', marginBottom: 4 }}>
-            {cat.icon && <span style={{ fontSize: 13 }}>{cat.icon}</span>}
-            <span style={{ fontSize: 10, fontWeight: 700, color: '#0D47A1' }}>{cat.name}</span>
+        {/* CATALOGUE label */}
+        <div style={{ flexShrink: 0, textAlign: 'right' }}>
+          <div style={{ fontSize: 20, fontWeight: 900, color: '#1a2b5e', letterSpacing: 1.5, textTransform: 'uppercase', lineHeight: 1.05 }}>
+            PRODUCT
           </div>
-          <div style={{ fontSize: 9, color: '#90A4AE' }}>Page {pageNum} / {totalPages}</div>
+          <div style={{ fontSize: 20, fontWeight: 900, color: '#1a2b5e', letterSpacing: 1.5, textTransform: 'uppercase', lineHeight: 1.05 }}>
+            CATALOGUE
+          </div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#1F6BC7', marginTop: 4 }}>
+            {isWithoutGst ? 'Price List' : 'Inclusive of GST'}
+          </div>
+          <div style={{ fontSize: 9, color: '#90A4AE', marginTop: 2 }}>As of {today}</div>
         </div>
       </div>
+      {/* ══ END HEADER BAND ══ */}
 
-      {/* Client/Associate band — only on first page of a personalised catalog */}
+      {/* ── Prepared For / Prepared By band (personalised, first page only) ── */}
       {share && pageNum === 1 && (
-        <div style={{ padding: '10px 28px 0' }}>
-          <div style={{
-            background: 'linear-gradient(135deg, #E8EAF6, #F0F4FF)',
-            border: '1px solid #C5CAE9',
-            borderRadius: 10,
-            padding: '10px 20px',
-            display: 'grid',
-            gridTemplateColumns: '1fr 1px 1fr',
-            gap: 0,
-            alignItems: 'start',
-          }}>
-            {/* Prepared for */}
-            <div style={{ paddingRight: 16 }}>
-              <div style={{ fontSize: 8, fontWeight: 700, color: '#7986CB', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 5 }}>
-                📋 Prepared For
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '3px 10px', alignItems: 'baseline', fontSize: 11 }}>
-                {[['🏢', share.business_name], ['👤', share.poc_name], ['📞', share.contact], ['📍', share.location]].filter(([, v]) => v).map(([icon, val]) => (
-                  <React.Fragment key={val}><span style={{ color: '#9FA8DA' }}>{icon}</span><span style={{ fontWeight: 700, color: '#0D2B6B' }}>{val}</span></React.Fragment>
-                ))}
-              </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
+          <div style={{ padding: '12px 20px', borderRight: '1px solid #e2e8f0' }}>
+            <div style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1.2, color: '#94a3b8', marginBottom: 7 }}>
+              Prepared For
             </div>
-            {/* Divider */}
-            <div style={{ background: '#C5CAE9', width: 1, alignSelf: 'stretch', margin: '0 16px' }} />
-            {/* Prepared by */}
-            <div style={{ paddingLeft: 16 }}>
-              <div style={{ fontSize: 8, fontWeight: 700, color: '#7986CB', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 5 }}>
-                👔 Prepared By
-              </div>
-              <div style={{ fontWeight: 900, color: '#0D2B6B', fontSize: 13 }}>{share.associate_name || '—'}</div>
-              {share.associate_phone && <div style={{ fontSize: 11, color: '#1565C0', fontWeight: 600, marginTop: 2 }}>📞 {share.associate_phone}</div>}
-              <div style={{ fontSize: 9, color: '#90A4AE', marginTop: 3 }}>
-                {new Date(share.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })}
-              </div>
+            {[['🏢', share.business_name], ['👤', share.poc_name], ['📞', share.contact], ['📍', share.location]].filter(([, v]) => v).map(([icon, val]) => (
+              <div key={val} style={{ fontSize: 11, color: '#334155', marginTop: 2 }}><span style={{ color: '#94a3b8' }}>{icon}</span> <strong style={{ color: '#1a2b5e' }}>{val}</strong></div>
+            ))}
+          </div>
+          <div style={{ padding: '12px 20px' }}>
+            <div style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1.2, color: '#94a3b8', marginBottom: 7 }}>
+              Prepared By
+            </div>
+            <div style={{ fontWeight: 900, color: '#1a2b5e', fontSize: 13 }}>{share.associate_name || '—'}</div>
+            {share.associate_phone && <div style={{ fontSize: 11, color: '#1F6BC7', fontWeight: 600, marginTop: 2 }}>📞 {share.associate_phone}</div>}
+            <div style={{ fontSize: 9, color: '#90A4AE', marginTop: 3 }}>
+              {new Date(share.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })}
             </div>
           </div>
         </div>
       )}
 
-      {/* Category banner */}
-      <div style={{ background: 'linear-gradient(135deg, #0D2B6B 0%, #1565C0 100%)', padding: '9px 28px', display: 'flex', alignItems: 'center', gap: 10, marginTop: share && pageNum === 1 ? 10 : 0 }}>
-        {cat.icon && <span style={{ fontSize: 18 }}>{cat.icon}</span>}
-        <span style={{ fontSize: 14, fontWeight: 900, color: '#fff', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{cat.name}</span>
-        <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.2)', marginLeft: 10 }} />
-        <span style={{ fontSize: 10, color: '#90CAF9', fontWeight: 600 }}>{cat.products.length} Products</span>
-      </div>
-
-      {/* Table */}
-      <div style={{ padding: '0 28px', flex: 1 }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+      {/* ── Items Table — same styling as Quote PDF ── */}
+      <div style={{ flex: 1 }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
-              {(isWithoutGst
-                ? ['#', 'Product Name & Description', 'Unit', 'Pack Sizes', 'Price']
-                : ['#', 'Product Name & Description', 'Unit', 'Pack Sizes', 'Base Price', 'GST', 'Price (incl. GST)']
-              ).map((h, i, arr) => (
-                <th key={h} style={{ padding: '8px 10px', background: '#F0F4FF', color: '#3F51B5', fontWeight: 700, fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.07em', borderBottom: '2px solid #C5CAE9', textAlign: i === 0 ? 'center' : i >= arr.length - (isWithoutGst ? 1 : 3) ? 'right' : 'left', whiteSpace: 'nowrap' }}>{h}</th>
+              {headers.map((h, i) => (
+                <TH key={h} style={{
+                  width: i === 0 ? 30 : undefined,
+                  textAlign: i === 0 ? 'center' : i >= colCount - (isWithoutGst ? 1 : 3) ? 'right' : 'left',
+                  borderRight: i === colCount - 1 ? 'none' : '1px solid #2d3f72',
+                  paddingLeft: i === 0 ? 14 : 10,
+                  paddingRight: i === colCount - 1 ? 14 : 10,
+                  whiteSpace: 'nowrap',
+                }}>{h}</TH>
               ))}
             </tr>
           </thead>
           <tbody>
+            {/* Category header row — Quote style */}
+            <tr>
+              <td colSpan={colCount} style={{
+                padding: '6px 14px 6px 12px', background: '#f1f5f9',
+                borderTop: '1px solid #e2e8f0', borderBottom: '1px solid #e2e8f0',
+                borderLeft: '3px solid #1F6BC7', fontWeight: 800, fontSize: 10.5,
+                color: '#1e40af', letterSpacing: 0.5, textTransform: 'uppercase',
+              }}>
+                {cat.icon && <span style={{ marginRight: 6 }}>{cat.icon}</span>}
+                {cat.name}
+                <span style={{ fontWeight: 600, color: '#64748b', textTransform: 'none', letterSpacing: 0 }}> · {cat.products.length} products</span>
+              </td>
+            </tr>
             {cat.products.map((p, idx) => {
-              const gst       = Number(p.gst_percent) || 0;
-              const base      = Number(p.base_price) || 0;
-              const gstAmt    = Math.round(base * gst / 100);
-              const finalP    = finalPrice(base, gst, gstMode);
+              const gst    = Number(p.gst_percent) || 0;
+              const base   = Number(p.base_price) || 0;
+              const gstAmt = Math.round(base * gst / 100);
+              const finalP = finalPrice(base, gst, gstMode);
               return (
-              <tr key={p.id} style={{ background: idx % 2 === 0 ? '#fff' : '#F8FAFF' }}>
-                <td style={{ padding: '8px 10px', textAlign: 'center', color: '#90A4AE', fontWeight: 700, fontSize: 10, borderBottom: '1px solid #E8EEF8', width: 28 }}>{idx + 1}</td>
-                <td style={{ padding: '8px 10px', borderBottom: '1px solid #E8EEF8' }}>
-                  <div style={{ fontWeight: 700, color: '#0D2B6B', fontSize: 12 }}>{p.name}</div>
-                  {p.description && <div style={{ color: '#607D8B', fontSize: 10, marginTop: 2, lineHeight: 1.4 }}>{p.description}</div>}
-                  {p.variants?.length > 0 && (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginTop: 3 }}>
-                      {p.variants.map((v, vi) => <span key={vi} style={{ fontSize: 9, background: '#E8EAF6', color: '#3F51B5', border: '1px solid #C5CAE9', borderRadius: 99, padding: '1px 6px', fontWeight: 600 }}>{v}</span>)}
-                    </div>
+                <tr key={p.id} style={{ background: idx % 2 === 0 ? '#ffffff' : '#fafbfd' }}>
+                  <TD style={{ textAlign: 'center', color: '#94a3b8', fontSize: 10, paddingLeft: 14 }}>{idx + 1}</TD>
+                  <TD style={{ paddingLeft: 14 }}>
+                    <span style={{ fontWeight: 700, color: '#1e293b' }}>{p.name}</span>
+                    {p.description && <div style={{ color: '#64748b', fontSize: 9.5, marginTop: 2, lineHeight: 1.35 }}>{p.description}</div>}
+                    {p.variants?.length > 0 && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginTop: 3 }}>
+                        {p.variants.map((v, vi) => <span key={vi} style={{ fontSize: 9, background: '#eef2ff', color: '#3730a3', border: '1px solid #c7d2fe', borderRadius: 99, padding: '1px 6px', fontWeight: 600 }}>{v}</span>)}
+                      </div>
+                    )}
+                  </TD>
+                  <TD style={{ fontWeight: 600, color: '#334155', whiteSpace: 'nowrap' }}>{unitLabel(p.unit)}</TD>
+                  <TD>
+                    {p.pack_sizes?.length > 0
+                      ? p.pack_sizes.map((s, si) => <span key={si} style={{ display: 'inline-block', fontSize: 9, background: '#eef4ff', color: '#1F6BC7', border: '1px solid #bdd6f5', borderRadius: 99, padding: '1px 7px', margin: '1px 2px', fontWeight: 600 }}>{s.size}</span>)
+                      : <span style={{ color: '#cbd5e1' }}>—</span>}
+                  </TD>
+                  {!isWithoutGst && (
+                    <TD style={{ textAlign: 'right', color: '#334155', whiteSpace: 'nowrap' }}>₹ {fmtNum(base)}</TD>
                   )}
-                </td>
-                <td style={{ padding: '8px 10px', color: '#37474F', fontWeight: 700, fontSize: 11, borderBottom: '1px solid #E8EEF8', whiteSpace: 'nowrap' }}>{unitLabel(p.unit)}</td>
-                <td style={{ padding: '8px 10px', borderBottom: '1px solid #E8EEF8' }}>
-                  {p.pack_sizes?.length > 0
-                    ? p.pack_sizes.map((s, si) => <span key={si} style={{ display: 'inline-block', fontSize: 9, background: '#E3F2FD', color: '#1565C0', border: '1px solid #90CAF9', borderRadius: 99, padding: '1px 7px', margin: '1px 2px', fontWeight: 600 }}>{s.size}</span>)
-                    : <span style={{ color: '#CFD8DC', fontSize: 11 }}>—</span>}
-                </td>
-                {!isWithoutGst && (
-                  <td style={{ padding: '8px 10px', textAlign: 'right', color: '#37474F', fontSize: 11, borderBottom: '1px solid #E8EEF8', whiteSpace: 'nowrap' }}>{fmtINR(base)}</td>
-                )}
-                {!isWithoutGst && (
-                  <td style={{ padding: '8px 10px', textAlign: 'right', borderBottom: '1px solid #E8EEF8', whiteSpace: 'nowrap' }}>
-                    <span style={{ color: '#607D8B', fontSize: 11 }}>{fmtINR(gstAmt)}</span>
-                    <span style={{ color: '#90A4AE', fontSize: 9 }}> ({gst}%)</span>
-                  </td>
-                )}
-                <td style={{ padding: '8px 14px 8px 10px', textAlign: 'right', borderBottom: '1px solid #E8EEF8', whiteSpace: 'nowrap' }}>
-                  <span style={{ fontWeight: 900, fontSize: 14, color: '#0D2B6B' }}>{fmtINR(finalP)}</span>
-                </td>
-              </tr>
+                  {!isWithoutGst && (
+                    <TD style={{ textAlign: 'right', color: '#475569', whiteSpace: 'nowrap' }}>
+                      ₹ {fmtNum(gstAmt)}<span style={{ color: '#94a3b8', fontSize: 9 }}> ({gst}%)</span>
+                    </TD>
+                  )}
+                  <TD style={{ textAlign: 'right', fontWeight: 800, color: '#1a2b5e', borderRight: 'none', paddingRight: 14, whiteSpace: 'nowrap' }}>
+                    ₹ {fmtNum(finalP)}
+                  </TD>
+                </tr>
               );
             })}
           </tbody>
         </table>
       </div>
 
-      {/* Footer */}
-      <div style={{ borderTop: '1.5px solid #BBDEFB', padding: '7px 28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#F0F4FF', marginTop: 'auto' }}>
-        <span style={{ fontSize: 9, color: '#5C6BC0', fontWeight: 600 }}>aromadelite-app.vercel.app/catalog</span>
-        <span style={{ fontSize: 9, color: '#78909C' }}>
+      {/* ── Footer ── */}
+      <div style={{ borderTop: '1px solid #e2e8f0', padding: '8px 28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', marginTop: 'auto' }}>
+        <span style={{ fontSize: 9, color: '#64748b', fontWeight: 600 }}>
           {share
             ? `Prepared by ${share.associate_name || 'Aromadelite'}${share.associate_phone ? ' · ' + share.associate_phone : ''}`
-            : 'Contact your Aromadelite representative for bulk pricing & custom quotes'
-          }
+            : 'Contact your Aromadelite representative for bulk pricing & custom quotes'}
         </span>
-        <span style={{ fontSize: 9, color: '#5C6BC0', fontWeight: 700 }}>Page {pageNum} / {totalPages}</span>
+        <span style={{ fontSize: 9, color: '#94a3b8' }}>{firm.name}</span>
+        <span style={{ fontSize: 9, color: '#1a2b5e', fontWeight: 700 }}>Page {pageNum} / {totalPages}</span>
       </div>
 
       {/* Bottom accent */}
-      <div style={{ height: 4, background: 'linear-gradient(90deg, #1565C0, #0D47A1)' }} />
+      <div style={{ height: 4, background: 'linear-gradient(90deg, #1a2b5e, #1F6BC7)' }} />
     </div>
   );
 }
