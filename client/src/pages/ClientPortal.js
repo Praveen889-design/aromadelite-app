@@ -5,17 +5,29 @@ import axios from 'axios';
 const api = axios.create({ baseURL: '' });
 
 /* Mirrors ProductCard logic — calculates pack price from size label + base per-unit price */
+// Pack price from the label's quantity + unit ("5L" = 5×base), independent of
+// how product.unit is stored. Mirrors calcPackPrice in ProductCard.js.
 const calcPackPrice = (sizeLabel, basePrice, unit) => {
   const base = Number(basePrice) || 0;
   const lbl  = (sizeLabel || '').toLowerCase().trim();
   const u    = (unit || '').toLowerCase().trim();
-  if ((u === 'ltr' || u === 'litre' || u === 'l') && /ltr|litre/i.test(lbl)) {
-    const qty = parseFloat(lbl); if (qty > 0) return Math.round(qty * base);
-  }
-  if (u === 'kg') {
-    if (/\bkg\b/i.test(lbl)) { const qty = parseFloat(lbl); if (qty > 0) return Math.round(qty * base); }
-    if (/gms?\b|grams?\b/i.test(lbl)) { const qty = parseFloat(lbl); if (qty > 0) return Math.round((qty / 1000) * base); }
-  }
+  const qty  = parseFloat(lbl);
+  if (!(qty > 0)) return base;
+
+  const lblMl    = /\d\s*ml\b/.test(lbl);
+  const lblLitre = !lblMl && /\d\s*(l\b|ltr|litre|liter)/.test(lbl);
+  const lblGram  = /\d\s*(gms?\b|grams?\b)/.test(lbl);
+  const lblKg    = !lblGram && /\d\s*kgs?\b/.test(lbl);
+
+  if (lblMl)    return Math.round((qty / 1000) * base);
+  if (lblLitre) return Math.round(qty * base);
+  if (lblGram)  return Math.round((qty / 1000) * base);
+  if (lblKg)    return Math.round(qty * base);
+
+  const unitLitre = u === 'l' || u === 'ltr' || u === 'litre' || u === 'liter' || u === 'litres';
+  const unitKg    = u === 'kg' || u === 'kgs' || u === 'kilogram';
+  if (unitLitre || unitKg) return Math.round(qty * base);
+
   return base;
 };
 

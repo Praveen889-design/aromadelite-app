@@ -105,20 +105,30 @@ router.get('/summary', async (req, res) => {
 /**
  * Pack-size multiplier: same logic as client-side calcPackPrice.
  * Converts per-unit manufacturing cost → per-pack cost so COGS is accurate.
- * e.g. pack_size="5 Ltr", mfgCost=₹10/ltr, unit="ltr" → ₹50 per pack
+ * The pack label carries the quantity + unit ("5L" = 5 × per-unit cost),
+ * independent of how product.unit is stored.
  */
 const calcPackCost = (packSize, costPerUnit, productUnit) => {
   const cost = Number(costPerUnit) || 0;
   const lbl  = (packSize     || '').toLowerCase().trim();
   const u    = (productUnit  || '').toLowerCase().trim();
+  const n    = parseFloat(lbl);
+  if (!(n > 0)) return cost;
 
-  if ((u === 'ltr' || u === 'litre' || u === 'l') && /ltr|litre/i.test(lbl)) {
-    const n = parseFloat(lbl); if (n > 0) return n * cost;
-  }
-  if (u === 'kg') {
-    if (/\bkg\b/i.test(lbl))            { const n = parseFloat(lbl); if (n > 0) return n * cost; }
-    if (/gms?\b|grams?\b/i.test(lbl))   { const n = parseFloat(lbl); if (n > 0) return (n / 1000) * cost; }
-  }
+  const lblMl    = /\d\s*ml\b/.test(lbl);
+  const lblLitre = !lblMl && /\d\s*(l\b|ltr|litre|liter)/.test(lbl);
+  const lblGram  = /\d\s*(gms?\b|grams?\b)/.test(lbl);
+  const lblKg    = !lblGram && /\d\s*kgs?\b/.test(lbl);
+
+  if (lblMl)    return (n / 1000) * cost;
+  if (lblLitre) return n * cost;
+  if (lblGram)  return (n / 1000) * cost;
+  if (lblKg)    return n * cost;
+
+  const unitLitre = u === 'l' || u === 'ltr' || u === 'litre' || u === 'liter' || u === 'litres';
+  const unitKg    = u === 'kg' || u === 'kgs' || u === 'kilogram';
+  if (unitLitre || unitKg) return n * cost;
+
   return cost; // fallback: treat cost as per-item already
 };
 

@@ -5,34 +5,38 @@ const formatINR = (n) =>
 
 /**
  * Calculate the pack price from the size label and the per-unit base_price.
- * Only multiplies when the pack unit matches the product unit.
+ * The pack LABEL carries the quantity + unit, so "5L" = 5 × base regardless
+ * of how product.unit is stored ("L", "l", "ltr", or even blank).
  *
- *   unit=ltr + size has "ltr/litre" → qty × base_price   (5ltr @ ₹40 = ₹200)
- *   unit=kg  + size has "kg/KG"    → qty × base_price   (10 KG @ ₹120 = ₹1200)
- *   unit=kg  + size has "gms/gm"   → (qty/1000) × base  (500gms @ ₹250 = ₹125)
- *   unit mismatch / no match       → base_price unchanged
+ *   "1L"=base   "5L"=5×base   "20L"=20×base   "500ml"=0.5×base
+ *   "1 Kg"=base "10kg"=10×base "500gms"=0.5×base
+ *   bare number ("5") + litre/kg product unit → 5×base
+ *   no recognizable measure → base_price unchanged
  */
 export function calcPackPrice(sizeLabel, basePrice, unit) {
   const base = Number(basePrice) || 0;
   const lbl  = (sizeLabel || '').toLowerCase().trim();
   const u    = (unit || '').toLowerCase().trim();
+  const qty  = parseFloat(lbl);
+  if (!(qty > 0)) return base;
 
-  if ((u === 'ltr' || u === 'litre' || u === 'l') && /ltr|litre/i.test(lbl)) {
-    const qty = parseFloat(lbl);
-    if (qty > 0) return Math.round(qty * base);
-  }
-  if (u === 'kg') {
-    // Match "1 KG", "10kg", "1KG" etc.
-    if (/\bkg\b/i.test(lbl)) {
-      const qty = parseFloat(lbl);
-      if (qty > 0) return Math.round(qty * base);
-    }
-    // Match "500gms", "500 gms", "500gm", "500 grams" — no leading \b needed
-    if (/gms?\b|grams?\b/i.test(lbl)) {
-      const qty = parseFloat(lbl);
-      if (qty > 0) return Math.round((qty / 1000) * base);
-    }
-  }
+  // Unit written in the pack label itself (most reliable)
+  const lblMl    = /\d\s*ml\b/.test(lbl);
+  const lblLitre = !lblMl && /\d\s*(l\b|ltr|litre|liter)/.test(lbl);
+  const lblGram  = /\d\s*(gms?\b|grams?\b)/.test(lbl);
+  const lblKg    = !lblGram && /\d\s*kgs?\b/.test(lbl);
+
+  if (lblMl)    return Math.round((qty / 1000) * base);
+  if (lblLitre) return Math.round(qty * base);
+  if (lblGram)  return Math.round((qty / 1000) * base);
+  if (lblKg)    return Math.round(qty * base);
+
+  // Label is a bare number with no unit token — scale by the product's
+  // measure unit (litre/kg). Non-measure units (pc/box/pair) stay flat.
+  const unitLitre = u === 'l' || u === 'ltr' || u === 'litre' || u === 'liter' || u === 'litres';
+  const unitKg    = u === 'kg' || u === 'kgs' || u === 'kilogram';
+  if (unitLitre || unitKg) return Math.round(qty * base);
+
   return base;
 }
 
