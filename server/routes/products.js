@@ -201,6 +201,12 @@ router.patch('/:id', requireRole('admin', 'central_office'), async (req, res) =>
     const $v = (v) => { vals.push(v); return `$${vals.length}`; };
     const setClauses = [];
 
+    if (b.category_id !== undefined) {
+      const catId = Number(b.category_id);
+      const catCheck = await pool.query('SELECT id FROM product_categories WHERE id = $1', [catId]);
+      if (!catCheck.rows[0]) return res.status(400).json({ error: 'Invalid category' });
+      setClauses.push(`category_id = ${$v(catId)}`);
+    }
     if (b.name !== undefined)         setClauses.push(`name = ${$v(b.name)}`);
     if (b.description !== undefined)  setClauses.push(`description = ${$v(b.description)}`);
     if (b.unit !== undefined)         setClauses.push(`unit = ${$v(b.unit)}`);
@@ -235,6 +241,24 @@ router.patch('/:id', requireRole('admin', 'central_office'), async (req, res) =>
     `, [req.params.id]);
     res.json({ product: hydrate(rows[0]) });
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Admin — permanently delete a product. Historical quotes/bills keep their
+// own item snapshots, so deleting here does not affect past documents.
+router.delete('/:id', requireRole('admin'), async (req, res) => {
+  try {
+    const existing = await pool.query('SELECT id, name FROM products WHERE id = $1', [req.params.id]);
+    if (!existing.rows[0]) return res.status(404).json({ error: 'Product not found' });
+
+    await pool.query('DELETE FROM products WHERE id = $1', [req.params.id]);
+    res.json({ ok: true, id: Number(req.params.id), name: existing.rows[0].name });
+  } catch (err) {
+    // Foreign-key violation → product is still referenced somewhere
+    if (err.code === '23503') {
+      return res.status(409).json({ error: 'This product is referenced elsewhere. Use "Disable" instead of deleting.' });
+    }
     res.status(500).json({ error: err.message });
   }
 });

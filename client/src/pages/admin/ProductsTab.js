@@ -61,6 +61,17 @@ export default function ProductsTab() {
     }
   };
 
+  const deleteProduct = async (p) => {
+    if (!window.confirm(`Delete "${p.name}" permanently?\n\nThis cannot be undone. Past quotes & bills keep their own records, so they are unaffected.`)) return;
+    try {
+      await api.delete(`/api/products/${p.id}`);
+      setProducts((arr) => arr.filter((x) => x.id !== p.id));
+      toast(`${p.name} deleted.`, { kind: 'success' });
+    } catch (e) {
+      toast(e?.response?.data?.error || 'Failed to delete', { kind: 'error' });
+    }
+  };
+
   const savePrice = async (p) => {
     const next = Number(editing[p.id]?.base_price);
     if (!Number.isFinite(next) || next < 0) return;
@@ -198,8 +209,13 @@ export default function ProductsTab() {
                           <button onClick={() => setModal({ open: true, mode: 'edit', product: p })}
                                   className="text-xs px-2 py-1 rounded border border-slate-300 hover:bg-slate-100 mr-1">Edit</button>
                           <button onClick={() => toggleActive(p)}
-                                  className="text-xs px-2 py-1 rounded border border-slate-300 hover:bg-slate-100">
+                                  className="text-xs px-2 py-1 rounded border border-slate-300 hover:bg-slate-100 mr-1">
                             {p.is_active ? 'Disable' : 'Enable'}
+                          </button>
+                          <button onClick={() => deleteProduct(p)}
+                                  title="Permanently delete this product"
+                                  className="text-xs px-2 py-1 rounded border border-rose-200 text-rose-600 hover:bg-rose-50">
+                            Delete
                           </button>
                         </>
                       )}
