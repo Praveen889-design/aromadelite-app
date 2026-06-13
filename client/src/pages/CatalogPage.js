@@ -398,15 +398,15 @@ export default function CatalogPage() {
       </div>
 
       {/* ── Notice ──────────────────────────────────────────── */}
-      <div className="no-print" style={{ maxWidth: 960, margin: '14px auto 0', padding: '0 16px' }}>
+      <div className="no-print" style={{ maxWidth: 820, margin: '14px auto 0', padding: '0 16px' }}>
         <div style={{ background: '#fff', border: '1px solid #C5CAE9', borderRadius: 10, padding: '10px 16px', fontSize: 12, color: '#3F51B5', display: 'flex', gap: 8, alignItems: 'center' }}>
           <span>ℹ️</span>
-          <span>Each category prints as a separate A4 landscape page. {isLoggedIn && !token ? 'Click <strong>Share Catalogue</strong> to generate a personalised link for a specific client.' : ''}</span>
+          <span>Each category prints as a separate A4 portrait page. {isLoggedIn && !token ? 'Click <strong>Share Catalogue</strong> to generate a personalised link for a specific client.' : ''}</span>
         </div>
       </div>
 
       {/* ── Catalog pages ────────────────────────────────────── */}
-      <div style={{ maxWidth: 960, margin: '16px auto 48px', padding: '0 16px' }} id="print-root">
+      <div style={{ maxWidth: 820, margin: '16px auto 48px', padding: '0 16px' }} id="print-root">
         {filtered.length === 0
           ? <div style={{ textAlign: 'center', color: '#78909C', padding: 60, fontSize: 15 }}>No products found.</div>
           : filtered.map((cat, i) => (
@@ -422,7 +422,7 @@ export default function CatalogPage() {
 
       {/* ── Print styles ─────────────────────────────────────── */}
       <style>{`
-        @page { size: A4 landscape; margin: 0; }
+        @page { size: A4 portrait; margin: 0; }
         @media print {
           * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
           .no-print { display: none !important; }
