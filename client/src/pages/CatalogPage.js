@@ -4,9 +4,10 @@
  * /catalog          → general public price list (no client details)
  * /catalog/:token   → personalised catalog (shows client details + associate)
  *
- * Associates generate a personalised link via the "Share Catalog" modal.
+ * The PDF is generated exactly like the Quote: one continuous A4 document
+ * sliced into pages at safe row boundaries (no per-category white space).
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
 import jsPDF from 'jspdf';
@@ -17,15 +18,12 @@ import { isNative, downloadPdf } from '../utils/pdfNative';
 const api = axios.create({ baseURL: '' });
 
 /* ── helpers ─────────────────────────────────────────────── */
-// Plain number with Indian grouping (prices are whole rupees) — matches Quote PDF
 const fmtNum = (n, dec = 0) =>
   new Intl.NumberFormat('en-IN', { maximumFractionDigits: dec }).format(n || 0);
 
 // Without-GST catalogues apply a flat markup instead of GST (mirrors quotes/bills)
 const WITHOUT_GST_MARKUP = 0.05; // +5%
 
-// with_gst    → base + GST = final price (GST shown separately)
-// without_gst → base × (1 + markup), no GST
 const finalPrice = (basePrice, gstPct, gstMode) =>
   gstMode === 'without_gst'
     ? Math.round(Number(basePrice || 0) * (1 + WITHOUT_GST_MARKUP))
@@ -67,181 +65,6 @@ const unitLabel = (unit) => {
 const today = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' });
 
 /* ═══════════════════════════════════════════════════════════
-   SHARE MODAL — captures client details before generating link
-═══════════════════════════════════════════════════════════ */
-/* ═══════════════════════════════════════════════════════════
-   PDF PAGE — one per category
-═══════════════════════════════════════════════════════════ */
-function CatalogPageSheet({ cat, pageNum, totalPages, share, gstMode }) {
-  const isWithoutGst = gstMode === 'without_gst';
-  const firm = firmFor(gstMode);
-  const headers = isWithoutGst
-    ? ['#', 'Product Name & Description', 'Unit', 'Pack Sizes', 'Price (₹)']
-    : ['#', 'Product Name & Description', 'Unit', 'Pack Sizes', 'Base Price (₹)', 'GST (₹)', 'Price incl. GST (₹)'];
-  const colCount = headers.length;
-
-  return (
-    <div className="catalog-page">
-      {/* ══ HEADER BAND — same as Quote PDF ══ */}
-      {/* Top accent stripe */}
-      <div style={{ height: 5, background: 'linear-gradient(90deg, #1a2b5e 0%, #1F6BC7 60%, #38bdf8 100%)' }} />
-
-      {/* Company block */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 20, padding: '16px 28px 14px', background: '#ffffff', borderBottom: '1px solid #e2e8f0' }}>
-        {/* Logo */}
-        <div style={{ width: 100, height: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          <img src="/aromadelite-logo.png" alt="Aromadelite" style={{ width: 100, height: 'auto', maxHeight: 60, objectFit: 'contain' }} />
-        </div>
-        {/* Company info */}
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 18, fontWeight: 900, color: '#1a2b5e', letterSpacing: 0.5, lineHeight: 1.1 }}>
-            {firm.name}
-          </div>
-          <div style={{ fontSize: 10, color: '#64748b', marginTop: 4, letterSpacing: 0.1 }}>
-            SAI NAGAR HNO 8-229/8, NVV NAGAR, CHINTAL, QUTHBULLAPUR, MALKAJGIRI – 500054
-          </div>
-          <div style={{ display: 'flex', gap: 24, marginTop: 5, fontSize: 10, color: '#475569' }}>
-            <span>📞 +91 63043 82947</span>
-            <span>✉ contact@aromadelite.in</span>
-            <span>🌐 aromadelite.in</span>
-          </div>
-          {firm.gstin && (
-            <div style={{ display: 'flex', gap: 24, marginTop: 3, fontSize: 10, color: '#475569' }}>
-              <span><strong style={{ color: '#1a2b5e' }}>GSTIN:</strong> {firm.gstin}</span>
-              <span><strong style={{ color: '#1a2b5e' }}>State:</strong> 36-Telangana</span>
-            </div>
-          )}
-        </div>
-        {/* CATALOGUE label */}
-        <div style={{ flexShrink: 0, textAlign: 'right' }}>
-          <div style={{ fontSize: 20, fontWeight: 900, color: '#1a2b5e', letterSpacing: 1.5, textTransform: 'uppercase', lineHeight: 1.05 }}>
-            PRODUCT
-          </div>
-          <div style={{ fontSize: 20, fontWeight: 900, color: '#1a2b5e', letterSpacing: 1.5, textTransform: 'uppercase', lineHeight: 1.05 }}>
-            CATALOGUE
-          </div>
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#1F6BC7', marginTop: 4 }}>
-            {isWithoutGst ? 'Price List' : 'Inclusive of GST'}
-          </div>
-          <div style={{ fontSize: 9, color: '#90A4AE', marginTop: 2 }}>As of {today}</div>
-        </div>
-      </div>
-      {/* ══ END HEADER BAND ══ */}
-
-      {/* ── Prepared For / Prepared By band (personalised, first page only) ── */}
-      {share && pageNum === 1 && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
-          <div style={{ padding: '12px 20px', borderRight: '1px solid #e2e8f0' }}>
-            <div style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1.2, color: '#94a3b8', marginBottom: 7 }}>
-              Prepared For
-            </div>
-            {[['🏢', share.business_name], ['👤', share.poc_name], ['📞', share.contact], ['📍', share.location]].filter(([, v]) => v).map(([icon, val]) => (
-              <div key={val} style={{ fontSize: 11, color: '#334155', marginTop: 2 }}><span style={{ color: '#94a3b8' }}>{icon}</span> <strong style={{ color: '#1a2b5e' }}>{val}</strong></div>
-            ))}
-          </div>
-          <div style={{ padding: '12px 20px' }}>
-            <div style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1.2, color: '#94a3b8', marginBottom: 7 }}>
-              Prepared By
-            </div>
-            <div style={{ fontWeight: 900, color: '#1a2b5e', fontSize: 13 }}>{share.associate_name || '—'}</div>
-            {share.associate_phone && <div style={{ fontSize: 11, color: '#1F6BC7', fontWeight: 600, marginTop: 2 }}>📞 {share.associate_phone}</div>}
-            <div style={{ fontSize: 9, color: '#90A4AE', marginTop: 3 }}>
-              {new Date(share.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Items Table — same styling as Quote PDF ── */}
-      <div style={{ flex: 1 }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr>
-              {headers.map((h, i) => (
-                <TH key={h} style={{
-                  width: i === 0 ? 30 : undefined,
-                  textAlign: i === 0 ? 'center' : i >= colCount - (isWithoutGst ? 1 : 3) ? 'right' : 'left',
-                  borderRight: i === colCount - 1 ? 'none' : '1px solid #2d3f72',
-                  paddingLeft: i === 0 ? 14 : 10,
-                  paddingRight: i === colCount - 1 ? 14 : 10,
-                  whiteSpace: 'nowrap',
-                }}>{h}</TH>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {/* Category header row — Quote style */}
-            <tr>
-              <td colSpan={colCount} style={{
-                padding: '6px 14px 6px 12px', background: '#f1f5f9',
-                borderTop: '1px solid #e2e8f0', borderBottom: '1px solid #e2e8f0',
-                borderLeft: '3px solid #1F6BC7', fontWeight: 800, fontSize: 10.5,
-                color: '#1e40af', letterSpacing: 0.5, textTransform: 'uppercase',
-              }}>
-                {cat.icon && <span style={{ marginRight: 6 }}>{cat.icon}</span>}
-                {cat.name}
-                <span style={{ fontWeight: 600, color: '#64748b', textTransform: 'none', letterSpacing: 0 }}> · {cat.products.length} products</span>
-              </td>
-            </tr>
-            {cat.products.map((p, idx) => {
-              const gst    = Number(p.gst_percent) || 0;
-              const base   = Number(p.base_price) || 0;
-              const gstAmt = Math.round(base * gst / 100);
-              const finalP = finalPrice(base, gst, gstMode);
-              return (
-                <tr key={p.id} style={{ background: idx % 2 === 0 ? '#ffffff' : '#fafbfd' }}>
-                  <TD style={{ textAlign: 'center', color: '#94a3b8', fontSize: 10, paddingLeft: 14 }}>{idx + 1}</TD>
-                  <TD style={{ paddingLeft: 14 }}>
-                    <span style={{ fontWeight: 700, color: '#1e293b' }}>{p.name}</span>
-                    {p.description && <div style={{ color: '#64748b', fontSize: 9.5, marginTop: 2, lineHeight: 1.35 }}>{p.description}</div>}
-                    {p.variants?.length > 0 && (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginTop: 3 }}>
-                        {p.variants.map((v, vi) => <span key={vi} style={{ fontSize: 9, background: '#eef2ff', color: '#3730a3', border: '1px solid #c7d2fe', borderRadius: 99, padding: '1px 6px', fontWeight: 600 }}>{v}</span>)}
-                      </div>
-                    )}
-                  </TD>
-                  <TD style={{ fontWeight: 600, color: '#334155', whiteSpace: 'nowrap' }}>{unitLabel(p.unit)}</TD>
-                  <TD>
-                    {p.pack_sizes?.length > 0
-                      ? p.pack_sizes.map((s, si) => <span key={si} style={{ display: 'inline-block', fontSize: 9, background: '#eef4ff', color: '#1F6BC7', border: '1px solid #bdd6f5', borderRadius: 99, padding: '1px 7px', margin: '1px 2px', fontWeight: 600 }}>{s.size}</span>)
-                      : <span style={{ color: '#cbd5e1' }}>—</span>}
-                  </TD>
-                  {!isWithoutGst && (
-                    <TD style={{ textAlign: 'right', color: '#334155', whiteSpace: 'nowrap' }}>₹ {fmtNum(base)}</TD>
-                  )}
-                  {!isWithoutGst && (
-                    <TD style={{ textAlign: 'right', color: '#475569', whiteSpace: 'nowrap' }}>
-                      ₹ {fmtNum(gstAmt)}<span style={{ color: '#94a3b8', fontSize: 9 }}> ({gst}%)</span>
-                    </TD>
-                  )}
-                  <TD style={{ textAlign: 'right', fontWeight: 800, color: '#1a2b5e', borderRight: 'none', paddingRight: 14, whiteSpace: 'nowrap' }}>
-                    ₹ {fmtNum(finalP)}
-                  </TD>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-
-      {/* ── Footer ── */}
-      <div style={{ borderTop: '1px solid #e2e8f0', padding: '8px 28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', marginTop: 'auto' }}>
-        <span style={{ fontSize: 9, color: '#64748b', fontWeight: 600 }}>
-          {share
-            ? `Prepared by ${share.associate_name || 'Aromadelite'}${share.associate_phone ? ' · ' + share.associate_phone : ''}`
-            : 'Contact your Aromadelite representative for bulk pricing & custom quotes'}
-        </span>
-        <span style={{ fontSize: 9, color: '#94a3b8' }}>{firm.name}</span>
-        <span style={{ fontSize: 9, color: '#1a2b5e', fontWeight: 700 }}>Page {pageNum} / {totalPages}</span>
-      </div>
-
-      {/* Bottom accent */}
-      <div style={{ height: 4, background: 'linear-gradient(90deg, #1a2b5e, #1F6BC7)' }} />
-    </div>
-  );
-}
-
-/* ═══════════════════════════════════════════════════════════
    MAIN COMPONENT
 ═══════════════════════════════════════════════════════════ */
 export default function CatalogPage() {
@@ -257,6 +80,9 @@ export default function CatalogPage() {
   const [gstMode,     setGstMode]     = useState('with_gst');
   const [pdfBusy,     setPdfBusy]     = useState(false);
 
+  const docRef    = useRef(null);
+  const headerRef = useRef(null);
+
   const authToken = localStorage.getItem('token');
   const isLoggedIn = !!authToken;
 
@@ -267,7 +93,6 @@ export default function CatalogPage() {
           const { data } = await api.get(`/api/catalog/share/${token}`);
           setCatalog(data.catalog || []);
           setShare(data.share || null);
-          // Personalised catalogues render in the mode chosen when shared
           setGstMode(data.share?.gst_mode === 'without_gst' ? 'without_gst' : 'with_gst');
         } else {
           const { data } = await api.get('/api/catalog');
@@ -293,7 +118,7 @@ export default function CatalogPage() {
     }))
     .filter(cat => cat.products.length > 0);
 
-  const handleCreated = (url) => {
+  const handleCreated = () => {
     setShowModal(false);
     setLinkCopied(true);
     setTimeout(() => setLinkCopied(false), 4000);
@@ -309,40 +134,116 @@ export default function CatalogPage() {
 
   const fileName = `Aromadelite_Catalogue${share?.business_name ? '_' + share.business_name.replace(/[^A-Za-z0-9]+/g, '_') : ''}.pdf`;
 
-  // Build a multi-page A4 portrait PDF — one captured catalogue sheet per page.
-  // Used for both web and the native (Capacitor) app, where window.print() is a no-op.
-  const buildCatalogPdf = async () => {
-    const sheets = Array.from(document.querySelectorAll('.catalog-page'));
-    if (!sheets.length) return null;
-    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  /* ── PDF builder — smart row-aware page breaks (same as Quote) ── */
+  const buildPdf = async () => {
+    const scale       = 2;
+    const containerEl = docRef.current;
+    if (!containerEl) return null;
+
+    // 1. Measure every tagged row BEFORE capture (canvas pixels)
+    const containerTop = containerEl.getBoundingClientRect().top;
+    const rowEls       = containerEl.querySelectorAll('[data-pdf-row]');
+    const rowBounds    = Array.from(rowEls)
+      .map(el => {
+        const r = el.getBoundingClientRect();
+        return {
+          top:    Math.round((r.top    - containerTop) * scale),
+          bottom: Math.round((r.bottom - containerTop) * scale),
+          keepWithNext: el.dataset.pdfRow === 'cat-header',
+        };
+      })
+      .sort((a, b) => a.top - b.top);
+
+    // Largest Y ≤ targetY that does NOT cut through a row (cat-header keeps with next)
+    const safeCutY = (targetY) => {
+      let y = targetY;
+      let changed = true;
+      while (changed) {
+        changed = false;
+        for (let i = rowBounds.length - 1; i >= 0; i--) {
+          const row = rowBounds[i];
+          if (row.top >= y) continue;
+          if (row.bottom <= y) {
+            if (row.keepWithNext && y === row.bottom) { y = row.top; changed = true; }
+            break;
+          }
+          y = row.top; changed = true; break;
+        }
+      }
+      return Math.max(y, 1);
+    };
+
+    // 2. Capture
+    const [fullCanvas, headerCanvas] = await Promise.all([
+      html2canvas(containerEl,       { scale, useCORS: true, backgroundColor: '#ffffff' }),
+      html2canvas(headerRef.current, { scale, useCORS: true, backgroundColor: '#ffffff' }),
+    ]);
+
+    const pdf   = new jsPDF({ unit: 'pt', format: 'a4', compress: true });
     const pageW = pdf.internal.pageSize.getWidth();
     const pageH = pdf.internal.pageSize.getHeight();
-    for (let i = 0; i < sheets.length; i++) {
-      const canvas = await html2canvas(sheets[i], { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
-      const img = canvas.toDataURL('image/jpeg', 0.92);
-      let w = pageW;
-      let h = (canvas.height / canvas.width) * w;
-      if (h > pageH) { h = pageH; w = (canvas.width / canvas.height) * h; }
-      if (i > 0) pdf.addPage();
-      pdf.addImage(img, 'JPEG', (pageW - w) / 2, 0, w, h);
+
+    const pxToPt  = pageW / fullCanvas.width;
+    const pageHpx = pageH / pxToPt;
+
+    const hdrNormH = Math.round((headerCanvas.height / headerCanvas.width) * fullCanvas.width);
+    const hdrHpt   = hdrNormH * pxToPt;
+
+    const tmp    = document.createElement('canvas');
+    tmp.width    = fullCanvas.width;
+    const tmpCtx = tmp.getContext('2d');
+
+    const crop = (src, srcY, srcH, srcNatW) => {
+      const h = Math.ceil(Math.min(srcH, src.height - srcY));
+      if (h <= 0) return null;
+      tmp.height = h;
+      tmpCtx.clearRect(0, 0, tmp.width, h);
+      tmpCtx.drawImage(src, 0, srcY, srcNatW, srcH, 0, 0, tmp.width, h);
+      return tmp.toDataURL('image/jpeg', 0.92);
+    };
+
+    const hdrData = crop(headerCanvas, 0, headerCanvas.height, headerCanvas.width);
+
+    // 3. Page 1
+    const rawP1Cut = Math.min(pageHpx, fullCanvas.height);
+    const p1Cut    = fullCanvas.height <= pageHpx ? rawP1Cut : safeCutY(rawP1Cut);
+    const p1Data   = crop(fullCanvas, 0, p1Cut, fullCanvas.width);
+    pdf.addImage(p1Data, 'JPEG', 0, 0, pageW, p1Cut * pxToPt, undefined, 'FAST');
+
+    // 4. Page 2+ — repeat header stripe + smart-cut content slice
+    let srcY = p1Cut;
+    while (srcY < fullCanvas.height) {
+      pdf.addPage();
+      pdf.addImage(hdrData, 'JPEG', 0, 0, pageW, hdrHpt, undefined, 'FAST');
+
+      const contentH = pageHpx - hdrNormH;
+      const rawCut   = srcY + contentH;
+      const cut      = rawCut >= fullCanvas.height ? fullCanvas.height : safeCutY(rawCut);
+
+      const advance = Math.max(cut - srcY, Math.ceil(contentH * 0.1));
+      const sliceH  = Math.min(advance, fullCanvas.height - srcY);
+
+      if (sliceH > 0) {
+        const sliceData = crop(fullCanvas, srcY, sliceH, fullCanvas.width);
+        if (sliceData) pdf.addImage(sliceData, 'JPEG', 0, hdrHpt, pageW, sliceH * pxToPt, undefined, 'FAST');
+      }
+      srcY += sliceH;
     }
     return pdf;
   };
 
   const handleDownloadPdf = async () => {
-    if (pdfBusy) return;
+    if (pdfBusy || !docRef.current) return;
     setPdfBusy(true);
     try {
-      const pdf = await buildCatalogPdf();
+      const pdf = await buildPdf();
       if (pdf) await downloadPdf(pdf, fileName);
     } catch (e) {
-      // Last-resort fallback for web browsers
-      if (!isNative()) window.print();
+      if (!isNative()) window.print(); // web last-resort
     } finally {
       setPdfBusy(false);
     }
   };
-
 
   if (loading) return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#F0F4FF' }}>
@@ -358,6 +259,16 @@ export default function CatalogPage() {
       <div style={{ textAlign: 'center', color: '#dc2626' }}>{error}</div>
     </div>
   );
+
+  const isWithoutGst = gstMode === 'without_gst';
+  const firm = firmFor(gstMode);
+  const headers = isWithoutGst
+    ? ['#', 'Product Name & Description', 'Unit', 'Pack Sizes', 'Price (₹)']
+    : ['#', 'Product Name & Description', 'Unit', 'Pack Sizes', 'Base Price (₹)', 'GST (₹)', 'Price incl. GST (₹)'];
+  const colCount = headers.length;
+  const colWidths = isWithoutGst
+    ? [30, undefined, 52, 110, 92]
+    : [30, undefined, 48, 88, 72, 78, 84];
 
   return (
     <div style={{ fontFamily: "'Inter', ui-sans-serif, system-ui, sans-serif", background: '#EEF2FF', minHeight: '100vh' }}>
@@ -414,14 +325,12 @@ export default function CatalogPage() {
             <span style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', fontSize: 15 }}>🔍</span>
           </div>
 
-          {/* Link copied toast */}
           {linkCopied && (
             <span style={{ background: '#E8F5E9', color: '#2E7D32', fontSize: 12, fontWeight: 700, padding: '6px 14px', borderRadius: 20 }}>
               ✓ Link copied!
             </span>
           )}
 
-          {/* Share catalog (logged in only) */}
           {isLoggedIn && !token && (
             <button onClick={() => setShowModal(true)} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 18px', background: '#fff', border: 'none', borderRadius: 9, color: '#0D2B6B', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>
               📋 Share Catalogue
@@ -438,43 +347,164 @@ export default function CatalogPage() {
         </div>
       </div>
 
-      {/* ── Notice ──────────────────────────────────────────── */}
-      <div className="no-print" style={{ maxWidth: 820, margin: '14px auto 0', padding: '0 16px' }}>
-        <div style={{ background: '#fff', border: '1px solid #C5CAE9', borderRadius: 10, padding: '10px 16px', fontSize: 12, color: '#3F51B5', display: 'flex', gap: 8, alignItems: 'center' }}>
-          <span>ℹ️</span>
-          <span>Each category prints as a separate A4 portrait page. {isLoggedIn && !token ? 'Click <strong>Share Catalogue</strong> to generate a personalised link for a specific client.' : ''}</span>
-        </div>
-      </div>
-
-      {/* ── Catalog pages ────────────────────────────────────── */}
-      <div style={{ maxWidth: 820, margin: '16px auto 48px', padding: '0 16px' }} id="print-root">
-        {filtered.length === 0
-          ? <div style={{ textAlign: 'center', color: '#78909C', padding: 60, fontSize: 15 }}>No products found.</div>
-          : filtered.map((cat, i) => (
-              <div key={cat.name} style={{ marginBottom: 24 }}>
-                <CatalogPageSheet cat={cat} pageNum={i + 1} totalPages={filtered.length} share={share} gstMode={gstMode} />
+      {/* ── Document (one continuous A4-width sheet, sliced into PDF pages) ── */}
+      <div style={{ overflowX: 'auto', padding: '20px 16px 48px' }}>
+        {filtered.length === 0 ? (
+          <div style={{ textAlign: 'center', color: '#78909C', padding: 60, fontSize: 15 }}>No products found.</div>
+        ) : (
+          <div
+            ref={docRef}
+            style={{
+              width: 794, background: '#ffffff', margin: '0 auto',
+              fontFamily: 'Arial, Helvetica, sans-serif', color: '#1e293b',
+              boxShadow: '0 4px 24px rgba(0,0,0,0.10)',
+            }}
+          >
+            {/* ══ HEADER BAND (repeats on every PDF page) ══ */}
+            <div ref={headerRef}>
+              <div style={{ height: 5, background: 'linear-gradient(90deg, #1a2b5e 0%, #1F6BC7 60%, #38bdf8 100%)' }} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 20, padding: '16px 28px 14px', background: '#ffffff', borderBottom: '1px solid #e2e8f0' }}>
+                <div style={{ width: 100, height: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <img src="/aromadelite-logo.png" alt="Aromadelite" style={{ width: 100, height: 'auto', maxHeight: 60, objectFit: 'contain' }} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 18, fontWeight: 900, color: '#1a2b5e', letterSpacing: 0.5, lineHeight: 1.1 }}>{firm.name}</div>
+                  <div style={{ fontSize: 10, color: '#64748b', marginTop: 4, letterSpacing: 0.1 }}>
+                    SAI NAGAR HNO 8-229/8, NVV NAGAR, CHINTAL, QUTHBULLAPUR, MALKAJGIRI – 500054
+                  </div>
+                  <div style={{ display: 'flex', gap: 24, marginTop: 5, fontSize: 10, color: '#475569' }}>
+                    <span>📞 +91 63043 82947</span>
+                    <span>✉ contact@aromadelite.in</span>
+                    <span>🌐 aromadelite.in</span>
+                  </div>
+                  {firm.gstin && (
+                    <div style={{ display: 'flex', gap: 24, marginTop: 3, fontSize: 10, color: '#475569' }}>
+                      <span><strong style={{ color: '#1a2b5e' }}>GSTIN:</strong> {firm.gstin}</span>
+                      <span><strong style={{ color: '#1a2b5e' }}>State:</strong> 36-Telangana</span>
+                    </div>
+                  )}
+                </div>
+                <div style={{ flexShrink: 0, textAlign: 'right' }}>
+                  <div style={{ fontSize: 20, fontWeight: 900, color: '#1a2b5e', letterSpacing: 1.2, textTransform: 'uppercase', lineHeight: 1.05 }}>PRODUCT</div>
+                  <div style={{ fontSize: 20, fontWeight: 900, color: '#1a2b5e', letterSpacing: 1.2, textTransform: 'uppercase', lineHeight: 1.05 }}>CATALOGUE</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#1F6BC7', marginTop: 4 }}>{isWithoutGst ? 'Price List' : 'Inclusive of GST'}</div>
+                  <div style={{ fontSize: 9, color: '#90A4AE', marginTop: 2 }}>As of {today}</div>
+                </div>
               </div>
-            ))
-        }
+            </div>
+            {/* ══ END HEADER BAND ══ */}
+
+            {/* Prepared For / Prepared By band */}
+            {share && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
+                <div style={{ padding: '12px 20px', borderRight: '1px solid #e2e8f0' }}>
+                  <div style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1.2, color: '#94a3b8', marginBottom: 7 }}>Prepared For</div>
+                  {[['🏢', share.business_name], ['👤', share.poc_name], ['📞', share.contact], ['📍', share.location]].filter(([, v]) => v).map(([icon, val]) => (
+                    <div key={val} style={{ fontSize: 11, color: '#334155', marginTop: 2 }}><span style={{ color: '#94a3b8' }}>{icon}</span> <strong style={{ color: '#1a2b5e' }}>{val}</strong></div>
+                  ))}
+                </div>
+                <div style={{ padding: '12px 20px' }}>
+                  <div style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1.2, color: '#94a3b8', marginBottom: 7 }}>Prepared By</div>
+                  <div style={{ fontWeight: 900, color: '#1a2b5e', fontSize: 13 }}>{share.associate_name || '—'}</div>
+                  {share.associate_phone && <div style={{ fontSize: 11, color: '#1F6BC7', fontWeight: 600, marginTop: 2 }}>📞 {share.associate_phone}</div>}
+                  <div style={{ fontSize: 9, color: '#90A4AE', marginTop: 3 }}>
+                    {new Date(share.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ── One continuous table — all categories flow back to back ── */}
+            <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+              <colgroup>
+                {colWidths.map((w, i) => <col key={i} style={w ? { width: w } : undefined} />)}
+              </colgroup>
+              <thead>
+                <tr>
+                  {headers.map((h, i) => (
+                    <TH key={h} style={{
+                      textAlign: i === 0 ? 'center' : i >= colCount - (isWithoutGst ? 1 : 3) ? 'right' : 'left',
+                      borderRight: i === colCount - 1 ? 'none' : '1px solid #2d3f72',
+                      paddingLeft: i === 0 ? 14 : 10,
+                      paddingRight: i === colCount - 1 ? 14 : 10,
+                    }}>{h}</TH>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((cat) => (
+                  <React.Fragment key={cat.name}>
+                    {/* Category header row */}
+                    <tr data-pdf-row="cat-header">
+                      <td colSpan={colCount} style={{
+                        padding: '6px 14px 6px 12px', background: '#f1f5f9',
+                        borderTop: '1px solid #e2e8f0', borderBottom: '1px solid #e2e8f0',
+                        borderLeft: '3px solid #1F6BC7', fontWeight: 800, fontSize: 10.5,
+                        color: '#1e40af', letterSpacing: 0.5, textTransform: 'uppercase',
+                      }}>
+                        {cat.icon && <span style={{ marginRight: 6 }}>{cat.icon}</span>}
+                        {cat.name}
+                        <span style={{ fontWeight: 600, color: '#64748b', textTransform: 'none', letterSpacing: 0 }}> · {cat.products.length} products</span>
+                      </td>
+                    </tr>
+                    {cat.products.map((p, idx) => {
+                      const gst    = Number(p.gst_percent) || 0;
+                      const base   = Number(p.base_price) || 0;
+                      const gstAmt = Math.round(base * gst / 100);
+                      const finalP = finalPrice(base, gst, gstMode);
+                      return (
+                        <tr key={p.id} data-pdf-row="item" style={{ background: idx % 2 === 0 ? '#ffffff' : '#fafbfd' }}>
+                          <TD style={{ textAlign: 'center', color: '#94a3b8', fontSize: 10, paddingLeft: 14 }}>{idx + 1}</TD>
+                          <TD style={{ paddingLeft: 14 }}>
+                            <span style={{ fontWeight: 700, color: '#1e293b' }}>{p.name}</span>
+                            {p.description && <div style={{ color: '#64748b', fontSize: 9.5, marginTop: 2, lineHeight: 1.35 }}>{p.description}</div>}
+                            {p.variants?.length > 0 && (
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginTop: 3 }}>
+                                {p.variants.map((v, vi) => <span key={vi} style={{ fontSize: 9, background: '#eef2ff', color: '#3730a3', border: '1px solid #c7d2fe', borderRadius: 99, padding: '1px 6px', fontWeight: 600 }}>{v}</span>)}
+                              </div>
+                            )}
+                          </TD>
+                          <TD style={{ fontWeight: 600, color: '#334155' }}>{unitLabel(p.unit)}</TD>
+                          <TD>
+                            {p.pack_sizes?.length > 0
+                              ? p.pack_sizes.map((s, si) => <span key={si} style={{ display: 'inline-block', fontSize: 9, background: '#eef4ff', color: '#1F6BC7', border: '1px solid #bdd6f5', borderRadius: 99, padding: '1px 7px', margin: '1px 2px', fontWeight: 600 }}>{s.size}</span>)
+                              : <span style={{ color: '#cbd5e1' }}>—</span>}
+                          </TD>
+                          {!isWithoutGst && (
+                            <TD style={{ textAlign: 'right', color: '#334155' }}>₹ {fmtNum(base)}</TD>
+                          )}
+                          {!isWithoutGst && (
+                            <TD style={{ textAlign: 'right', color: '#475569' }}>
+                              ₹ {fmtNum(gstAmt)}<span style={{ color: '#94a3b8', fontSize: 9 }}> ({gst}%)</span>
+                            </TD>
+                          )}
+                          <TD style={{ textAlign: 'right', fontWeight: 800, color: '#1a2b5e', borderRight: 'none', paddingRight: 14 }}>
+                            ₹ {fmtNum(finalP)}
+                          </TD>
+                        </tr>
+                      );
+                    })}
+                  </React.Fragment>
+                ))}
+              </tbody>
+            </table>
+
+            {/* Closing note */}
+            <div style={{ borderTop: '1px solid #e2e8f0', padding: '10px 28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc' }}>
+              <span style={{ fontSize: 9, color: '#64748b', fontWeight: 600 }}>
+                {share
+                  ? `Prepared by ${share.associate_name || 'Aromadelite'}${share.associate_phone ? ' · ' + share.associate_phone : ''}`
+                  : 'Contact your Aromadelite representative for bulk pricing & custom quotes'}
+              </span>
+              <span style={{ fontSize: 9, color: '#94a3b8' }}>{firm.name}</span>
+            </div>
+            <div style={{ height: 4, background: 'linear-gradient(90deg, #1a2b5e, #1F6BC7)' }} />
+          </div>
+        )}
       </div>
 
       {/* ── Share modal ──────────────────────────────────────── */}
       {showModal && <ShareCatalogModal onClose={() => setShowModal(false)} onCreated={handleCreated} />}
-
-      {/* ── Print styles ─────────────────────────────────────── */}
-      <style>{`
-        @page { size: A4 portrait; margin: 0; }
-        @media print {
-          * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-          .no-print { display: none !important; }
-          body, html { margin: 0 !important; padding: 0 !important; background: #fff !important; }
-          #print-root { max-width: 100% !important; margin: 0 !important; padding: 0 !important; }
-          #print-root > div { margin-bottom: 0 !important; }
-          .catalog-page { page-break-before: always !important; break-before: page !important; page-break-inside: avoid !important; width: 100% !important; display: flex !important; flex-direction: column !important; background: #fff !important; }
-          .catalog-page:first-child { page-break-before: avoid !important; break-before: avoid !important; }
-          tr { page-break-inside: avoid !important; break-inside: avoid !important; }
-        }
-      `}</style>
     </div>
   );
 }
