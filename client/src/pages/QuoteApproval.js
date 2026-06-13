@@ -111,6 +111,9 @@ export default function QuoteApproval() {
   const isWithoutGst = quote.gst_mode === 'without_gst';
   const grandTotal = +(totals.total_amount + (Math.round(totals.total_amount) - totals.total_amount)).toFixed(2);
 
+  // Without-GST quotes are issued under "Vemuri Life Care" (no GST registration).
+  const firmName = isWithoutGst ? 'Vemuri Life Care' : 'Sri Vemuri Sai Enterprises';
+
   /* ── Done confirmation screen ── */
   if (step === 'done' || quote.client_approval_status) {
     const wasApproved = (quote.client_approval_status || decision) === 'approved';
@@ -155,7 +158,7 @@ export default function QuoteApproval() {
         </svg>
         <div>
           <div style={{ fontWeight: 900, fontSize: 15 }}>Aromadelite</div>
-          <div style={{ fontSize: 11, opacity: 0.8 }}>Sri Vemuri Sai Enterprises</div>
+          <div style={{ fontSize: 11, opacity: 0.8 }}>{firmName}</div>
         </div>
         <div style={{ marginLeft: 'auto', fontSize: 12, opacity: 0.8, textAlign: 'right' }}>
           <div>Quotation #{quote.quote_number}</div>
@@ -206,17 +209,24 @@ export default function QuoteApproval() {
             <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 480 }}>
               <thead>
                 <tr style={{ background: '#f8fafc' }}>
-                  {['#', 'Product', 'Qty', 'Unit', 'Rate', 'GST', 'Amount'].map((h) => (
+                  {(isWithoutGst
+                    ? ['#', 'Product', 'Qty', 'Unit', 'Amount']
+                    : ['#', 'Product', 'Qty', 'Unit', 'Base Price', 'GST', 'Amount']
+                  ).map((h) => (
                     <th key={h} style={{
                       padding: '9px 12px', fontSize: 11, fontWeight: 700,
-                      color: '#64748b', textAlign: h === '#' || h === 'Qty' ? 'center' : h === 'Amount' || h === 'Rate' || h === 'GST' ? 'right' : 'left',
+                      color: '#64748b', textAlign: h === '#' || h === 'Qty' ? 'center' : h === 'Amount' || h === 'Base Price' || h === 'GST' ? 'right' : 'left',
                       borderBottom: '1.5px solid #e2e8f0', whiteSpace: 'nowrap',
                     }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {items.map((it, i) => (
+                {items.map((it, i) => {
+                  const gst      = Number(it.gst_percent) || 0;
+                  const lineBase = +((Number(it.quantity) || 0) * (Number(it.unit_price) || 0)).toFixed(2);
+                  const lineGst  = +(lineBase * gst / 100).toFixed(2);
+                  return (
                   <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
                     <td style={{ padding: '9px 12px', textAlign: 'center', fontSize: 12, color: '#94a3b8' }}>{i + 1}</td>
                     <td style={{ padding: '9px 12px' }}>
@@ -234,17 +244,22 @@ export default function QuoteApproval() {
                     </td>
                     <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 700, fontSize: 13 }}>{it.quantity}</td>
                     <td style={{ padding: '9px 12px', fontSize: 12, color: '#64748b' }}>{it.unit}</td>
-                    <td style={{ padding: '9px 12px', textAlign: 'right', fontSize: 13 }}>
-                      {fmt(it.unit_price)}
-                    </td>
-                    <td style={{ padding: '9px 12px', textAlign: 'right', fontSize: 12, color: '#64748b' }}>
-                      {it.gst_percent}%
-                    </td>
+                    {!isWithoutGst && (
+                      <td style={{ padding: '9px 12px', textAlign: 'right', fontSize: 13 }}>
+                        {fmt(it.unit_price)}
+                      </td>
+                    )}
+                    {!isWithoutGst && (
+                      <td style={{ padding: '9px 12px', textAlign: 'right', fontSize: 12, color: '#64748b' }}>
+                        {fmt(lineGst)} <span style={{ color: '#94a3b8', fontSize: 10 }}>({gst}%)</span>
+                      </td>
+                    )}
                     <td style={{ padding: '9px 12px', textAlign: 'right', fontWeight: 700, fontSize: 13, color: '#0f172a' }}>
                       {fmt(it.line_total)}
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -260,9 +275,6 @@ export default function QuoteApproval() {
                   <span>GST</span><span>{fmt(totals.gst_amount)}</span>
                 </div>
               </>
-            )}
-            {isWithoutGst && (
-              <div style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>* Prices are inclusive of GST</div>
             )}
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 17, fontWeight: 900, color: '#0891B2' }}>
               <span>Total Amount</span>
@@ -395,10 +407,10 @@ export default function QuoteApproval() {
 
         {/* Footer */}
         <div style={{ textAlign: 'center', marginTop: 28, fontSize: 12, color: '#94a3b8' }}>
-          <div>🌿 <strong>Aromadelite</strong> · Sri Vemuri Sai Enterprises</div>
+          <div>🌿 <strong>Aromadelite</strong> · {firmName}</div>
           <div style={{ marginTop: 4 }}>{company.phone} · {company.email}</div>
           <div style={{ marginTop: 2 }}>{company.address}</div>
-          <div style={{ marginTop: 4, fontSize: 11 }}>GSTIN: {company.gstin}</div>
+          {!isWithoutGst && <div style={{ marginTop: 4, fontSize: 11 }}>GSTIN: {company.gstin}</div>}
         </div>
       </div>
     </div>

@@ -201,6 +201,11 @@ export default function BillPreview() {
   const subTotal     = totals.total_amount; // GST-inclusive total (or plain for without_gst)
   const roundOff     = +(Math.round(subTotal) - subTotal).toFixed(2);
   const grandTotal   = +(subTotal + roundOff).toFixed(2);
+
+  // Without-GST invoices are issued under "Vemuri Life Care" (no GST registration).
+  const firm = isWithoutGst
+    ? { name: 'VEMURI LIFE CARE', gstin: null }
+    : { name: 'SRI VEMURI SAI ENTERPRISES', gstin: '36AQJPV7026L2Z5' };
   const fileName     = `Aromadelite_Bill_${bill.number}.pdf`;
   const onMobile     = isNative() || (typeof window !== 'undefined' && window.innerWidth < 640);
 
@@ -355,8 +360,10 @@ export default function BillPreview() {
         const itemLines = items.map((it, i) =>
           `${i + 1}. *${it.product_name}* · Qty ${it.quantity} ${it.unit || ''} × ₹${fmtNum(it.unit_price)} = *₹${fmtNum(it.line_total)}*`
         );
-        const gstNote = isWithoutGst ? '_(Prices inclusive of GST)_\n' : `GST: ₹${fmtNum(totals.gst_amount)}\n`;
-        const msg = `🌿 *AROMADELITE — TAX INVOICE*\n_Sri Vemuri Sai Enterprises_\n\n${greeting}\n\n*Bill No:* ${bill.number}\n*Date:* ${formatDate(bill.created_at)}\n\n${itemLines.join('\n')}\n\n━━━━━━━━━━━━\n${gstNote}*TOTAL: ₹${fmtNum(grandTotal)}*\n━━━━━━━━━━━━\n\n📞 6304382947 · contact@aromadelite.in`;
+        const gstNote = isWithoutGst ? '' : `GST: ₹${fmtNum(totals.gst_amount)}\n`;
+        const docTitle = isWithoutGst ? 'INVOICE' : 'TAX INVOICE';
+        const firmLine = isWithoutGst ? 'Vemuri Life Care' : 'Sri Vemuri Sai Enterprises';
+        const msg = `🌿 *AROMADELITE — ${docTitle}*\n_${firmLine}_\n\n${greeting}\n\n*Bill No:* ${bill.number}\n*Date:* ${formatDate(bill.created_at)}\n\n${itemLines.join('\n')}\n\n━━━━━━━━━━━━\n${gstNote}*TOTAL: ₹${fmtNum(grandTotal)}*\n━━━━━━━━━━━━\n\n📞 6304382947 · contact@aromadelite.in`;
         const phone = (client.phone || '').replace(/\D/g, '');
         window.open(phone
           ? `https://wa.me/${phone.length === 10 ? '91' + phone : phone}?text=${encodeURIComponent(msg)}`
@@ -755,7 +762,7 @@ export default function BillPreview() {
           {/* ── TITLE ── */}
           <div style={{ textAlign: 'center', marginBottom: 16 }}>
             <span style={{ fontSize: 20, fontWeight: 900, fontFamily: 'Georgia, serif', letterSpacing: 0.5 }}>
-              Tax Invoice
+              {isWithoutGst ? 'Invoice' : 'Tax Invoice'}
             </span>
           </div>
 
@@ -776,7 +783,7 @@ export default function BillPreview() {
               {/* Company details */}
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 22, fontWeight: 900, color: '#1a2b5e', letterSpacing: 0.3, lineHeight: 1.15, fontFamily: 'Arial, sans-serif' }}>
-                  SRI VEMURI SAI ENTERPRISES
+                  {firm.name}
                 </div>
                 <div style={{ fontSize: 11, color: '#333', marginTop: 4 }}>
                   SAI NAGAR H No 8-229/8, NVV NAGAR CHINTAL , QUTHBULLAPUR Hyderabad
@@ -785,10 +792,12 @@ export default function BillPreview() {
                   <span><strong>Phone:</strong>&nbsp; 6304382947</span>
                   <span><strong>Email:</strong>&nbsp; contact@aromadelite.in</span>
                 </div>
-                <div style={{ display: 'flex', gap: 32, marginTop: 2, fontSize: 11 }}>
-                  <span><strong>GSTIN:</strong>&nbsp; 36AQJPV7026L2Z5</span>
-                  <span><strong>State:</strong>&nbsp; 36-Telangana</span>
-                </div>
+                {firm.gstin && (
+                  <div style={{ display: 'flex', gap: 32, marginTop: 2, fontSize: 11 }}>
+                    <span><strong>GSTIN:</strong>&nbsp; {firm.gstin}</span>
+                    <span><strong>State:</strong>&nbsp; 36-Telangana</span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -803,7 +812,7 @@ export default function BillPreview() {
                 {client.city && <div style={{ fontSize: 11 }}>{client.city}</div>}
                 <div style={{ fontSize: 11, marginTop: 2 }}>
                   {client.phone && <span>Contact No: {client.phone}&nbsp;&nbsp;</span>}
-                  {client.gstin && <span>GSTIN: {client.gstin}</span>}
+                  {!isWithoutGst && client.gstin && <span>GSTIN: {client.gstin}</span>}
                 </div>
                 {client.state && <div style={{ fontSize: 11 }}>State: {client.state}</div>}
               </div>
@@ -827,23 +836,26 @@ export default function BillPreview() {
             </div>
 
             {/* ── Items Table ── */}
+            {/* With GST:  # | Product | Quantity | Unit | Base Price | GST | Amount
+                Without GST: # | Product | Quantity | Unit | Amount  (no GST shown) */}
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
                   <TH style={{ width: 28, textAlign: 'center' }}>#</TH>
-                  <TH>Item name</TH>
-                  <TH style={{ width: 72 }}>HSN/ SAC</TH>
+                  <TH>Product Name</TH>
                   <TH style={{ width: 72, textAlign: 'right' }}>Quantity</TH>
-                  <TH style={{ width: 40 }}>Unit</TH>
-                  <TH style={{ width: 90, textAlign: 'right' }}>
-                    Price/ Unit(₹)
-                  </TH>
-                  <TH style={{ width: 90, textAlign: 'right', borderRight: 'none' }}>Amount(₹)</TH>
+                  <TH style={{ width: 44 }}>Unit</TH>
+                  {!isWithoutGst && <TH style={{ width: 90, textAlign: 'right' }}>Base Price(₹)</TH>}
+                  {!isWithoutGst && <TH style={{ width: 88, textAlign: 'right' }}>GST(₹)</TH>}
+                  <TH style={{ width: 94, textAlign: 'right', borderRight: 'none' }}>Amount(₹)</TH>
                 </tr>
               </thead>
               <tbody>
                 {items.map((it, i) => {
                   const lineTotal = it.line_total || 0;
+                  const gst       = Number(it.gst_percent) || 0;
+                  const lineBase  = +((Number(it.quantity) || 0) * (Number(it.unit_price) || 0)).toFixed(2);
+                  const lineGst   = +(lineBase * gst / 100).toFixed(2);
                   return (
                     <tr key={i} style={{ background: i % 2 === 0 ? '#ffffff' : '#fafafa' }}>
                       <TD style={{ textAlign: 'center', color: '#666' }}>{i + 1}</TD>
@@ -855,10 +867,14 @@ export default function BillPreview() {
                           </span>
                         )}
                       </TD>
-                      <TD>{it.hsn_code || ''}</TD>
                       <TD style={{ textAlign: 'right' }}>{fmtNum(it.quantity, 0)}</TD>
                       <TD>{it.unit || 'Nos'}</TD>
-                      <TD style={{ textAlign: 'right' }}>₹ {fmtNum(it.unit_price)}</TD>
+                      {!isWithoutGst && <TD style={{ textAlign: 'right' }}>₹ {fmtNum(it.unit_price)}</TD>}
+                      {!isWithoutGst && (
+                        <TD style={{ textAlign: 'right', color: '#555' }}>
+                          ₹ {fmtNum(lineGst)}<span style={{ color: '#999', fontSize: 9 }}> ({gst}%)</span>
+                        </TD>
+                      )}
                       <TD style={{ textAlign: 'right', borderRight: 'none', fontWeight: 600 }}>
                         ₹ {fmtNum(lineTotal)}
                       </TD>
@@ -867,14 +883,15 @@ export default function BillPreview() {
                 })}
                 {/* Total row */}
                 <tr style={{ borderTop: '1.5px solid #000', fontWeight: 800, background: '#f5f5f5' }}>
-                  <td colSpan={3} style={{ padding: '6px 8px', fontSize: 12, fontWeight: 800, borderRight: '1px solid #ccc' }}>
+                  <td colSpan={2} style={{ padding: '6px 8px', fontSize: 12, fontWeight: 800, borderRight: '1px solid #ccc' }}>
                     Total
                   </td>
                   <td style={{ padding: '6px 8px', textAlign: 'right', fontSize: 12, fontWeight: 800, borderRight: '1px solid #ccc' }}>
                     {fmtNum(totalQty, 0)}
                   </td>
                   <td style={{ padding: '6px 8px', borderRight: '1px solid #ccc' }}></td>
-                  <td style={{ padding: '6px 8px', borderRight: '1px solid #ccc' }}></td>
+                  {!isWithoutGst && <td style={{ padding: '6px 8px', borderRight: '1px solid #ccc' }}></td>}
+                  {!isWithoutGst && <td style={{ padding: '6px 8px', borderRight: '1px solid #ccc' }}></td>}
                   <td style={{ padding: '6px 8px', textAlign: 'right', fontSize: 12, fontWeight: 800 }}>
                     ₹ {fmtNum(subTotal)}
                   </td>
@@ -1003,9 +1020,6 @@ export default function BillPreview() {
                   <div style={{ fontSize: 10, color: '#333', fontStyle: 'italic', lineHeight: 1.5 }}>
                     {amountInWords(grandTotal)} Only
                   </div>
-                  <div style={{ fontSize: 9, color: '#888', marginTop: 4, fontStyle: 'italic' }}>
-                    (All prices inclusive of applicable GST)
-                  </div>
                 </div>
               </div>
             </div>
@@ -1038,11 +1052,11 @@ export default function BillPreview() {
               <div style={{ fontSize: 11 }}><strong>Name :</strong> INDIAN BANK, CHINTHAL</div>
               <div style={{ fontSize: 11, marginTop: 3 }}><strong>Account No. :</strong> 6878749399</div>
               <div style={{ fontSize: 11, marginTop: 3 }}><strong>IFSC code :</strong> IDIB000C135</div>
-              <div style={{ fontSize: 11, marginTop: 3 }}><strong>Account holder's name :</strong> SRI VEMURI SAI ENTERPRISES</div>
+              <div style={{ fontSize: 11, marginTop: 3 }}><strong>Account holder's name :</strong> {firm.name}</div>
             </div>
             <div style={{ padding: '10px 12px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ fontSize: 11, fontWeight: 700, alignSelf: 'flex-end', width: '100%', textAlign: 'right' }}>
-                For SRI VEMURI SAI ENTERPRISES:
+                For {firm.name}:
               </div>
               <img
                 src="/signature.png"

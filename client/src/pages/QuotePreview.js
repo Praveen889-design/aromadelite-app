@@ -289,6 +289,13 @@ export default function QuotePreview() {
   const roundOff   = +(Math.round(subTotal) - subTotal).toFixed(2);
   const grandTotal = +(subTotal + roundOff).toFixed(2);
 
+  // Firm identity switches with GST mode. Without-GST documents are issued
+  // under "Vemuri Life Care" (no GST registration) — GSTIN hidden everywhere.
+  const firm = isWithoutGst
+    ? { name: 'VEMURI LIFE CARE', gstin: null }
+    : { name: 'SRI VEMURI SAI ENTERPRISES', gstin: '36AQJPV7026L2Z5' };
+  const colCount = isWithoutGst ? 5 : 7;
+
   const fileName = `Aromadelite_Quote_${quote.number}.pdf`;
 
   /* ── Shared PDF builder — smart row-aware page breaks ── */
@@ -460,7 +467,7 @@ export default function QuotePreview() {
       ? `\n🛒 *Expected Order:* ${ddmm(quote.expected_order_date)}` : '';
 
     return `🌿 *AROMADELITE*
-_Sri Vemuri Sai Enterprises_
+_${firm.name === 'VEMURI LIFE CARE' ? 'Vemuri Life Care' : 'Sri Vemuri Sai Enterprises'}_
 
 ${greeting}
 
@@ -2035,7 +2042,7 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
               {/* Company info */}
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 19, fontWeight: 900, color: '#1a2b5e', letterSpacing: 0.5, lineHeight: 1.1 }}>
-                  SRI VEMURI SAI ENTERPRISES
+                  {firm.name}
                 </div>
                 <div style={{ fontSize: 10, color: '#64748b', marginTop: 4, letterSpacing: 0.1 }}>
                   SAI NAGAR HNO 8-229/8, NVV NAGAR, CHINTAL, QUTHBULLAPUR, MALKAJGIRI – 500054
@@ -2045,10 +2052,12 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
                   <span>✉ contact@aromadelite.in</span>
                   <span>🌐 aromadelite.in</span>
                 </div>
-                <div style={{ display: 'flex', gap: 24, marginTop: 3, fontSize: 10, color: '#475569' }}>
-                  <span><strong style={{ color: '#1a2b5e' }}>GSTIN:</strong> 36AQJPV7026L2Z5</span>
-                  <span><strong style={{ color: '#1a2b5e' }}>State:</strong> 36-Telangana</span>
-                </div>
+                {firm.gstin && (
+                  <div style={{ display: 'flex', gap: 24, marginTop: 3, fontSize: 10, color: '#475569' }}>
+                    <span><strong style={{ color: '#1a2b5e' }}>GSTIN:</strong> {firm.gstin}</span>
+                    <span><strong style={{ color: '#1a2b5e' }}>State:</strong> 36-Telangana</span>
+                  </div>
+                )}
               </div>
               {/* QUOTATION label */}
               <div style={{ flexShrink: 0, textAlign: 'right' }}>
@@ -2116,16 +2125,8 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
                   ))}
                 </tbody>
               </table>
-              <div style={{ marginTop: 10 }}>
-                {isWithoutGst ? (
-                  <span style={{
-                    fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.8,
-                    background: '#fef9c3', color: '#854d0e', padding: '3px 10px', borderRadius: 20,
-                    display: 'inline-block',
-                  }}>
-                    GST Inclusive Pricing
-                  </span>
-                ) : (
+              {!isWithoutGst && (
+                <div style={{ marginTop: 10 }}>
                   <span style={{
                     fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.8,
                     background: '#ede9fe', color: '#5b21b6', padding: '3px 10px', borderRadius: 20,
@@ -2133,22 +2134,24 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
                   }}>
                     Prices Excl. GST · CGST + SGST Applicable
                   </span>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           </div>
 
           {/* ── Items Table ── */}
+          {/* With GST:  # | Product | Qty | Unit | Base Price | GST | Amount
+              Without GST: # | Product | Qty | Unit | Amount  (no GST shown) */}
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
                 <TH style={{ width: 30, textAlign: 'center', paddingLeft: 10 }}>#</TH>
-                <TH>Item Description</TH>
-                <TH style={{ width: 68, textAlign: 'center' }}>HSN/SAC</TH>
+                <TH>Product Name</TH>
                 <TH style={{ width: 58, textAlign: 'right' }}>Qty</TH>
-                <TH style={{ width: 38, textAlign: 'center' }}>Unit</TH>
-                <TH style={{ width: 88, textAlign: 'right' }}>Unit Price (₹)</TH>
-                <TH style={{ width: 92, textAlign: 'right', borderRight: 'none', paddingRight: 14 }}>Amount (₹)</TH>
+                <TH style={{ width: 44, textAlign: 'center' }}>Unit</TH>
+                {!isWithoutGst && <TH style={{ width: 88, textAlign: 'right' }}>Base Price (₹)</TH>}
+                {!isWithoutGst && <TH style={{ width: 84, textAlign: 'right' }}>GST (₹)</TH>}
+                <TH style={{ width: 96, textAlign: 'right', borderRight: 'none', paddingRight: 14 }}>Amount (₹)</TH>
               </tr>
             </thead>
             <tbody>
@@ -2156,7 +2159,7 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
                 <React.Fragment key={group.name}>
                   {/* ── Category header row ── */}
                   <tr data-pdf-row="cat-header">
-                    <td colSpan={7} style={{
+                    <td colSpan={colCount} style={{
                       padding: '6px 14px 6px 12px',
                       background: '#f1f5f9',
                       borderTop: '1px solid #e2e8f0',
@@ -2176,14 +2179,10 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
                   </tr>
                   {/* ── Items in this category ── */}
                   {group.rows.map((it, i) => {
-                    const lineTotal   = it.line_total || 0;
-                    const gst         = Number(it.gst_percent) || 0;
-                    const dispUnit    = isWithoutGst
-                      ? +(it.unit_price * (1 + gst / 100)).toFixed(2)
-                      : it.unit_price;
-                    const dispSysUnit = isWithoutGst
-                      ? +(it.system_price * (1 + gst / 100)).toFixed(2)
-                      : it.system_price;
+                    const lineTotal = it.line_total || 0;
+                    const gst       = Number(it.gst_percent) || 0;
+                    const lineBase  = +((Number(it.quantity) || 0) * (Number(it.unit_price) || 0)).toFixed(2);
+                    const lineGst   = +(lineBase * gst / 100).toFixed(2);
                     return (
                       <tr key={it._idx} data-pdf-row="item" style={{ background: i % 2 === 0 ? '#ffffff' : '#fafbfd' }}>
                         <TD style={{ textAlign: 'center', color: '#94a3b8', fontSize: 10, paddingLeft: 10 }}>{it._idx}</TD>
@@ -2200,19 +2199,26 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
                             </div>
                           )}
                         </TD>
-                        <TD style={{ textAlign: 'center', color: '#64748b', fontSize: 10 }}>{it.hsn_code || '—'}</TD>
                         <TD style={{ textAlign: 'right', fontWeight: 600 }}>{fmtNum(it.quantity, 0)}</TD>
                         <TD style={{ textAlign: 'center', color: '#64748b', fontSize: 10 }}>{it.unit || 'Nos'}</TD>
-                        <TD style={{ textAlign: 'right' }}>
-                          {it.system_price && it.system_price > it.unit_price ? (
-                            <div>
-                              <div style={{ textDecoration: 'line-through', color: '#cbd5e1', fontSize: 9 }}>
-                                ₹ {fmtNum(dispSysUnit)}
+                        {!isWithoutGst && (
+                          <TD style={{ textAlign: 'right' }}>
+                            {it.system_price && it.system_price > it.unit_price ? (
+                              <div>
+                                <div style={{ textDecoration: 'line-through', color: '#cbd5e1', fontSize: 9 }}>
+                                  ₹ {fmtNum(it.system_price)}
+                                </div>
+                                <div style={{ color: '#059669', fontWeight: 700 }}>₹ {fmtNum(it.unit_price)}</div>
                               </div>
-                              <div style={{ color: '#059669', fontWeight: 700 }}>₹ {fmtNum(dispUnit)}</div>
-                            </div>
-                          ) : <span style={{ color: '#334155' }}>₹ {fmtNum(dispUnit)}</span>}
-                        </TD>
+                            ) : <span style={{ color: '#334155' }}>₹ {fmtNum(it.unit_price)}</span>}
+                          </TD>
+                        )}
+                        {!isWithoutGst && (
+                          <TD style={{ textAlign: 'right', color: '#475569' }}>
+                            ₹ {fmtNum(lineGst)}
+                            <span style={{ color: '#94a3b8', fontSize: 9 }}> ({gst}%)</span>
+                          </TD>
+                        )}
                         <TD style={{ textAlign: 'right', fontWeight: 700, color: '#1e293b', borderRight: 'none', paddingRight: 14 }}>
                           ₹ {fmtNum(lineTotal)}
                         </TD>
@@ -2221,7 +2227,7 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
                   })}
                   {/* ── Category subtotal row ── */}
                   <tr data-pdf-row="subtotal" style={{ background: '#f8fafc' }}>
-                    <td colSpan={6} style={{
+                    <td colSpan={colCount - 1} style={{
                       padding: '5px 14px 5px 10px', fontSize: 10, textAlign: 'right',
                       color: '#475569', borderBottom: '1px solid #e2e8f0',
                       borderRight: '1px solid #eef1f7', fontStyle: 'italic',
@@ -2239,14 +2245,15 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
               ))}
               {/* ── Grand Total row ── */}
               <tr style={{ background: '#1a2b5e' }}>
-                <td colSpan={3} style={{ padding: '10px 14px', fontSize: 12, fontWeight: 900, color: '#ffffff', paddingLeft: 14 }}>
+                <td colSpan={2} style={{ padding: '10px 14px', fontSize: 12, fontWeight: 900, color: '#ffffff', paddingLeft: 14 }}>
                   TOTAL
                 </td>
                 <td style={{ padding: '10px 10px', textAlign: 'right', fontSize: 11, fontWeight: 700, color: '#e2e8f0' }}>
                   {fmtNum(items.reduce((s, it) => s + (Number(it.quantity) || 0), 0), 0)}
                 </td>
                 <td style={{ padding: '10px 8px' }}></td>
-                <td style={{ padding: '10px 10px' }}></td>
+                {!isWithoutGst && <td style={{ padding: '10px 8px' }}></td>}
+                {!isWithoutGst && <td style={{ padding: '10px 8px' }}></td>}
                 <td style={{ padding: '10px 14px', textAlign: 'right', fontSize: 14, fontWeight: 900, color: '#ffffff' }}>
                   ₹ {fmtNum(subTotal)}
                 </td>
@@ -2398,7 +2405,7 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
                       ['Bank', 'INDIAN BANK, CHINTHAL'],
                       ['Account No.', '6878749399'],
                       ['IFSC Code', 'IDIB000C135'],
-                      ['Account Name', 'SRI VEMURI SAI ENTERPRISES'],
+                      ['Account Name', firm.name],
                     ].map(([label, value]) => (
                       <tr key={label}>
                         <td style={{ padding: '2px 0', fontSize: 10, color: '#64748b', width: 90, verticalAlign: 'top' }}>{label}</td>
@@ -2412,7 +2419,7 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
               {/* Signature */}
               <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', justifyContent: 'space-between' }}>
                 <div style={{ fontSize: 10, fontWeight: 700, color: '#1a2b5e', textAlign: 'right' }}>
-                  For SRI VEMURI SAI ENTERPRISES
+                  For {firm.name}
                 </div>
                 <div style={{ textAlign: 'center', width: '100%' }}>
                   <img
