@@ -60,6 +60,15 @@ const pool = require('./database/db');
   }
 })();
 
+// Migrate: add products.image_url (stores a thumbnail data-URL or external URL)
+(async () => {
+  try {
+    await pool.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS image_url TEXT`);
+  } catch (e) {
+    console.warn('[migration] products.image_url add skipped:', e.message);
+  }
+})();
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 const IS_PROD = process.env.NODE_ENV === 'production';

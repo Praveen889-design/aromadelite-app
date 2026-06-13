@@ -456,13 +456,21 @@ export default function CatalogPage() {
                         <tr key={p.id} data-pdf-row="item" style={{ background: idx % 2 === 0 ? '#ffffff' : '#fafbfd' }}>
                           <TD style={{ textAlign: 'center', color: '#94a3b8', fontSize: 10, paddingLeft: 14 }}>{idx + 1}</TD>
                           <TD style={{ paddingLeft: 14 }}>
-                            <span style={{ fontWeight: 700, color: '#1e293b' }}>{p.name}</span>
-                            {p.description && <div style={{ color: '#64748b', fontSize: 9.5, marginTop: 2, lineHeight: 1.35 }}>{p.description}</div>}
-                            {p.variants?.length > 0 && (
-                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginTop: 3 }}>
-                                {p.variants.map((v, vi) => <span key={vi} style={{ fontSize: 9, background: '#eef2ff', color: '#3730a3', border: '1px solid #c7d2fe', borderRadius: 99, padding: '1px 6px', fontWeight: 600 }}>{v}</span>)}
+                            <div style={{ display: 'flex', gap: 9, alignItems: 'flex-start' }}>
+                              {p.image_url && (
+                                <img src={p.image_url} alt="" crossOrigin="anonymous"
+                                  style={{ width: 42, height: 42, objectFit: 'cover', borderRadius: 6, border: '1px solid #e2e8f0', flexShrink: 0 }} />
+                              )}
+                              <div style={{ minWidth: 0 }}>
+                                <span style={{ fontWeight: 700, color: '#1e293b' }}>{p.name}</span>
+                                {p.description && <div style={{ color: '#64748b', fontSize: 9.5, marginTop: 2, lineHeight: 1.35 }}>{p.description}</div>}
+                                {p.variants?.length > 0 && (
+                                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginTop: 3 }}>
+                                    {p.variants.map((v, vi) => <span key={vi} style={{ fontSize: 9, background: '#eef2ff', color: '#3730a3', border: '1px solid #c7d2fe', borderRadius: 99, padding: '1px 6px', fontWeight: 600 }}>{v}</span>)}
+                                  </div>
+                                )}
                               </div>
-                            )}
+                            </div>
                           </TD>
                           <TD style={{ fontWeight: 600, color: '#334155' }}>{unitLabel(p.unit)}</TD>
                           <TD>

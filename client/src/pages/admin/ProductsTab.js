@@ -237,8 +237,15 @@ export default function ProductsTab() {
                 return (
                   <tr key={p.id} className="border-t border-slate-100">
                     <td className="px-3 py-2">
-                      <div className="font-medium text-slate-800">{p.name}</div>
-                      <div className="text-[11px] text-slate-500">{(p.variants || []).slice(0,3).join(' · ')}</div>
+                      <div className="flex items-center gap-2">
+                        {p.image_url
+                          ? <img src={p.image_url} alt="" className="rounded border border-slate-200 object-cover" style={{ width: 34, height: 34, flexShrink: 0 }} />
+                          : <div className="rounded border border-dashed border-slate-200 flex items-center justify-center text-slate-300" style={{ width: 34, height: 34, fontSize: 13, flexShrink: 0 }}>🖼️</div>}
+                        <div>
+                          <div className="font-medium text-slate-800">{p.name}</div>
+                          <div className="text-[11px] text-slate-500">{(p.variants || []).slice(0,3).join(' · ')}</div>
+                        </div>
+                      </div>
                     </td>
                     <td className="px-3 py-2 text-xs">{p.category_icon} {p.category_name}</td>
                     <td className="px-3 py-2 text-right">

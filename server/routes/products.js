@@ -196,8 +196,8 @@ router.post('/', requireRole('admin'), async (req, res) => {
       INSERT INTO products
         (category_id, name, description, variants, pack_sizes, unit,
          base_price, bulk_price_5L, bulk_price_20L, bulk_price_200L,
-         gst_percent, hsn_code, manufacturing_cost, is_active)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+         gst_percent, hsn_code, manufacturing_cost, is_active, image_url)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
       RETURNING id
     `, [
       b.category_id, b.name, b.description || null,
@@ -206,6 +206,7 @@ router.post('/', requireRole('admin'), async (req, res) => {
       Number(b.gst_percent), b.hsn_code || null,
       Number(b.manufacturing_cost) || 0,
       b.is_active === false ? 0 : 1,
+      b.image_url || null,
     ]);
 
     const created = await pool.query('SELECT * FROM products WHERE id = $1', [rows[0].id]);
@@ -243,6 +244,7 @@ router.patch('/:id', requireRole('admin', 'central_office'), async (req, res) =>
       setClauses.push(`gst_percent = ${$v(Number(b.gst_percent))}`);
     }
     if (b.hsn_code !== undefined)           setClauses.push(`hsn_code = ${$v(b.hsn_code)}`);
+    if (b.image_url !== undefined)          setClauses.push(`image_url = ${$v(b.image_url || null)}`);
     if (b.manufacturing_cost !== undefined) setClauses.push(`manufacturing_cost = ${$v(Number(b.manufacturing_cost) || 0)}`);
     if (b.is_active !== undefined) setClauses.push(`is_active = ${$v(b.is_active ? 1 : 0)}`);
     if (b.variants !== undefined)  setClauses.push(`variants = ${$v(JSON.stringify(Array.isArray(b.variants) ? b.variants : []))}`);

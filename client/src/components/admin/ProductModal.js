@@ -41,10 +41,11 @@ export default function ProductModal({ open, mode = 'create', product, categorie
   const [v, setV] = useState({
     category_id: '', name: '', description: '', unit: '',
     base_price: 0, manufacturing_cost: 0, margin_percent: '', margin_basis: 'cost',
-    gst_percent: 18, hsn_code: '',
+    gst_percent: 18, hsn_code: '', image_url: '',
     variantsText: '', packSizesText: '', is_active: true,
   });
   const [busy, setBusy] = useState(false);
+  const [imgBusy, setImgBusy] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -62,12 +63,13 @@ export default function ProductModal({ open, mode = 'create', product, categorie
         margin_basis: 'cost',
         gst_percent: product.gst_percent || 18,
         hsn_code: product.hsn_code || '',
+        image_url: product.image_url || '',
         variantsText: (product.variants || []).join(', '),
         packSizesText: (product.pack_sizes || []).map((p) => `${p.size}=${p.price}`).join(', '),
         is_active: !!product.is_active,
       });
     } else {
-      setV((s) => ({ ...s, category_id: categories[0]?.id || '', name: '', description: '', unit: '', base_price: 0, manufacturing_cost: 0, margin_percent: '', margin_basis: 'cost', gst_percent: 18, hsn_code: '', variantsText: '', packSizesText: '', is_active: true }));
+      setV((s) => ({ ...s, category_id: categories[0]?.id || '', name: '', description: '', unit: '', base_price: 0, manufacturing_cost: 0, margin_percent: '', margin_basis: 'cost', gst_percent: 18, hsn_code: '', image_url: '', variantsText: '', packSizesText: '', is_active: true }));
     }
   }, [open, mode, product, categories]);
 
@@ -92,6 +94,35 @@ export default function ProductModal({ open, mode = 'create', product, categorie
     margin_percent: marginFromBase(s.manufacturing_cost, s.base_price, basis),
   }));
 
+  // Resize a chosen image to a small thumbnail data-URL (≈ max 360px, JPEG).
+  // Stored inline so no external image hosting is required.
+  const handleImageFile = (file) => {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { toast('Please choose an image file.', { kind: 'error' }); return; }
+    setImgBusy(true);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const MAX = 360;
+        let { width, height } = img;
+        if (width > height && width > MAX) { height = Math.round(height * MAX / width); width = MAX; }
+        else if (height > MAX) { width = Math.round(width * MAX / height); height = MAX; }
+        const canvas = document.createElement('canvas');
+        canvas.width = width; canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, width, height);
+        ctx.drawImage(img, 0, 0, width, height);
+        upd({ image_url: canvas.toDataURL('image/jpeg', 0.72) });
+        setImgBusy(false);
+      };
+      img.onerror = () => { toast('Could not read that image.', { kind: 'error' }); setImgBusy(false); };
+      img.src = reader.result;
+    };
+    reader.onerror = () => { toast('Could not read that file.', { kind: 'error' }); setImgBusy(false); };
+    reader.readAsDataURL(file);
+  };
+
   const parsePackSizes = (text) =>
     text.split(',').map((s) => s.trim()).filter(Boolean).map((kv) => {
       const [size, price] = kv.split('=').map((x) => x?.trim());
@@ -109,6 +140,7 @@ export default function ProductModal({ open, mode = 'create', product, categorie
       manufacturing_cost: Number(v.manufacturing_cost) || 0,
       gst_percent: Number(v.gst_percent),
       hsn_code: v.hsn_code.trim() || null,
+      image_url: v.image_url || null,
       variants: v.variantsText.split(',').map((s) => s.trim()).filter(Boolean),
       pack_sizes: parsePackSizes(v.packSizesText),
       is_active: v.is_active,
@@ -259,6 +291,40 @@ export default function ProductModal({ open, mode = 'create', product, categorie
             <Field label="Description">
               <textarea rows={2} className={inputCls} value={v.description}
                         onChange={(e) => upd({ description: e.target.value })} />
+            </Field>
+          </div>
+
+          {/* Product image */}
+          <div className="sm:col-span-2">
+            <Field label="Product Image — shown on the catalogue & shared link">
+              <div className="flex items-center gap-3">
+                <div style={{ width: 64, height: 64, borderRadius: 8, border: '1px dashed #cbd5e1', background: '#f8fafc',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
+                  {v.image_url
+                    ? <img src={v.image_url} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    : <span style={{ fontSize: 20, color: '#cbd5e1' }}>🖼️</span>}
+                </div>
+                <div className="flex-1">
+                  <input id="prod-img" type="file" accept="image/*" className="hidden"
+                         onChange={(e) => { handleImageFile(e.target.files?.[0]); e.target.value = ''; }} />
+                  <div className="flex gap-2">
+                    <label htmlFor="prod-img"
+                           className="cursor-pointer text-xs px-3 py-1.5 rounded-lg border border-cyan-600 text-cyan-700 font-semibold hover:bg-cyan-50">
+                      {imgBusy ? 'Processing…' : v.image_url ? 'Change image' : 'Upload image'}
+                    </label>
+                    {v.image_url && (
+                      <button type="button" onClick={() => upd({ image_url: '' })}
+                              className="text-xs px-3 py-1.5 rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50">
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                  <div className="text-[10px] text-slate-400 mt-1">Auto-resized to a small thumbnail. Or paste an image URL below.</div>
+                  <input className={`${inputCls} mt-1.5`} value={v.image_url?.startsWith('data:') ? '' : v.image_url}
+                         onChange={(e) => upd({ image_url: e.target.value })}
+                         placeholder="https://…/image.jpg (optional)" />
+                </div>
+              </div>
             </Field>
           </div>
         </div>

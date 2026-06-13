@@ -27,7 +27,7 @@ async function buildCatalog() {
   const { rows } = await pool.query(`
     SELECT
       p.id, p.name, p.description, p.base_price, p.unit,
-      p.gst_percent, p.hsn_code, p.variants, p.pack_sizes,
+      p.gst_percent, p.hsn_code, p.variants, p.pack_sizes, p.image_url,
       c.name        AS category_name,
       c.icon_emoji  AS category_icon,
       c.sort_order  AS category_sort
@@ -49,6 +49,7 @@ async function buildCatalog() {
       base_price:  Number(p.base_price) || 0,
       gst_percent: Number(p.gst_percent) || 0,
       hsn_code:    p.hsn_code || null,
+      image_url:   p.image_url || null,
       variants:    parseJSON(p.variants,   []),
       pack_sizes:  parseJSON(p.pack_sizes, []),
     });
