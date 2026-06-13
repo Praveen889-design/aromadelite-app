@@ -16,15 +16,43 @@ const CSV_TEMPLATE = [
   'Acid,Cleaning Chemicals,Direct base price example,L,10,,22,18,2806,,,true',
 ].join('\n');
 
+// Split one CSV line, honouring "quoted, fields" and "" escaped quotes.
+function splitCsvLine(line) {
+  const out = [];
+  let cur = '', inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (inQ) {
+      if (ch === '"') {
+        if (line[i + 1] === '"') { cur += '"'; i++; } else { inQ = false; }
+      } else cur += ch;
+    } else if (ch === '"') {
+      inQ = true;
+    } else if (ch === ',') {
+      out.push(cur); cur = '';
+    } else cur += ch;
+  }
+  out.push(cur);
+  return out.map((v) => v.trim());
+}
+
 function parseCSV(text) {
-  const lines = text.trim().split('\n');
+  // Strip a UTF-8 BOM (Excel adds one) and normalise line endings
+  const clean = text.replace(/^﻿/, '').replace(/\r\n/g, '\n').trim();
+  const lines = clean.split('\n');
   if (lines.length < 2) return [];
-  const headers = lines[0].split(',').map((h) => h.trim());
+  const headers = splitCsvLine(lines[0]);
   return lines.slice(1).map((line) => {
-    const vals = line.split(',').map((v) => v.trim());
+    const vals = splitCsvLine(line);
     return Object.fromEntries(headers.map((h, i) => [h, vals[i] ?? '']));
   }).filter((r) => r.name);
 }
+
+// Quote a CSV field when it contains a comma, quote, or newline
+const csvCell = (v) => {
+  const s = v == null ? '' : String(v);
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+};
 
 export default function ProductsTab() {
   const { toast } = useToast();
@@ -93,6 +121,40 @@ export default function ProductsTab() {
     a.click();
   };
 
+  // Export every ACTIVE product in the bulk-upload column format.
+  // Edit base_price (or manufacturing_cost) and re-upload to update prices.
+  const exportActiveCsv = () => {
+    const active = products.filter((p) => p.is_active);
+    if (!active.length) { toast('No active products to export.', { kind: 'error' }); return; }
+    const COLS = ['name', 'category_name', 'description', 'unit', 'manufacturing_cost', 'margin_percent', 'base_price', 'gst_percent', 'hsn_code', 'variants', 'pack_sizes', 'is_active'];
+    const lines = [COLS.join(',')];
+    for (const p of active) {
+      const variants = (p.variants || []).join('|');
+      const packs = (p.pack_sizes || []).map((s) => `${s.size}=${s.price}`).join('|');
+      lines.push([
+        p.name,
+        p.category_name,
+        p.description || '',
+        p.unit || '',
+        p.manufacturing_cost ?? '',
+        '',                       // margin_percent left blank — base_price is authoritative
+        p.base_price ?? '',
+        p.gst_percent ?? '',
+        p.hsn_code || '',
+        variants,
+        packs,
+        'true',
+      ].map(csvCell).join(','));
+    }
+    const stamp = new Date().toISOString().slice(0, 10);
+    const blob = new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `aromadelite_products_${stamp}.csv`;
+    a.click();
+    toast(`Exported ${active.length} active products.`, { kind: 'success' });
+  };
+
   const handleFileUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -103,7 +165,7 @@ export default function ProductsTab() {
     setUploading(true);
     try {
       const { data } = await api.post('/api/products/bulk-upload', { rows: csvRows });
-      toast(`Bulk upload done: ${data.created} created, ${data.skipped} skipped.`, { kind: 'success' });
+      toast(`Bulk upload done: ${data.created} created, ${data.updated || 0} updated, ${data.skipped} skipped.`, { kind: 'success' });
       if (data.errors?.length) {
         data.errors.slice(0, 3).forEach((err) => toast(err, { kind: 'error' }));
       }
@@ -131,6 +193,11 @@ export default function ProductsTab() {
           <option value="">All categories</option>
           {categories.map((c) => <option key={c.id} value={c.id}>{c.icon_emoji} {c.name}</option>)}
         </select>
+        <button onClick={exportActiveCsv}
+                title="Download all active products as CSV — edit prices and re-upload to update them"
+                className="border border-emerald-600 text-emerald-700 text-sm font-semibold rounded-lg px-3 py-2 hover:bg-emerald-50 whitespace-nowrap">
+          ⬇ Export Products
+        </button>
         <button onClick={downloadTemplate}
                 className="border border-slate-300 text-slate-700 text-sm font-medium rounded-lg px-3 py-2 hover:bg-slate-50 whitespace-nowrap">
           ↓ CSV Template

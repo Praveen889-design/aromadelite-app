@@ -91,7 +91,7 @@ router.post('/bulk-upload', requireRole('admin'), async (req, res) => {
     const catRes = await pool.query('SELECT id, name FROM product_categories');
     const catMap = Object.fromEntries(catRes.rows.map((c) => [c.name.toLowerCase(), c.id]));
 
-    const results = { created: 0, skipped: 0, errors: [] };
+    const results = { created: 0, updated: 0, skipped: 0, errors: [] };
 
     for (let i = 0; i < csvRows.length; i++) {
       const row = csvRows[i];
@@ -119,22 +119,46 @@ router.post('/bulk-upload', requireRole('admin'), async (req, res) => {
         basePrice = Math.round(cost * (1 + margin / 100) * 100) / 100;
       }
 
-      await pool.query(`
-        INSERT INTO products
-          (category_id, name, description, variants, pack_sizes, unit,
-           base_price, bulk_price_5L, bulk_price_20L, bulk_price_200L,
-           gst_percent, hsn_code, manufacturing_cost, is_active)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
-        ON CONFLICT DO NOTHING
-      `, [
-        catId, row.name.trim(), row.description || null,
-        JSON.stringify(variants), JSON.stringify(packSizes), row.unit || null,
-        basePrice, find5L, find20L, find200L,
-        gst, row.hsn_code || null,
-        cost,
-        row.is_active === 'false' || row.is_active === '0' ? 0 : 1,
-      ]);
-      results.created++;
+      const isActive = row.is_active === 'false' || row.is_active === '0' ? 0 : 1;
+      const name = row.name.trim();
+
+      // Upsert by (category, name): update an existing product, else insert.
+      // This is what lets a re-uploaded export update prices in bulk.
+      const found = await pool.query(
+        'SELECT id FROM products WHERE category_id = $1 AND LOWER(TRIM(name)) = LOWER($2) LIMIT 1',
+        [catId, name]
+      );
+
+      if (found.rows[0]) {
+        await pool.query(`
+          UPDATE products SET
+            description = $1, variants = $2, pack_sizes = $3, unit = $4,
+            base_price = $5, bulk_price_5L = $6, bulk_price_20L = $7, bulk_price_200L = $8,
+            gst_percent = $9, hsn_code = $10, manufacturing_cost = $11, is_active = $12
+          WHERE id = $13
+        `, [
+          row.description || null,
+          JSON.stringify(variants), JSON.stringify(packSizes), row.unit || null,
+          basePrice, find5L, find20L, find200L,
+          gst, row.hsn_code || null, cost, isActive,
+          found.rows[0].id,
+        ]);
+        results.updated++;
+      } else {
+        await pool.query(`
+          INSERT INTO products
+            (category_id, name, description, variants, pack_sizes, unit,
+             base_price, bulk_price_5L, bulk_price_20L, bulk_price_200L,
+             gst_percent, hsn_code, manufacturing_cost, is_active)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+        `, [
+          catId, name, row.description || null,
+          JSON.stringify(variants), JSON.stringify(packSizes), row.unit || null,
+          basePrice, find5L, find20L, find200L,
+          gst, row.hsn_code || null, cost, isActive,
+        ]);
+        results.created++;
+      }
     }
 
     res.json(results);
