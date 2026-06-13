@@ -17,8 +17,20 @@ const api = axios.create({ baseURL: '' });
 const fmtINR = (n) =>
   new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n || 0);
 
-const displayPrice = (basePrice, gstPct) =>
-  Math.round(Number(basePrice || 0) * (1 + Number(gstPct || 0) / 100));
+// Without-GST catalogues apply a flat markup instead of GST (mirrors quotes/bills)
+const WITHOUT_GST_MARKUP = 0.05; // +5%
+
+// with_gst    → base + GST = final price (GST shown separately)
+// without_gst → base × (1 + markup), no GST
+const finalPrice = (basePrice, gstPct, gstMode) =>
+  gstMode === 'without_gst'
+    ? Math.round(Number(basePrice || 0) * (1 + WITHOUT_GST_MARKUP))
+    : Math.round(Number(basePrice || 0) * (1 + Number(gstPct || 0) / 100));
+
+// Firm identity switches with GST mode (same as Quote / Tax Invoice)
+const firmFor = (gstMode) => gstMode === 'without_gst'
+  ? { name: 'VEMURI LIFE CARE', gstin: null }
+  : { name: 'SRI VEMURI SAI ENTERPRISES', gstin: '36AQJPV7026L2Z5' };
 
 const unitLabel = (unit) => {
   const u = String(unit || '').toLowerCase().trim();
@@ -42,7 +54,9 @@ const today = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'l
 /* ═══════════════════════════════════════════════════════════
    PDF PAGE — one per category
 ═══════════════════════════════════════════════════════════ */
-function CatalogPageSheet({ cat, pageNum, totalPages, share }) {
+function CatalogPageSheet({ cat, pageNum, totalPages, share, gstMode }) {
+  const isWithoutGst = gstMode === 'without_gst';
+  const firm = firmFor(gstMode);
   return (
     <div className="catalog-page">
       {/* Top accent */}
@@ -60,8 +74,8 @@ function CatalogPageSheet({ cat, pageNum, totalPages, share }) {
         <img src="/aromadelite-logo.png" alt="Aromadelite" style={{ height: 50, objectFit: 'contain' }} />
 
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 9, letterSpacing: '0.22em', color: '#5C6BC0', fontWeight: 700, textTransform: 'uppercase' }}>
-            AROMADELITE ENTERPRISES
+          <div style={{ fontSize: 9, letterSpacing: '0.18em', color: '#5C6BC0', fontWeight: 700, textTransform: 'uppercase' }}>
+            {firm.name}
           </div>
           <div style={{ fontSize: 19, fontWeight: 900, color: '#0D2B6B', letterSpacing: '0.08em', textTransform: 'uppercase', lineHeight: 1.1, marginTop: 2 }}>
             PRODUCT CATALOGUE
@@ -70,9 +84,14 @@ function CatalogPageSheet({ cat, pageNum, totalPages, share }) {
           <div style={{ fontSize: 9, color: '#78909C' }}>
             {share
               ? <>Prepared for <strong style={{ color: '#0D2B6B' }}>{share.business_name || share.poc_name}</strong></>
-              : `Prices inclusive of GST · Valid as of ${today}`
+              : isWithoutGst
+                ? `Valid as of ${today}`
+                : `Prices inclusive of GST · Valid as of ${today}`
             }
           </div>
+          {firm.gstin && (
+            <div style={{ fontSize: 8.5, color: '#90A4AE', marginTop: 1 }}>GSTIN: {firm.gstin}</div>
+          )}
         </div>
 
         <div style={{ textAlign: 'right' }}>
@@ -138,13 +157,21 @@ function CatalogPageSheet({ cat, pageNum, totalPages, share }) {
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
           <thead>
             <tr>
-              {['#', 'Product Name & Description', 'Unit', 'Pack Sizes', 'HSN Code', 'GST', 'Price (incl. GST)'].map((h, i) => (
-                <th key={h} style={{ padding: '8px 10px', background: '#F0F4FF', color: '#3F51B5', fontWeight: 700, fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.07em', borderBottom: '2px solid #C5CAE9', textAlign: i === 0 ? 'center' : i >= 4 ? 'right' : 'left', whiteSpace: 'nowrap' }}>{h}</th>
+              {(isWithoutGst
+                ? ['#', 'Product Name & Description', 'Unit', 'Pack Sizes', 'Price']
+                : ['#', 'Product Name & Description', 'Unit', 'Pack Sizes', 'Base Price', 'GST', 'Price (incl. GST)']
+              ).map((h, i, arr) => (
+                <th key={h} style={{ padding: '8px 10px', background: '#F0F4FF', color: '#3F51B5', fontWeight: 700, fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.07em', borderBottom: '2px solid #C5CAE9', textAlign: i === 0 ? 'center' : i >= arr.length - (isWithoutGst ? 1 : 3) ? 'right' : 'left', whiteSpace: 'nowrap' }}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {cat.products.map((p, idx) => (
+            {cat.products.map((p, idx) => {
+              const gst       = Number(p.gst_percent) || 0;
+              const base      = Number(p.base_price) || 0;
+              const gstAmt    = Math.round(base * gst / 100);
+              const finalP    = finalPrice(base, gst, gstMode);
+              return (
               <tr key={p.id} style={{ background: idx % 2 === 0 ? '#fff' : '#F8FAFF' }}>
                 <td style={{ padding: '8px 10px', textAlign: 'center', color: '#90A4AE', fontWeight: 700, fontSize: 10, borderBottom: '1px solid #E8EEF8', width: 28 }}>{idx + 1}</td>
                 <td style={{ padding: '8px 10px', borderBottom: '1px solid #E8EEF8' }}>
@@ -162,15 +189,21 @@ function CatalogPageSheet({ cat, pageNum, totalPages, share }) {
                     ? p.pack_sizes.map((s, si) => <span key={si} style={{ display: 'inline-block', fontSize: 9, background: '#E3F2FD', color: '#1565C0', border: '1px solid #90CAF9', borderRadius: 99, padding: '1px 7px', margin: '1px 2px', fontWeight: 600 }}>{s.size}</span>)
                     : <span style={{ color: '#CFD8DC', fontSize: 11 }}>—</span>}
                 </td>
-                <td style={{ padding: '8px 10px', textAlign: 'right', color: '#78909C', fontSize: 10, borderBottom: '1px solid #E8EEF8', fontFamily: 'monospace' }}>{p.hsn_code || '—'}</td>
-                <td style={{ padding: '8px 10px', textAlign: 'right', borderBottom: '1px solid #E8EEF8' }}>
-                  <span style={{ fontSize: 10, fontWeight: 700, background: '#E8F5E9', color: '#2E7D32', borderRadius: 99, padding: '2px 7px' }}>{p.gst_percent}%</span>
-                </td>
+                {!isWithoutGst && (
+                  <td style={{ padding: '8px 10px', textAlign: 'right', color: '#37474F', fontSize: 11, borderBottom: '1px solid #E8EEF8', whiteSpace: 'nowrap' }}>{fmtINR(base)}</td>
+                )}
+                {!isWithoutGst && (
+                  <td style={{ padding: '8px 10px', textAlign: 'right', borderBottom: '1px solid #E8EEF8', whiteSpace: 'nowrap' }}>
+                    <span style={{ color: '#607D8B', fontSize: 11 }}>{fmtINR(gstAmt)}</span>
+                    <span style={{ color: '#90A4AE', fontSize: 9 }}> ({gst}%)</span>
+                  </td>
+                )}
                 <td style={{ padding: '8px 14px 8px 10px', textAlign: 'right', borderBottom: '1px solid #E8EEF8', whiteSpace: 'nowrap' }}>
-                  <span style={{ fontWeight: 900, fontSize: 14, color: '#0D2B6B' }}>{fmtINR(displayPrice(p.base_price, p.gst_percent))}</span>
+                  <span style={{ fontWeight: 900, fontSize: 14, color: '#0D2B6B' }}>{fmtINR(finalP)}</span>
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -206,6 +239,7 @@ export default function CatalogPage() {
   const [searchQ,     setSearchQ]     = useState('');
   const [showModal,   setShowModal]   = useState(false);
   const [linkCopied,  setLinkCopied]  = useState(false);
+  const [gstMode,     setGstMode]     = useState('with_gst');
 
   const authToken = localStorage.getItem('token');
   const isLoggedIn = !!authToken;
@@ -217,6 +251,8 @@ export default function CatalogPage() {
           const { data } = await api.get(`/api/catalog/share/${token}`);
           setCatalog(data.catalog || []);
           setShare(data.share || null);
+          // Personalised catalogues render in the mode chosen when shared
+          setGstMode(data.share?.gst_mode === 'without_gst' ? 'without_gst' : 'with_gst');
         } else {
           const { data } = await api.get('/api/catalog');
           setCatalog(data.catalog || []);
@@ -296,6 +332,28 @@ export default function CatalogPage() {
         </div>
 
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          {/* GST mode toggle — logged-in users on the general catalogue */}
+          {isLoggedIn && !token && (
+            <div style={{ display: 'flex', borderRadius: 9, overflow: 'hidden', border: '1.5px solid rgba(255,255,255,0.35)' }}>
+              {[
+                { val: 'with_gst',    label: 'With GST' },
+                { val: 'without_gst', label: 'Without GST' },
+              ].map(opt => {
+                const active = gstMode === opt.val;
+                return (
+                  <button key={opt.val} onClick={() => setGstMode(opt.val)}
+                    style={{
+                      padding: '9px 14px', border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 800,
+                      background: active ? '#fff' : 'transparent',
+                      color: active ? '#0D2B6B' : '#E3F2FD',
+                    }}>
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
           {/* Search */}
           <div style={{ position: 'relative' }}>
             <input type="text" placeholder="Search products…" value={searchQ} onChange={e => setSearchQ(e.target.value)}
@@ -341,7 +399,7 @@ export default function CatalogPage() {
           ? <div style={{ textAlign: 'center', color: '#78909C', padding: 60, fontSize: 15 }}>No products found.</div>
           : filtered.map((cat, i) => (
               <div key={cat.name} style={{ marginBottom: 24 }}>
-                <CatalogPageSheet cat={cat} pageNum={i + 1} totalPages={filtered.length} share={share} />
+                <CatalogPageSheet cat={cat} pageNum={i + 1} totalPages={filtered.length} share={share} gstMode={gstMode} />
               </div>
             ))
         }

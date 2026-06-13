@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import api from '../utils/api';
 
 export default function ShareCatalogModal({ onClose, onCreated }) {
-  const [form,   setForm]   = useState({ business_name: '', poc_name: '', contact: '', location: '' });
-  const [saving, setSaving] = useState(false);
-  const [err,    setErr]    = useState('');
+  const [form,    setForm]    = useState({ business_name: '', poc_name: '', contact: '', location: '' });
+  const [gstMode, setGstMode] = useState('with_gst');
+  const [saving,  setSaving]  = useState(false);
+  const [err,     setErr]     = useState('');
 
   const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }));
 
@@ -16,7 +17,7 @@ export default function ShareCatalogModal({ onClose, onCreated }) {
     }
     setSaving(true); setErr('');
     try {
-      const { data } = await api.post('/api/catalog/share', form);
+      const { data } = await api.post('/api/catalog/share', { ...form, gst_mode: gstMode });
       const url = `${window.location.origin}/catalog/${data.token}`;
       navigator.clipboard.writeText(url).then(() => {});
       onCreated(url, data.token);
@@ -73,6 +74,32 @@ export default function ShareCatalogModal({ onClose, onCreated }) {
               />
             </div>
           ))}
+
+          {/* GST mode */}
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#3F51B5', marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              🧾 Catalogue Pricing
+            </label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {[
+                { val: 'with_gst',    label: 'With GST',    sub: 'Sri Vemuri Sai Enterprises' },
+                { val: 'without_gst', label: 'Without GST', sub: 'Vemuri Life Care · +5%' },
+              ].map(opt => {
+                const active = gstMode === opt.val;
+                return (
+                  <button key={opt.val} type="button" onClick={() => setGstMode(opt.val)}
+                    style={{
+                      flex: 1, textAlign: 'left', padding: '9px 12px', borderRadius: 9, cursor: 'pointer',
+                      border: active ? '1.5px solid #1565C0' : '1.5px solid #C5CAE9',
+                      background: active ? '#E3F2FD' : '#fff',
+                    }}>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: active ? '#0D2B6B' : '#607D8B' }}>{opt.label}</div>
+                    <div style={{ fontSize: 9.5, color: active ? '#1565C0' : '#90A4AE', marginTop: 1 }}>{opt.sub}</div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
           {err && (
             <div style={{ background: '#FFF3E0', border: '1px solid #FFCC02', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: '#E65100', marginBottom: 12 }}>

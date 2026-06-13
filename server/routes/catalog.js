@@ -67,9 +67,12 @@ async function ensureTable() {
       poc_name      TEXT,
       contact       TEXT,
       location      TEXT,
+      gst_mode      TEXT DEFAULT 'with_gst',
       created_at    TIMESTAMPTZ DEFAULT NOW()
     )
   `);
+  // Migrate older tables that predate the gst_mode column
+  await pool.query(`ALTER TABLE catalog_shares ADD COLUMN IF NOT EXISTS gst_mode TEXT DEFAULT 'with_gst'`);
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -92,7 +95,7 @@ router.get('/share/:token', async (req, res) => {
     await ensureTable();
     const shareRes = await pool.query(`
       SELECT
-        cs.id, cs.business_name, cs.poc_name, cs.contact, cs.location, cs.created_at,
+        cs.id, cs.business_name, cs.poc_name, cs.contact, cs.location, cs.gst_mode, cs.created_at,
         e.name  AS associate_name,
         e.phone AS associate_phone
       FROM catalog_shares cs
@@ -121,12 +124,13 @@ router.post('/share', requireAuth, async (req, res) => {
     if (!business_name && !poc_name) {
       return res.status(400).json({ error: 'Business name or POC name is required' });
     }
+    const gst_mode = req.body?.gst_mode === 'without_gst' ? 'without_gst' : 'with_gst';
     const token = crypto.randomBytes(18).toString('hex');
     const { rows } = await pool.query(`
-      INSERT INTO catalog_shares (token, associate_id, business_name, poc_name, contact, location)
-      VALUES ($1, $2, $3, $4, $5, $6)
+      INSERT INTO catalog_shares (token, associate_id, business_name, poc_name, contact, location, gst_mode)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
       RETURNING id, token, created_at
-    `, [token, req.user.id, business_name || null, poc_name || null, contact || null, location || null]);
+    `, [token, req.user.id, business_name || null, poc_name || null, contact || null, location || null, gst_mode]);
 
     res.status(201).json({ token: rows[0].token, share_id: rows[0].id });
   } catch (err) {
@@ -141,7 +145,7 @@ router.get('/shares', requireAuth, async (req, res) => {
     const isAdmin = ['admin', 'central_office'].includes(req.user.role);
     const { rows } = await pool.query(`
       SELECT
-        cs.id, cs.token, cs.business_name, cs.poc_name, cs.contact, cs.location, cs.created_at,
+        cs.id, cs.token, cs.business_name, cs.poc_name, cs.contact, cs.location, cs.gst_mode, cs.created_at,
         e.name  AS associate_name,
         e.phone AS associate_phone
       FROM catalog_shares cs
