@@ -11,11 +11,37 @@ const Field = ({ label, children, required }) => (
   </label>
 );
 
+const r2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
+const fmt = (n) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(Number(n) || 0);
+
+// Base selling price from cost + margin.
+//   basis 'cost'  → cost × (1 + margin/100)        (markup on cost)
+//   basis 'price' → cost ÷ (1 − margin/100)        (margin on selling price)
+const computeBase = (cost, margin, basis) => {
+  const c = Number(cost) || 0;
+  const m = Number(margin) || 0;
+  if (c <= 0) return 0;
+  if (basis === 'price') {
+    if (m >= 100) return 0;            // 100% margin on price is undefined
+    return r2(c / (1 - m / 100));
+  }
+  return r2(c * (1 + m / 100));
+};
+
+// Reverse: implied margin % from cost + base price (for edit mode + manual overrides)
+const marginFromBase = (cost, base, basis) => {
+  const c = Number(cost) || 0;
+  const b = Number(base) || 0;
+  if (c <= 0 || b <= 0) return '';
+  return basis === 'price' ? r2(((b - c) / b) * 100) : r2(((b / c) - 1) * 100);
+};
+
 export default function ProductModal({ open, mode = 'create', product, categories, onClose, onSaved }) {
   const { toast } = useToast();
   const [v, setV] = useState({
     category_id: '', name: '', description: '', unit: '',
-    base_price: 0, manufacturing_cost: 0, gst_percent: 18, hsn_code: '',
+    base_price: 0, manufacturing_cost: 0, margin_percent: '', margin_basis: 'cost',
+    gst_percent: 18, hsn_code: '',
     variantsText: '', packSizesText: '', is_active: true,
   });
   const [busy, setBusy] = useState(false);
@@ -23,13 +49,17 @@ export default function ProductModal({ open, mode = 'create', product, categorie
   useEffect(() => {
     if (!open) return;
     if (mode === 'edit' && product) {
+      const cost = product.manufacturing_cost || 0;
+      const base = product.base_price || 0;
       setV({
         category_id: product.category_id,
         name: product.name || '',
         description: product.description || '',
         unit: product.unit || '',
-        base_price: product.base_price || 0,
-        manufacturing_cost: product.manufacturing_cost || 0,
+        base_price: base,
+        manufacturing_cost: cost,
+        margin_percent: marginFromBase(cost, base, 'cost'),
+        margin_basis: 'cost',
         gst_percent: product.gst_percent || 18,
         hsn_code: product.hsn_code || '',
         variantsText: (product.variants || []).join(', '),
@@ -37,12 +67,30 @@ export default function ProductModal({ open, mode = 'create', product, categorie
         is_active: !!product.is_active,
       });
     } else {
-      setV((s) => ({ ...s, category_id: categories[0]?.id || '', name: '', description: '', unit: '', base_price: 0, gst_percent: 18, hsn_code: '', variantsText: '', packSizesText: '', is_active: true }));
+      setV((s) => ({ ...s, category_id: categories[0]?.id || '', name: '', description: '', unit: '', base_price: 0, manufacturing_cost: 0, margin_percent: '', margin_basis: 'cost', gst_percent: 18, hsn_code: '', variantsText: '', packSizesText: '', is_active: true }));
     }
   }, [open, mode, product, categories]);
 
   if (!open) return null;
   const upd = (patch) => setV((s) => ({ ...s, ...patch }));
+
+  // ── Pricing calculator handlers (bidirectional: cost/margin ⇄ base) ──
+  const editCost = (val) => setV((s) => ({
+    ...s, manufacturing_cost: val,
+    base_price: s.margin_percent !== '' ? computeBase(val, s.margin_percent, s.margin_basis) : s.base_price,
+  }));
+  const editMargin = (val) => setV((s) => ({
+    ...s, margin_percent: val,
+    base_price: computeBase(s.manufacturing_cost, val, s.margin_basis),
+  }));
+  const editBase = (val) => setV((s) => ({
+    ...s, base_price: val,
+    margin_percent: marginFromBase(s.manufacturing_cost, val, s.margin_basis),
+  }));
+  const changeBasis = (basis) => setV((s) => ({
+    ...s, margin_basis: basis,
+    margin_percent: marginFromBase(s.manufacturing_cost, s.base_price, basis),
+  }));
 
   const parsePackSizes = (text) =>
     text.split(',').map((s) => s.trim()).filter(Boolean).map((kv) => {
@@ -99,14 +147,10 @@ export default function ProductModal({ open, mode = 'create', product, categorie
               ))}
             </select>
           </Field>
-          <Field label="GST %" required>
-            <select className={inputCls} value={v.gst_percent} onChange={(e) => upd({ gst_percent: Number(e.target.value) })}>
-              <option value={0}>0%</option>
-              <option value={3}>3%</option>
-              <option value={5}>5%</option>
-              <option value={12}>12%</option>
-              <option value={18}>18%</option>
-              <option value={28}>28%</option>
+          <Field label="Active">
+            <select className={inputCls} value={v.is_active ? '1' : '0'} onChange={(e) => upd({ is_active: e.target.value === '1' })}>
+              <option value="1">Active</option>
+              <option value="0">Inactive</option>
             </select>
           </Field>
           <div className="sm:col-span-2">
@@ -120,21 +164,83 @@ export default function ProductModal({ open, mode = 'create', product, categorie
           <Field label="HSN Code">
             <input className={inputCls} value={v.hsn_code} onChange={(e) => upd({ hsn_code: e.target.value })} placeholder="3402" />
           </Field>
-          <Field label="Base price (₹)">
-            <input className={inputCls} type="number" min={0} value={v.base_price}
-                   onChange={(e) => upd({ base_price: e.target.value })} />
-          </Field>
-          <Field label="Manufacturing Cost (₹) — Admin only">
-            <input className={inputCls} type="number" min={0} value={v.manufacturing_cost}
-                   onChange={(e) => upd({ manufacturing_cost: e.target.value })}
-                   placeholder="0" />
-          </Field>
-          <Field label="Active">
-            <select className={inputCls} value={v.is_active ? '1' : '0'} onChange={(e) => upd({ is_active: e.target.value === '1' })}>
-              <option value="1">Active</option>
-              <option value="0">Inactive</option>
-            </select>
-          </Field>
+
+          {/* ── Pricing calculator ─────────────────────────────── */}
+          <div className="sm:col-span-2 rounded-xl border border-cyan-200 bg-cyan-50/40 p-3">
+            <div className="flex items-center justify-between mb-2.5">
+              <div className="text-xs font-bold text-cyan-800">💡 Price Calculator</div>
+              <div className="flex rounded-lg border border-cyan-300 overflow-hidden text-[10px] font-semibold bg-white">
+                <button type="button" onClick={() => changeBasis('cost')}
+                  className={v.margin_basis === 'cost' ? 'px-2.5 py-1 bg-cyan-600 text-white' : 'px-2.5 py-1 text-slate-600'}>
+                  Markup on cost
+                </button>
+                <button type="button" onClick={() => changeBasis('price')}
+                  className={v.margin_basis === 'price' ? 'px-2.5 py-1 bg-cyan-600 text-white' : 'px-2.5 py-1 text-slate-600 border-l border-cyan-300'}>
+                  Margin on price
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2.5">
+              <Field label="Mfg Cost (₹)" required>
+                <input className={inputCls} type="number" min={0} value={v.manufacturing_cost}
+                       onChange={(e) => editCost(e.target.value)} placeholder="0" />
+              </Field>
+              <Field label={`Margin % ${v.margin_basis === 'cost' ? '(on cost)' : '(on price)'}`}>
+                <input className={inputCls} type="number" min={0} value={v.margin_percent}
+                       onChange={(e) => editMargin(e.target.value)} placeholder="e.g. 100" />
+              </Field>
+              <Field label="GST %" required>
+                <select className={inputCls} value={v.gst_percent} onChange={(e) => upd({ gst_percent: Number(e.target.value) })}>
+                  <option value={0}>0%</option>
+                  <option value={3}>3%</option>
+                  <option value={5}>5%</option>
+                  <option value={12}>12%</option>
+                  <option value={18}>18%</option>
+                  <option value={28}>28%</option>
+                </select>
+              </Field>
+            </div>
+
+            <div className="mt-2.5">
+              <Field label="Base selling price (₹) — auto, editable">
+                <input className={`${inputCls} font-semibold`} type="number" min={0} value={v.base_price}
+                       onChange={(e) => editBase(e.target.value)} />
+              </Field>
+            </div>
+
+            {/* Live preview */}
+            {(() => {
+              const base   = Number(v.base_price) || 0;
+              const cost   = Number(v.manufacturing_cost) || 0;
+              const gstAmt = r2(base * (Number(v.gst_percent) || 0) / 100);
+              const incl   = r2(base + gstAmt);
+              const profit = r2(base - cost);
+              return (
+                <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
+                  <div className="rounded-lg bg-white border border-slate-200 px-2 py-2">
+                    <div className="text-[9px] uppercase font-bold text-slate-400">Base price</div>
+                    <div className="text-sm font-bold text-slate-800">{fmt(base)}</div>
+                  </div>
+                  <div className="rounded-lg bg-white border border-slate-200 px-2 py-2">
+                    <div className="text-[9px] uppercase font-bold text-slate-400">GST {v.gst_percent}%</div>
+                    <div className="text-sm font-bold text-slate-600">{fmt(gstAmt)}</div>
+                  </div>
+                  <div className="rounded-lg bg-cyan-600 px-2 py-2">
+                    <div className="text-[9px] uppercase font-bold text-cyan-100">Incl. GST</div>
+                    <div className="text-sm font-bold text-white">{fmt(incl)}</div>
+                  </div>
+                  <div className="rounded-lg bg-white border border-emerald-200 px-2 py-2">
+                    <div className="text-[9px] uppercase font-bold text-emerald-500">Profit / unit</div>
+                    <div className={`text-sm font-bold ${profit >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>{fmt(profit)}</div>
+                  </div>
+                </div>
+              );
+            })()}
+            <p className="mt-2 text-[10px] text-slate-500 leading-snug">
+              Enter Mfg Cost + Margin and the base selling price fills in automatically. GST is always stored and shown separately. You can still type a base price directly to override.
+            </p>
+          </div>
           <div className="sm:col-span-2">
             <Field label="Variants (comma-separated)">
               <input className={inputCls} value={v.variantsText}
