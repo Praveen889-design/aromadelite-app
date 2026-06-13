@@ -6,10 +6,14 @@ import ProductModal from '../../components/admin/ProductModal';
 const formatINR = (n) =>
   new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n || 0);
 
+// Pricing: fill manufacturing_cost + margin_percent (markup on cost) and leave
+// base_price blank — the system computes base_price = cost x (1 + margin/100).
+// Or set base_price directly to override (it wins when provided).
 const CSV_TEMPLATE = [
-  'name,category_name,description,unit,base_price,gst_percent,hsn_code,variants,pack_sizes,manufacturing_cost,is_active',
-  'Floor Cleaner,Chemical Cleaners,Multi-surface cleaner,L,35,18,3402,Standard|Concentrated,1L=35|5L=160|20L=580,18,true',
-  'Dish Wash Bar,Chemical Cleaners,Heavy-duty bar,pc,8,18,3402,Standard,,4,true',
+  'name,category_name,description,unit,manufacturing_cost,margin_percent,base_price,gst_percent,hsn_code,variants,pack_sizes,is_active',
+  'Floor Cleaner,Chemical Cleaners,Multi-surface cleaner,L,18,100,,18,3402,Standard|Concentrated,1L=35|5L=160|20L=580,true',
+  'Dish Wash Bar,Chemical Cleaners,Heavy-duty bar,pc,4,100,,18,3402,Standard,,true',
+  'Acid,Cleaning Chemicals,Direct base price example,L,10,,22,18,2806,,,true',
 ].join('\n');
 
 function parseCSV(text) {

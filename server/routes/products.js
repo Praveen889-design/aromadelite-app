@@ -110,6 +110,15 @@ router.post('/bulk-upload', requireRole('admin'), async (req, res) => {
       const find20L  = packSizes.find((p) => /^\s*20L\b/i.test(p.size))?.price ?? null;
       const find200L = packSizes.find((p) => /^\s*200L\b/i.test(p.size))?.price ?? null;
 
+      // Pricing: explicit base_price wins. Otherwise derive it from
+      // manufacturing_cost + margin_percent (markup on cost).
+      const cost   = Number(row.manufacturing_cost) || 0;
+      const margin = Number(row.margin_percent);
+      let basePrice = Number(row.base_price) || 0;
+      if (!basePrice && cost > 0 && Number.isFinite(margin)) {
+        basePrice = Math.round(cost * (1 + margin / 100) * 100) / 100;
+      }
+
       await pool.query(`
         INSERT INTO products
           (category_id, name, description, variants, pack_sizes, unit,
@@ -120,9 +129,9 @@ router.post('/bulk-upload', requireRole('admin'), async (req, res) => {
       `, [
         catId, row.name.trim(), row.description || null,
         JSON.stringify(variants), JSON.stringify(packSizes), row.unit || null,
-        Number(row.base_price) || 0, find5L, find20L, find200L,
+        basePrice, find5L, find20L, find200L,
         gst, row.hsn_code || null,
-        Number(row.manufacturing_cost) || 0,
+        cost,
         row.is_active === 'false' || row.is_active === '0' ? 0 : 1,
       ]);
       results.created++;
