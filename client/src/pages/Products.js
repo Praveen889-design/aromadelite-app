@@ -85,26 +85,28 @@ function ProductCard({ product, inCart, onAddToQuote }) {
     }}>
       {/* ── Image ── */}
       <div style={{
-        position: 'relative', width: '100%', aspectRatio: '4 / 3',
-        background: 'linear-gradient(135deg, #ECFEFF 0%, #F0FDFA 100%)',
+        position: 'relative', width: '100%', aspectRatio: '1 / 1',
+        background: product.image_url ? '#FFFFFF' : 'linear-gradient(135deg, #ECFEFF 0%, #F0FDFA 100%)',
         display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+        borderBottom: '1px solid #EEF3F6',
       }}>
         {product.image_url
-          ? <img src={product.image_url} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          ? <img className="prod-img" src={product.image_url} alt={product.name}
+              style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 10, boxSizing: 'border-box' }} />
           : <span style={{ fontSize: 54, opacity: 0.45 }}>{emoji}</span>}
 
-        {/* GST badge */}
+        {/* GST badge — frosted */}
         <span style={{
-          position: 'absolute', top: 8, left: 8,
-          background: 'rgba(255,255,255,0.92)', color: '#0E7490',
-          fontFamily: "'Source Sans 3', sans-serif", fontWeight: 800, fontSize: 9.5,
-          padding: '2px 7px', borderRadius: 99, letterSpacing: '.04em',
-          boxShadow: '0 1px 3px rgba(8,42,56,.12)',
+          position: 'absolute', top: 10, left: 10,
+          background: 'rgba(15,43,58,0.82)', color: '#FFFFFF',
+          fontFamily: "'Source Sans 3', sans-serif", fontWeight: 700, fontSize: 9.5,
+          padding: '3px 8px', borderRadius: 99, letterSpacing: '.05em',
+          backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)',
         }}>{gst}% GST</span>
 
         {inCart && (
           <span style={{
-            position: 'absolute', top: 8, right: 8,
+            position: 'absolute', top: 10, right: 10,
             display: 'inline-flex', alignItems: 'center', gap: 4,
             background: '#059669', color: '#FFFFFF',
             fontFamily: "'Nunito', sans-serif", fontWeight: 800, fontSize: 10,
@@ -339,8 +341,10 @@ export default function Products() {
 
       {/* Card hover polish */}
       <style>{`
-        .prod-card { transition: transform .15s ease, box-shadow .15s ease; }
-        .prod-card:hover { transform: translateY(-3px); box-shadow: 0 10px 26px rgba(8,42,56,.12); }
+        .prod-card { transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
+        .prod-card:hover { transform: translateY(-4px); box-shadow: 0 14px 32px rgba(8,42,56,.13); border-color: #CBE7EE; }
+        .prod-img { transition: transform .45s cubic-bezier(.2,.7,.2,1); }
+        .prod-card:hover .prod-img { transform: scale(1.07); }
       `}</style>
 
       {/* Floating cart bar */}
