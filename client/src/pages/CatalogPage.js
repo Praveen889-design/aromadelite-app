@@ -9,7 +9,10 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 import ShareCatalogModal from '../components/ShareCatalogModal';
+import { isNative, downloadPdf } from '../utils/pdfNative';
 
 const api = axios.create({ baseURL: '' });
 
@@ -252,6 +255,7 @@ export default function CatalogPage() {
   const [showModal,   setShowModal]   = useState(false);
   const [linkCopied,  setLinkCopied]  = useState(false);
   const [gstMode,     setGstMode]     = useState('with_gst');
+  const [pdfBusy,     setPdfBusy]     = useState(false);
 
   const authToken = localStorage.getItem('token');
   const isLoggedIn = !!authToken;
@@ -302,6 +306,43 @@ export default function CatalogPage() {
       : `Hi! Here is our product catalogue with prices:\n${url}`;
     window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
   };
+
+  const fileName = `Aromadelite_Catalogue${share?.business_name ? '_' + share.business_name.replace(/[^A-Za-z0-9]+/g, '_') : ''}.pdf`;
+
+  // Build a multi-page A4 portrait PDF — one captured catalogue sheet per page.
+  // Used for both web and the native (Capacitor) app, where window.print() is a no-op.
+  const buildCatalogPdf = async () => {
+    const sheets = Array.from(document.querySelectorAll('.catalog-page'));
+    if (!sheets.length) return null;
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
+    for (let i = 0; i < sheets.length; i++) {
+      const canvas = await html2canvas(sheets[i], { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+      const img = canvas.toDataURL('image/jpeg', 0.92);
+      let w = pageW;
+      let h = (canvas.height / canvas.width) * w;
+      if (h > pageH) { h = pageH; w = (canvas.width / canvas.height) * h; }
+      if (i > 0) pdf.addPage();
+      pdf.addImage(img, 'JPEG', (pageW - w) / 2, 0, w, h);
+    }
+    return pdf;
+  };
+
+  const handleDownloadPdf = async () => {
+    if (pdfBusy) return;
+    setPdfBusy(true);
+    try {
+      const pdf = await buildCatalogPdf();
+      if (pdf) await downloadPdf(pdf, fileName);
+    } catch (e) {
+      // Last-resort fallback for web browsers
+      if (!isNative()) window.print();
+    } finally {
+      setPdfBusy(false);
+    }
+  };
+
 
   if (loading) return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#F0F4FF' }}>
@@ -391,8 +432,8 @@ export default function CatalogPage() {
             📲 WhatsApp
           </button>
 
-          <button onClick={() => window.print()} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 18px', background: 'rgba(255,255,255,0.15)', border: '1.5px solid rgba(255,255,255,0.35)', borderRadius: 9, color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
-            🖨️ Save as PDF
+          <button onClick={handleDownloadPdf} disabled={pdfBusy} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 18px', background: 'rgba(255,255,255,0.15)', border: '1.5px solid rgba(255,255,255,0.35)', borderRadius: 9, color: '#fff', fontWeight: 700, fontSize: 13, cursor: pdfBusy ? 'wait' : 'pointer', opacity: pdfBusy ? 0.7 : 1 }}>
+            {pdfBusy ? '⏳ Generating…' : '⬇️ Download PDF'}
           </button>
         </div>
       </div>
