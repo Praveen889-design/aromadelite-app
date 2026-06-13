@@ -2189,7 +2189,7 @@ _Reliable supply. Factory-direct pricing. Reach us anytime._
                         <TD style={{ paddingLeft: 14 }}>
                           <div style={{ display: 'flex', gap: 9, alignItems: 'flex-start' }}>
                             {it.image_url && (
-                              <img src={it.image_url} alt="" crossOrigin="anonymous"
+                              <img src={it.image_url} alt=""
                                 style={{ width: 38, height: 38, objectFit: 'cover', borderRadius: 5, border: '1px solid #e2e8f0', flexShrink: 0 }} />
                             )}
                             <div style={{ minWidth: 0 }}>

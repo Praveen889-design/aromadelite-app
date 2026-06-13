@@ -458,7 +458,7 @@ export default function CatalogPage() {
                           <TD style={{ paddingLeft: 14 }}>
                             <div style={{ display: 'flex', gap: 9, alignItems: 'flex-start' }}>
                               {p.image_url && (
-                                <img src={p.image_url} alt="" crossOrigin="anonymous"
+                                <img src={p.image_url} alt=""
                                   style={{ width: 42, height: 42, objectFit: 'cover', borderRadius: 6, border: '1px solid #e2e8f0', flexShrink: 0 }} />
                               )}
                               <div style={{ minWidth: 0 }}>
