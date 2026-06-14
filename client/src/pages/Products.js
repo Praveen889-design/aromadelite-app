@@ -8,7 +8,7 @@ import { calcPackPrice, baseUnitLabel } from '../components/quote/ProductCard';
 import { gradients, radii, shadow, tint } from '../theme/tokens';
 
 // Each category gets a stable colour identity for a vibrant, scannable grid
-const CAT_PALETTE = ['#2563EB', '#06B6D4', '#22C55E', '#F59E0B', '#8B5CF6', '#EC4899', '#EF4444', '#0EA5E9', '#14B8A6'];
+const CAT_PALETTE = ['#6366F1', '#0EA5E9', '#14B8A6', '#10B981', '#84CC16', '#EAB308', '#F97316', '#F43F5E', '#D946EF', '#8B5CF6'];
 const catColor = (name = '') => {
   let h = 0;
   for (const ch of String(name)) h = (h * 31 + ch.charCodeAt(0)) % 9973;

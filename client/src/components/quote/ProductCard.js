@@ -4,7 +4,7 @@ const formatINR = (n) =>
   new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n || 0);
 
 // Per-category colour identity (stable) — keeps the quote browser vibrant
-const CAT_PALETTE = ['#2563EB', '#06B6D4', '#22C55E', '#F59E0B', '#8B5CF6', '#EC4899', '#EF4444', '#0EA5E9', '#14B8A6'];
+const CAT_PALETTE = ['#6366F1', '#0EA5E9', '#14B8A6', '#10B981', '#84CC16', '#EAB308', '#F97316', '#F43F5E', '#D946EF', '#8B5CF6'];
 const catColor = (name = '') => {
   let h = 0;
   for (const ch of String(name)) h = (h * 31 + ch.charCodeAt(0)) % 9973;
