@@ -9,6 +9,7 @@ import {
 } from '../components/leads/badges';
 import { SkeletonTable } from '../components/Skeleton';
 import EmptyState from '../components/EmptyState';
+import { colors, gradients, radii, shadow } from '../theme/tokens';
 
 const formatINR = (n) =>
   new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n || 0);
@@ -93,68 +94,61 @@ export default function Leads() {
   return (
     <div className="space-y-4">
       {/* HEADER */}
-      <div className="flex items-center justify-between">
-        <h2 className="flex items-center gap-2 text-xl font-semibold text-slate-900">
-          Lead Tracker
-          <span className="text-xs font-semibold bg-slate-200 text-slate-700 px-2 py-0.5 rounded-full">
-            {summary.total ?? leads.length}
-          </span>
-        </h2>
-        {isAdmin && (
-          <label className="inline-flex items-center gap-2 text-xs text-slate-600">
-            <input
-              type="checkbox"
-              checked={groupByAssociate}
-              onChange={(e) => setGroupByAssociate(e.target.checked)}
-              className="accent-cyan-600"
-            />
-            Group by associate
-          </label>
-        )}
+      <div style={{ position: 'relative', overflow: 'hidden', borderRadius: radii.xl, padding: '18px 20px', background: gradients.orange, boxShadow: shadow.md }}>
+        <div style={{ position: 'absolute', right: -30, top: -36, width: 130, height: 130, borderRadius: '50%', background: 'rgba(255,255,255,.16)' }} />
+        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+          <div>
+            <h2 style={{ display: 'flex', alignItems: 'center', gap: 9, fontSize: 20, fontWeight: 900, color: '#fff', letterSpacing: '-.02em', margin: 0 }}>
+              <span style={{ width: 34, height: 34, borderRadius: 11, background: 'rgba(255,255,255,.22)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="9" r="3.5"/><path d="M2.5 19c.6-3.2 3.4-5.5 6.5-5.5s5.9 2.3 6.5 5.5"/><path d="M16 4a3 3 0 0 1 0 6M22 18c-.4-2.4-2.2-4-4.5-4.4"/></svg>
+              </span>
+              Lead Tracker
+              <span style={{ fontSize: 12, fontWeight: 800, background: 'rgba(255,255,255,.25)', color: '#fff', padding: '3px 10px', borderRadius: 999 }}>{summary.total ?? leads.length}</span>
+            </h2>
+            <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,.9)', marginTop: 5 }}>
+              {summary.conversion_rate ?? 0}% conversion · {summary.converted ?? 0} won
+            </div>
+          </div>
+          {isAdmin && (
+            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 12, fontWeight: 600, color: '#fff', background: 'rgba(255,255,255,.18)', padding: '7px 12px', borderRadius: 999, cursor: 'pointer' }}>
+              <input type="checkbox" checked={groupByAssociate} onChange={(e) => setGroupByAssociate(e.target.checked)} style={{ accentColor: '#fff' }} />
+              Group by associate
+            </label>
+          )}
+        </div>
       </div>
 
-      {/* SUMMARY CARDS */}
-      <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
-        <SummaryCard label="Total" value={summary.total} active={!filters.status}
-                     onClick={() => setFilters((f) => ({ ...f, status: '' }))} kindCls="bg-slate-50 border-slate-200 text-slate-800" />
-        <SummaryCard label="New" value={summary.new} active={filters.status === 'new'}
-                     onClick={() => setStatusFilter('new')} kindCls="bg-cyan-50 border-cyan-200 text-cyan-800" />
-        <SummaryCard label="Contacted" value={summary.contacted} active={filters.status === 'contacted'}
-                     onClick={() => setStatusFilter('contacted')} kindCls="bg-amber-50 border-amber-200 text-amber-800" />
-        <SummaryCard label="Qualified" value={summary.qualified} active={filters.status === 'qualified'}
-                     onClick={() => setStatusFilter('qualified')} kindCls="bg-teal-50 border-teal-200 text-teal-800" />
-        <SummaryCard label="Converted" value={`${summary.converted ?? 0} (${summary.conversion_rate ?? 0}%)`} active={filters.status === 'converted'}
-                     onClick={() => setStatusFilter('converted')} kindCls="bg-emerald-50 border-emerald-200 text-emerald-800" />
-        <SummaryCard
-          label="Lost"
-          value={`${summary.lost ?? 0} (${summary.total ? ((summary.lost/summary.total)*100).toFixed(0) : 0}%)`}
-          active={filters.status === 'lost'}
-          onClick={() => setStatusFilter('lost')}
-          kindCls="bg-rose-50 border-rose-200 text-rose-700"
-        />
+      {/* PIPELINE SUMMARY CARDS */}
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-2.5">
+        <SummaryCard label="Total"     value={summary.total}     dot={colors.neutral} active={!filters.status}                 onClick={() => setFilters((f) => ({ ...f, status: '' }))} />
+        <SummaryCard label="New"       value={summary.new}       dot={colors.cyan}    active={filters.status === 'new'}        onClick={() => setStatusFilter('new')} />
+        <SummaryCard label="Contacted" value={summary.contacted} dot={colors.orange}  active={filters.status === 'contacted'}  onClick={() => setStatusFilter('contacted')} />
+        <SummaryCard label="Qualified" value={summary.qualified} dot={colors.purple}  active={filters.status === 'qualified'}  onClick={() => setStatusFilter('qualified')} />
+        <SummaryCard label="Converted" value={`${summary.converted ?? 0} · ${summary.conversion_rate ?? 0}%`} dot={colors.green} active={filters.status === 'converted'} onClick={() => setStatusFilter('converted')} />
+        <SummaryCard label="Lost"      value={`${summary.lost ?? 0} · ${summary.total ? ((summary.lost/summary.total)*100).toFixed(0) : 0}%`} dot={colors.red} active={filters.status === 'lost'} onClick={() => setStatusFilter('lost')} />
       </div>
 
       {/* FILTER BAR */}
       <div className="bg-white rounded-xl border border-slate-200 p-3 grid grid-cols-1 md:grid-cols-6 gap-2">
         <select value={filters.status} onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value }))}
-                className="md:col-span-1 border border-slate-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-600">
+                className="md:col-span-1 border border-slate-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
           <option value="">All statuses</option>
           {Object.entries(STATUS_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
         </select>
         <select value={filters.client_type} onChange={(e) => setFilters((f) => ({ ...f, client_type: e.target.value }))}
-                className="md:col-span-1 border border-slate-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-600">
+                className="md:col-span-1 border border-slate-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
           <option value="">All business types</option>
           {Object.entries(CLIENT_TYPE_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
         </select>
         <input type="date" value={filters.from} onChange={(e) => setFilters((f) => ({ ...f, from: e.target.value }))}
-               className="md:col-span-1 border border-slate-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-600"
+               className="md:col-span-1 border border-slate-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                placeholder="From" aria-label="From date" />
         <input type="date" value={filters.to} onChange={(e) => setFilters((f) => ({ ...f, to: e.target.value }))}
-               className="md:col-span-1 border border-slate-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-600"
+               className="md:col-span-1 border border-slate-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                placeholder="To" aria-label="To date" />
         <input type="search" value={filters.q} onChange={(e) => setFilters((f) => ({ ...f, q: e.target.value }))}
                placeholder="Search name or phone…"
-               className="md:col-span-2 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-600" />
+               className="md:col-span-2 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
       </div>
 
       {/* TABLE (md+) / CARDS (mobile) */}
@@ -200,18 +194,24 @@ export default function Leads() {
   );
 }
 
-const SummaryCard = ({ label, value, active, onClick, kindCls }) => (
+const SummaryCard = ({ label, value, active, onClick, dot = colors.neutral }) => (
   <button
     type="button"
     onClick={onClick}
-    className={[
-      'text-left rounded-xl border px-3 py-3 transition-shadow',
-      kindCls,
-      active ? 'ring-2 ring-cyan-500 ring-offset-1' : 'hover:shadow-sm',
-    ].join(' ')}
+    style={{
+      textAlign: 'left', borderRadius: radii.lg, padding: '12px 13px',
+      background: active ? '#fff' : '#fff',
+      border: `1.5px solid ${active ? dot : colors.border}`,
+      boxShadow: active ? `0 6px 16px ${dot}33` : shadow.sm,
+      cursor: 'pointer', transition: 'all .15s ease',
+      borderTop: `3px solid ${dot}`,
+    }}
   >
-    <div className="text-[10px] uppercase tracking-wide opacity-75">{label}</div>
-    <div className="text-xl font-bold mt-1">{value ?? '—'}</div>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      <span style={{ width: 7, height: 7, borderRadius: '50%', background: dot }} />
+      <span style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.05em', color: colors.sub }}>{label}</span>
+    </div>
+    <div style={{ fontSize: 21, fontWeight: 900, color: colors.ink, marginTop: 5, letterSpacing: '-.02em' }}>{value ?? '—'}</div>
   </button>
 );
 
@@ -278,7 +278,7 @@ function LeadsTable({ rows, isAdmin, onOpen }) {
                   <button
                     type="button"
                     onClick={() => onOpen(l.id)}
-                    className="text-xs px-2 py-1 rounded bg-cyan-600 text-white hover:bg-cyan-700"
+                    className="text-xs px-2 py-1 rounded bg-blue-600 text-white hover:bg-blue-700"
                   >Update</button>
                 </td>
               </tr>
