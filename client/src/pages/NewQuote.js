@@ -331,19 +331,42 @@ export default function NewQuote() {
         )}
       </section>
 
-      {/* Mobile cart trigger pill */}
-      {items.length > 0 && (
+      {/* Mobile cart trigger — prominent Review & Generate bar */}
+      {items.length > 0 && !sheetOpen && (
         <button
           type="button"
           onClick={() => setSheetOpen(true)}
-          className="lg:hidden fixed left-4 right-4 bottom-16 z-30 text-white rounded-xl shadow-lg px-4 py-3 flex items-center justify-between"
-          style={{ background: 'linear-gradient(135deg, #2563EB, #06B6D4)', boxShadow: '0 8px 22px rgba(37,99,235,.4)' }}
+          className="lg:hidden fixed left-3 right-3 bottom-16 z-30 text-white"
+          style={{
+            background: 'linear-gradient(135deg, #2563EB, #06B6D4)',
+            borderRadius: 16, padding: '11px 14px',
+            display: 'flex', alignItems: 'center', gap: 12,
+            boxShadow: '0 10px 28px rgba(37,99,235,.5)',
+            animation: 'cartBarIn .25s ease',
+          }}
         >
-          <span className="flex items-center gap-2 font-semibold">
-            <span className="bg-white/20 text-xs px-2 py-0.5 rounded-full">{totals.line_count}</span>
-            View cart
+          {/* Cart icon + count badge */}
+          <span style={{ position: 'relative', width: 42, height: 42, borderRadius: 12, background: 'rgba(255,255,255,.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="20" r="1.5"/><circle cx="17" cy="20" r="1.5"/><path d="M3 4h2l2.5 11.2A2 2 0 0 0 9.5 17H17a2 2 0 0 0 2-1.6L21 8H6"/></svg>
+            <span style={{ position: 'absolute', top: -5, right: -5, minWidth: 19, height: 19, padding: '0 4px', borderRadius: 999, background: '#F43F5E', color: '#fff', fontWeight: 900, fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #fff' }}>{totals.line_count}</span>
           </span>
-          <span className="font-bold">{formatINR(totals.total_amount)}</span>
+
+          {/* Label + total */}
+          <span style={{ flex: 1, textAlign: 'left', lineHeight: 1.2 }}>
+            <span style={{ display: 'block', fontWeight: 900, fontSize: 15 }}>Review &amp; Generate</span>
+            <span style={{ display: 'block', fontSize: 11.5, color: 'rgba(255,255,255,.85)' }}>
+              {totals.line_count} {totals.line_count === 1 ? 'item' : 'items'} · tap to edit prices
+            </span>
+          </span>
+
+          {/* Amount + arrow */}
+          <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+            <span style={{ fontWeight: 900, fontSize: 17, letterSpacing: '-.02em' }}>
+              {formatINR(gstMode === 'without_gst' ? +(totals.subtotal * (1 + WITHOUT_GST_MARKUP)).toFixed(2) : totals.total_amount)}
+            </span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+          </span>
+          <style>{`@keyframes cartBarIn{from{transform:translateY(120%);opacity:0}to{transform:translateY(0);opacity:1}}`}</style>
         </button>
       )}
 
