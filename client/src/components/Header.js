@@ -83,7 +83,7 @@ export default function Header({ onOpenMenu }) {
   return (
     <header style={{
       position: 'sticky', top: 0, zIndex: 40,
-      background: isHome ? '#0891B2' : '#FFFFFF',
+      background: isHome ? 'linear-gradient(135deg, #2563EB 0%, #4F46E5 100%)' : '#FFFFFF',
       borderBottom: isHome ? 'none' : '1px solid #E5E7EB',
       boxShadow: isHome ? 'none' : '0 1px 4px rgba(8,42,56,.05)',
       color: isHome ? '#FFFFFF' : '#164E63',
@@ -168,7 +168,7 @@ export default function Header({ onOpenMenu }) {
                 fontSize: 10, fontWeight: 800,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 padding: '0 3px',
-                boxShadow: `0 0 0 2px ${isHome ? '#0891B2' : '#FFFFFF'}`,
+                boxShadow: `0 0 0 2px ${isHome ? '#2563EB' : '#FFFFFF'}`,
                 lineHeight: 1,
               }}>
                 {badgeCount > 99 ? '99+' : badgeCount}
@@ -180,7 +180,7 @@ export default function Header({ onOpenMenu }) {
                   position: 'absolute', top: 7, right: 7,
                   width: 8, height: 8, borderRadius: '50%',
                   background: '#F59E0B',
-                  boxShadow: `0 0 0 2px ${isHome ? '#0891B2' : '#FFFFFF'}`,
+                  boxShadow: `0 0 0 2px ${isHome ? '#2563EB' : '#FFFFFF'}`,
                 }} />
               )
             )}
@@ -326,7 +326,7 @@ export default function Header({ onOpenMenu }) {
                     style={{
                       width: '100%', textAlign: 'center',
                       border: 'none', background: 'transparent',
-                      color: '#0891B2', fontSize: 12, fontWeight: 700,
+                      color: '#2563EB', fontSize: 12, fontWeight: 700,
                       cursor: 'pointer', padding: '4px 0',
                     }}
                   >
@@ -341,7 +341,7 @@ export default function Header({ onOpenMenu }) {
         {/* Avatar */}
         <div style={{
           width: 36, height: 36, borderRadius: '50%',
-          background: isHome ? '#22D3EE' : '#0891B2',
+          background: isHome ? '#22D3EE' : '#2563EB',
           color: isHome ? '#164E63' : '#FFFFFF',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontFamily: "'Nunito', sans-serif", fontWeight: 800, fontSize: 13,
