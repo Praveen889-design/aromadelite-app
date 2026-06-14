@@ -49,7 +49,7 @@ const avatarColors = [
   { bg: '#E0E7FF', fg: '#3730A3' },
   { bg: '#D1FAE5', fg: '#065F46' },
   { bg: '#FEE2E2', fg: '#991B1B' },
-  { bg: '#ECFEFF', fg: '#155DA6' },
+  { bg: '#ECFEFF', fg: '#1D4ED8' },
 ];
 const avatarColor = (name = '') => avatarColors[name.charCodeAt(0) % avatarColors.length];
 
@@ -77,7 +77,7 @@ const CARD_HDR = {
 };
 
 // ─── KPI tile ────────────────────────────────────────────────
-const KPI = ({ glyph, label, value, sub, accent = '#1F6BC7' }) => (
+const KPI = ({ glyph, label, value, sub, accent = '#2563EB' }) => (
   <div style={{
     ...CARD, padding: '20px 20px 16px',
     position: 'relative',
@@ -311,7 +311,7 @@ const TeamRow = ({ emp, rank, best }) => {
         <td key={i} style={{
           textAlign: 'right', padding: '11px 16px',
           fontWeight: i === 1 ? 700 : 600, fontSize: 13,
-          color: i === 1 ? '#1F6BC7' : '#0f172a',
+          color: i === 1 ? '#2563EB' : '#0f172a',
         }}>{v}</td>
       ))}
     </tr>
@@ -321,7 +321,7 @@ const TeamRow = ({ emp, rank, best }) => {
 // ─── Pipeline funnel ─────────────────────────────────────────
 const PIPE_STAGES = [
   { key: 'new',       label: 'New Leads',  color: '#475569', fill: '#64748B', light: '#F1F5F9' },
-  { key: 'contacted', label: 'Contacted',  color: '#155DA6', fill: '#1F6BC7', light: '#ECFEFF' },
+  { key: 'contacted', label: 'Contacted',  color: '#1D4ED8', fill: '#2563EB', light: '#ECFEFF' },
   { key: 'qualified', label: 'Qualified',  color: '#6D28D9', fill: '#7C3AED', light: '#EDE9FE' },
   { key: 'converted', label: 'Converted',  color: '#065F46', fill: '#059669', light: '#D1FAE5' },
 ];
@@ -673,7 +673,7 @@ function AgingQuotesAlert() {
                   {['Age', 'Quote', 'Client', 'Associate', 'Status', 'Amount', 'Follow-up', 'Actions'].map((h, i) => (
                     <th key={i} style={{
                       fontFamily: "'Inter', sans-serif", fontWeight: 700,
-                      fontSize: 10, color: '#155DA6', letterSpacing: '.07em',
+                      fontSize: 10, color: '#1D4ED8', letterSpacing: '.07em',
                       textTransform: 'uppercase', padding: '8px 12px',
                       textAlign: i >= 5 ? 'right' : 'left',
                       borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap',
@@ -707,7 +707,7 @@ function AgingQuotesAlert() {
                       <td style={{ padding: '10px 12px' }}>
                         <a href={`/quotes/${q.id}`} style={{
                           fontFamily: "'Manrope', sans-serif", fontWeight: 700,
-                          fontSize: 12, color: '#155DA6', textDecoration: 'none',
+                          fontSize: 12, color: '#1D4ED8', textDecoration: 'none',
                         }}>{q.quote_number}</a>
                         <div style={{
                           fontFamily: "'Inter', sans-serif",
@@ -742,7 +742,7 @@ function AgingQuotesAlert() {
                         <span style={{
                           display: 'inline-block',
                           background: q.status === 'sent' ? '#ECFEFF' : '#F1F5F9',
-                          color:      q.status === 'sent' ? '#155DA6'  : '#374151',
+                          color:      q.status === 'sent' ? '#1D4ED8'  : '#374151',
                           fontFamily: "'Inter', sans-serif", fontWeight: 700,
                           fontSize: 9.5, padding: '2px 8px', borderRadius: 999,
                           textTransform: 'uppercase', letterSpacing: '.06em',
@@ -764,7 +764,7 @@ function AgingQuotesAlert() {
                           <span style={{
                             display: 'inline-block',
                             background: overdue ? '#FEE2E2' : '#ECFEFF',
-                            color: overdue ? '#991B1B' : '#155DA6',
+                            color: overdue ? '#991B1B' : '#1D4ED8',
                             fontFamily: "'Manrope', sans-serif", fontSize: 10,
                             fontWeight: 700, padding: '2px 7px', borderRadius: 6,
                           }}>
@@ -1188,7 +1188,7 @@ function TopClients() {
             <button key={p.key} onClick={() => setPeriod(p.key)} style={{
               border: 0, borderRadius: 6, cursor: 'pointer',
               padding: '4px 10px',
-              background: period === p.key ? '#1F6BC7' : 'transparent',
+              background: period === p.key ? '#2563EB' : 'transparent',
               color: period === p.key ? '#fff' : '#6B7280',
               fontFamily: "'Inter', sans-serif",
               fontWeight: period === p.key ? 700 : 500, fontSize: 11,
@@ -1213,7 +1213,7 @@ function TopClients() {
             ⚠ {err}
           </span>
           <button onClick={() => load(period)} style={{
-            background: '#1F6BC7', color: '#fff', border: 0, borderRadius: 8,
+            background: '#2563EB', color: '#fff', border: 0, borderRadius: 8,
             padding: '5px 14px', cursor: 'pointer',
             fontFamily: "'Manrope', sans-serif", fontWeight: 700, fontSize: 12,
           }}>Retry</button>
@@ -1317,7 +1317,7 @@ function TopClients() {
                     <div style={{
                       height: '100%',
                       width: `${barPct}%`,
-                      background: `linear-gradient(90deg, #1F6BC7, #06B6D4)`,
+                      background: `linear-gradient(90deg, #2563EB, #06B6D4)`,
                       borderRadius: 999, transition: 'width .4s ease',
                     }} />
                   </div>
@@ -1347,7 +1347,7 @@ function TopClients() {
             Showing top {clients.length} clients
           </span>
           <span style={{
-            fontFamily: "'Manrope', sans-serif", fontWeight: 700, fontSize: 12, color: '#155DA6',
+            fontFamily: "'Manrope', sans-serif", fontWeight: 700, fontSize: 12, color: '#1D4ED8',
           }}>
             Total: {fmtL(clients.reduce((s, c) => s + c.total_revenue, 0))}
             {clients.some(c => c.accepted_revenue > 0) && (
@@ -1367,7 +1367,7 @@ const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
 const monthLabel = (y, m) => `${MONTHS[m - 1]} ${y}`;
 
 const pctColor = (p) =>
-  p >= 100 ? '#059669' : p >= 80 ? '#1F6BC7' : p >= 50 ? '#F59E0B' : '#EF4444';
+  p >= 100 ? '#059669' : p >= 80 ? '#2563EB' : p >= 50 ? '#F59E0B' : '#EF4444';
 
 const ProgBar = ({ actual, target, fmt }) => {
   if (!target) return (
@@ -1410,7 +1410,7 @@ const statusBadge = (row) => {
   if (!hasAny) return { label: 'No Target', bg: '#F1F5F9', fg: '#6B7280' };
   const rp = row.revenue_target > 0 ? (row.actual_revenue / row.revenue_target) * 100 : 100;
   if (rp >= 100) return { label: '🏆 Exceeded',       bg: '#D1FAE5', fg: '#065F46' };
-  if (rp >= 80)  return { label: '🔵 On Track',        bg: '#ECFEFF', fg: '#155DA6' };
+  if (rp >= 80)  return { label: '🔵 On Track',        bg: '#ECFEFF', fg: '#1D4ED8' };
   if (rp >= 50)  return { label: '🟡 Getting There',   bg: '#FEF3C7', fg: '#92400E' };
   return             { label: '🔴 Behind',             bg: '#FEE2E2', fg: '#991B1B' };
 };
@@ -1615,7 +1615,7 @@ function TargetVsActual() {
             <button
               onClick={() => setModalOpen(true)}
               style={{
-                background: '#1F6BC7', color: '#fff',
+                background: '#2563EB', color: '#fff',
                 border: 0, borderRadius: 8, cursor: 'pointer',
                 fontFamily: "'Manrope', sans-serif", fontWeight: 700, fontSize: 12,
                 padding: '6px 14px', whiteSpace: 'nowrap',
@@ -1643,7 +1643,7 @@ function TargetVsActual() {
                   {['Associate', 'Revenue vs Target', 'Leads vs Target', 'Conversions', 'Status'].map((h, i) => (
                     <th key={i} style={{
                       fontFamily: "'Inter', sans-serif", fontWeight: 700,
-                      fontSize: 10, color: '#155DA6', letterSpacing: '.07em',
+                      fontSize: 10, color: '#1D4ED8', letterSpacing: '.07em',
                       textTransform: 'uppercase', padding: '9px 14px',
                       textAlign: i === 0 ? 'left' : i === 4 ? 'center' : 'left',
                       borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap',
@@ -1801,7 +1801,7 @@ function OverviewTab() {
         fontFamily: "'Inter', sans-serif", fontSize: 12, color: '#6B7280',
       }}>{error}</div>
       <button onClick={load} style={{
-        background: '#1F6BC7', color: '#fff', border: 0, borderRadius: 8,
+        background: '#2563EB', color: '#fff', border: 0, borderRadius: 8,
         padding: '8px 18px', cursor: 'pointer',
         fontFamily: "'Manrope', sans-serif", fontWeight: 700, fontSize: 13,
       }}>Retry</button>
@@ -1814,7 +1814,7 @@ function OverviewTab() {
   const bestIdx  = perf.length ? perf.reduce((bi, p, i) => p.quote_value > perf[bi].quote_value ? i : bi, 0) : -1;
   const topProds = stats.top_products || [];
   const maxUnits = topProds.length ? Math.max(...topProds.map(p => p.quantity), 1) : 1;
-  const BAR_COLORS = ['#1F6BC7','#155DA6','#06B6D4','#22D3EE','#67E8F9'];
+  const BAR_COLORS = ['#2563EB','#1D4ED8','#06B6D4','#22D3EE','#67E8F9'];
   const activity   = stats.recent_activity || [];
 
   return (
@@ -1826,7 +1826,7 @@ function OverviewTab() {
         gridTemplateColumns: 'repeat(auto-fit, minmax(175px, 1fr))',
         gap: 14,
       }}>
-        <KPI glyph={Ic.quote}  label="Quotes (Month)" accent="#1F6BC7"
+        <KPI glyph={Ic.quote}  label="Quotes (Month)" accent="#2563EB"
           value={stats.quotes.month.count}
           sub="all associates" />
         <KPI glyph={Ic.rupee}  label="Total Value"    accent="#059669"
@@ -1835,7 +1835,7 @@ function OverviewTab() {
         <KPI glyph={Ic.people} label="Total Leads"    accent="#22D3EE"
           value={stats.leads.total}
           sub="across team" />
-        <KPI glyph={Ic.trend}  label="Conversion"     accent="#1F6BC7"
+        <KPI glyph={Ic.trend}  label="Conversion"     accent="#2563EB"
           value={`${stats.leads.conversion_rate}%`}
           sub="lead → converted" />
       </div>
@@ -2120,8 +2120,8 @@ export default function AdminPanel() {
                 padding: '14px 18px', border: 'none', background: 'transparent',
                 cursor: 'pointer', whiteSpace: 'nowrap', position: 'relative',
                 fontSize: 13, fontWeight: active ? 700 : 500,
-                color: active ? '#1F6BC7' : '#64748b',
-                borderBottom: active ? '2px solid #1F6BC7' : '2px solid transparent',
+                color: active ? '#2563EB' : '#64748b',
+                borderBottom: active ? '2px solid #2563EB' : '2px solid transparent',
                 transition: 'color 0.15s, border-color 0.15s',
                 marginBottom: -1,
               }}>

@@ -18,9 +18,9 @@ const VariantPill = ({ children, active, onClick }) => (
   <button onClick={onClick} style={{
     height: 22, padding: '0 8px',
     borderRadius: 999,
-    background: active ? '#0E7490' : 'transparent',
-    color: active ? '#FFFFFF' : '#0E7490',
-    border: '1.2px solid #0E7490',
+    background: active ? '#2563EB' : 'transparent',
+    color: active ? '#FFFFFF' : '#2563EB',
+    border: '1.2px solid #2563EB',
     fontFamily: "'Source Sans 3', sans-serif", fontWeight: 600, fontSize: 10.5,
     display: 'inline-flex', alignItems: 'center',
     whiteSpace: 'nowrap', cursor: 'pointer',
@@ -33,9 +33,9 @@ const CategoryChip = ({ children, active, emoji, onClick }) => (
     display: 'inline-flex', alignItems: 'center', gap: 5,
     height: 34, padding: '0 14px',
     borderRadius: 999,
-    background: active ? '#0E7490' : '#FFFFFF',
-    color: active ? '#FFFFFF' : '#0E7490',
-    border: active ? '1.5px solid #0E7490' : '1.5px solid #A5F3FC',
+    background: active ? '#2563EB' : '#FFFFFF',
+    color: active ? '#FFFFFF' : '#2563EB',
+    border: active ? '1.5px solid #2563EB' : '1.5px solid #BFDBFE',
     fontFamily: "'Source Sans 3', sans-serif", fontWeight: 600, fontSize: 13,
     boxShadow: active ? '0 4px 12px rgba(14,116,144,.25)' : 'none',
     whiteSpace: 'nowrap', cursor: 'pointer',
@@ -86,7 +86,7 @@ function ProductCard({ product, inCart, onAddToQuote }) {
       {/* ── Image ── */}
       <div style={{
         position: 'relative', width: '100%', aspectRatio: '1 / 1',
-        background: product.image_url ? '#FFFFFF' : 'linear-gradient(135deg, #ECFEFF 0%, #F0FDFA 100%)',
+        background: product.image_url ? '#FFFFFF' : 'linear-gradient(135deg, #EFF6FF 0%, #F0FDFA 100%)',
         display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
         borderBottom: '1px solid #EEF3F6',
       }}>
@@ -120,7 +120,7 @@ function ProductCard({ product, inCart, onAddToQuote }) {
       <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 7, flex: 1 }}>
         <span style={{
           fontFamily: "'Source Sans 3', sans-serif", fontWeight: 700, fontSize: 9.5,
-          color: '#0E7490', letterSpacing: '.1em', textTransform: 'uppercase',
+          color: '#2563EB', letterSpacing: '.1em', textTransform: 'uppercase',
         }}>{product.category_name || 'Product'}</span>
 
         <div style={{
@@ -150,7 +150,7 @@ function ProductCard({ product, inCart, onAddToQuote }) {
         {packs.length > 1 && (
           <select value={selPack} onChange={(e) => setSelPack(Number(e.target.value))} style={{
             border: '1px solid #CBE7EE', borderRadius: 8, padding: '6px 8px', fontSize: 12,
-            color: '#164E63', background: '#F7FCFD', fontFamily: "'Source Sans 3', sans-serif", outline: 'none',
+            color: '#0F2B3A', background: '#F7FCFD', fontFamily: "'Source Sans 3', sans-serif", outline: 'none',
           }}>
             {packs.map((p, i) => (
               <option key={i} value={i}>
@@ -163,7 +163,7 @@ function ProductCard({ product, inCart, onAddToQuote }) {
         {/* Price + Add */}
         <div style={{ marginTop: 'auto', paddingTop: 6 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 8 }}>
-            <span style={{ fontFamily: "'Nunito', sans-serif", fontWeight: 900, fontSize: 21, color: '#0E7490', letterSpacing: '-.02em' }}>
+            <span style={{ fontFamily: "'Nunito', sans-serif", fontWeight: 900, fontSize: 21, color: '#2563EB', letterSpacing: '-.02em' }}>
               {formatINR(price)}
             </span>
             <span style={{ fontFamily: "'Source Sans 3', sans-serif", fontSize: 11.5, color: '#94A3B8' }}>
@@ -173,7 +173,7 @@ function ProductCard({ product, inCart, onAddToQuote }) {
 
           <button onClick={() => onAddToQuote(product, activePack, variants[selVariant] || null)} style={{
             width: '100%', height: 40, borderRadius: 10,
-            background: inCart ? '#FFFFFF' : 'linear-gradient(135deg, #059669, #0E7490)',
+            background: inCart ? '#FFFFFF' : 'linear-gradient(135deg, #059669, #2563EB)',
             border: inCart ? '1.5px solid #059669' : 0,
             color: inCart ? '#059669' : '#FFFFFF',
             fontFamily: "'Nunito', sans-serif", fontWeight: 800, fontSize: 13.5,
@@ -360,7 +360,7 @@ export default function Products() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{
               width: 40, height: 40, borderRadius: 10,
-              background: '#ECFEFF', color: '#0E7490',
+              background: '#EFF6FF', color: '#2563EB',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               position: 'relative',
             }}>
@@ -378,7 +378,7 @@ export default function Products() {
               }}>{cartCount}</span>
             </div>
             <div>
-              <div style={{ fontFamily: "'Nunito', sans-serif", fontWeight: 800, fontSize: 13, color: '#164E63' }}>
+              <div style={{ fontFamily: "'Nunito', sans-serif", fontWeight: 800, fontSize: 13, color: '#0F2B3A' }}>
                 {cartCount} item{cartCount !== 1 ? 's' : ''} in quote
               </div>
               <div style={{ fontFamily: "'DM Mono', monospace", fontWeight: 500, fontSize: 13, color: '#059669' }}>
