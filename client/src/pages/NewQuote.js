@@ -339,7 +339,8 @@ export default function NewQuote() {
         <button
           type="button"
           onClick={() => setSheetOpen(true)}
-          className="lg:hidden fixed left-4 right-4 bottom-16 z-30 bg-cyan-600 hover:bg-cyan-700 text-white rounded-xl shadow-lg px-4 py-3 flex items-center justify-between"
+          className="lg:hidden fixed left-4 right-4 bottom-16 z-30 text-white rounded-xl shadow-lg px-4 py-3 flex items-center justify-between"
+          style={{ background: 'linear-gradient(135deg, #2563EB, #06B6D4)', boxShadow: '0 8px 22px rgba(37,99,235,.4)' }}
         >
           <span className="flex items-center gap-2 font-semibold">
             <span className="bg-white/20 text-xs px-2 py-0.5 rounded-full">{totals.line_count}</span>
@@ -366,10 +367,14 @@ export default function NewQuote() {
           sheetOpen ? 'max-lg:translate-y-0' : 'max-lg:translate-y-full',
         ].join(' ')}
       >
-        <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <h2 className="font-semibold text-slate-900">Quote Builder</h2>
-            <span className="text-[11px] font-semibold bg-cyan-100 text-cyan-800 px-2 py-0.5 rounded-full">
+        <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between"
+             style={{ background: 'linear-gradient(135deg, #EFF6FF, #ECFEFF)' }}>
+          <div className="flex items-center gap-2.5">
+            <span style={{ width: 32, height: 32, borderRadius: 10, background: 'linear-gradient(135deg, #2563EB, #06B6D4)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(37,99,235,.3)' }}>
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="20" r="1.5"/><circle cx="17" cy="20" r="1.5"/><path d="M3 4h2l2.5 11.2A2 2 0 0 0 9.5 17H17a2 2 0 0 0 2-1.6L21 8H6"/></svg>
+            </span>
+            <h2 className="font-extrabold" style={{ color: '#0F2B3A', fontSize: 15 }}>Quote Builder</h2>
+            <span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: '#2563EB', color: '#fff' }}>
               {totals.line_count} {totals.line_count === 1 ? 'item' : 'items'}
             </span>
           </div>
@@ -378,7 +383,7 @@ export default function NewQuote() {
               <button
                 type="button"
                 onClick={() => { if (window.confirm('Clear all items?')) clearCart(); }}
-                className="text-[11px] text-slate-500 hover:text-rose-600"
+                className="text-[11px] font-semibold text-slate-500 hover:text-rose-600"
               >Clear</button>
             )}
             <button

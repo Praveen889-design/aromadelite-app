@@ -18,7 +18,7 @@ const CLIENT_EMOJI = {
 };
 
 const STATUS_CONFIG = {
-  sent:                  { bg: '#CFFAFE', fg: '#155E75',  border: '#0891B2', label: 'Sent' },
+  sent:                  { bg: '#CFFAFE', fg: '#155E75',  border: '#2563EB', label: 'Sent' },
   draft:                 { bg: '#E5E7EB', fg: '#374151',  border: '#9CA3AF', label: 'Draft' },
   accepted:              { bg: '#D1FAE5', fg: '#065F46',  border: '#059669', label: '✓ Accepted' },
   modifications_required:{ bg: '#FEF3C7', fg: '#92400E',  border: '#F59E0B', label: '✏️ Modifications' },
@@ -48,9 +48,9 @@ const FilterTab = ({ children, active, onClick }) => (
     flex: '0 0 auto',
     height: 32, padding: '0 14px',
     borderRadius: 999,
-    background: active ? '#0E7490' : '#FFFFFF',
-    color: active ? '#FFFFFF' : '#0E7490',
-    border: active ? '1.5px solid #0E7490' : '1.5px solid #A5F3FC',
+    background: active ? '#2563EB' : '#FFFFFF',
+    color: active ? '#FFFFFF' : '#2563EB',
+    border: active ? '1.5px solid #2563EB' : '1.5px solid #BFDBFE',
     fontFamily: "'Source Sans 3', sans-serif", fontWeight: 700, fontSize: 12.5,
     display: 'inline-flex', alignItems: 'center',
     boxShadow: active ? '0 4px 10px rgba(14,116,144,.20)' : 'none',
@@ -76,8 +76,8 @@ const QuoteCard = ({ quote, onClick, onGenerateBill, onViewBill }) => {
     <div onClick={onClick} style={{
       background: isDraft ? '#F8FAFC' : '#FFFFFF',
       border: '1px solid',
-      borderColor: isPostAccepted ? '#6EE7B7' : isRejected ? '#FECACA' : '#A5F3FC',
-      borderLeft: isPostAccepted ? '4px solid #059669' : isRejected ? '4px solid #EF4444' : '1px solid #A5F3FC',
+      borderColor: isPostAccepted ? '#6EE7B7' : isRejected ? '#FECACA' : '#BFDBFE',
+      borderLeft: isPostAccepted ? '4px solid #059669' : isRejected ? '4px solid #EF4444' : '1px solid #BFDBFE',
       borderRadius: 14,
       padding: 14,
       cursor: 'pointer',
@@ -88,7 +88,7 @@ const QuoteCard = ({ quote, onClick, onGenerateBill, onViewBill }) => {
         <div>
           <div style={{
             fontFamily: "'DM Mono', monospace", fontWeight: 500, fontSize: 12,
-            color: '#0E7490', letterSpacing: '.04em',
+            color: '#2563EB', letterSpacing: '.04em',
           }}>{quote.quote_number || `ARO-${String(quote.id).padStart(4, '0')}`}</div>
           <div style={{
             fontFamily: "'Nunito', sans-serif", fontWeight: 800, fontSize: 15,
@@ -99,7 +99,7 @@ const QuoteCard = ({ quote, onClick, onGenerateBill, onViewBill }) => {
           <StatusBadge status={status} />
           <div style={{
             fontFamily: "'Nunito', sans-serif", fontWeight: 800, fontSize: 18,
-            color: isRejected ? '#9CA3AF' : isPostAccepted ? '#059669' : '#0E7490',
+            color: isRejected ? '#9CA3AF' : isPostAccepted ? '#059669' : '#2563EB',
             textDecoration: isRejected ? 'line-through' : 'none',
             marginTop: 6, letterSpacing: '-.01em',
           }}>{formatINR(quote.grand_total)}</div>
@@ -171,8 +171,8 @@ const QuoteCard = ({ quote, onClick, onGenerateBill, onViewBill }) => {
         ) : isRejected ? (
           <button onClick={(e) => { e.stopPropagation(); onClick(); }} style={{
             height: 34, padding: '0 14px',
-            border: '1.5px solid #0E7490', borderRadius: 8,
-            background: '#FFFFFF', color: '#0E7490',
+            border: '1.5px solid #2563EB', borderRadius: 8,
+            background: '#FFFFFF', color: '#2563EB',
             fontFamily: "'Nunito', sans-serif", fontWeight: 700, fontSize: 12,
             cursor: 'pointer',
           }}>Revise Quote</button>
@@ -231,7 +231,7 @@ const QuoteCard = ({ quote, onClick, onGenerateBill, onViewBill }) => {
           </>
         ) : (
           <>
-            <button onClick={(e) => { e.stopPropagation(); onClick(); }} style={smallActionBtn('#0E7490')}>
+            <button onClick={(e) => { e.stopPropagation(); onClick(); }} style={smallActionBtn('#2563EB')}>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
               View
             </button>
@@ -300,7 +300,7 @@ export default function MyQuotes() {
 
   if (loading) return (
     <div className="space-y-4">
-      <SkeletonCards n={4} />
+      <SkeletonCards count={4} />
     </div>
   );
 
@@ -312,7 +312,7 @@ export default function MyQuotes() {
           My Quotes
         </h1>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
-          <span style={{ fontFamily: "'Source Sans 3', sans-serif", fontWeight: 600, fontSize: 13, color: '#0E7490' }}>
+          <span style={{ fontFamily: "'Source Sans 3', sans-serif", fontWeight: 600, fontSize: 13, color: '#2563EB' }}>
             {quotes.length} quotes
           </span>
           <span style={{ color: '#CBD5E1' }}>·</span>
@@ -372,8 +372,8 @@ export default function MyQuotes() {
 const sortPill = {
   display: 'inline-flex', alignItems: 'center', gap: 4,
   fontFamily: "'Source Sans 3', sans-serif", fontWeight: 600, fontSize: 12.5,
-  color: '#0E7490', background: '#ECFEFF',
-  border: '1px solid #A5F3FC', padding: '6px 10px', borderRadius: 8,
+  color: '#2563EB', background: '#EFF6FF',
+  border: '1px solid #BFDBFE', padding: '6px 10px', borderRadius: 8,
   cursor: 'pointer',
 };
 
@@ -386,12 +386,12 @@ function EmptyQuotesState({ onGenerate }) {
       {/* Illustrated doc icon */}
       <div style={{
         width: 80, height: 80, borderRadius: 20,
-        background: 'linear-gradient(135deg, #ECFEFF, #CFFAFE)',
-        border: '2px solid #A5F3FC',
+        background: 'linear-gradient(135deg, #EFF6FF, #CFFAFE)',
+        border: '2px solid #BFDBFE',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         marginBottom: 20,
       }}>
-        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#0891B2" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
           <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/>
           <path d="M14 3v6h6M9 13h6M9 17h4"/>
           <circle cx="16" cy="18" r="4" fill="#059669" stroke="none"/>
