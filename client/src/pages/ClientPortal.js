@@ -72,6 +72,7 @@ export default function ClientPortal() {
   const [activeTab,    setActiveTab]    = useState('my_items'); // 'my_items' | 'catalog'
   const [searchQ,      setSearchQ]      = useState('');
   const [gstView,      setGstView]      = useState('with_gst'); // client-chosen GST mode
+  const [priceOverrides, setPriceOverrides] = useState({});    // cartKey -> edited base price
 
   useEffect(() => {
     (async () => {
@@ -161,7 +162,7 @@ export default function ClientPortal() {
           qty,
           product_id:  p.id || p.product_id,
           name:        p.name,
-          unit_price:  p.unit_price ?? p.display_price ?? p.negotiated_price ?? 0,
+          unit_price:  priceOverrides[key] !== undefined ? priceOverrides[key] : (p.unit_price ?? p.display_price ?? p.negotiated_price ?? 0),
           gst_percent: p.gst_percent || 0,
           unit:        pack_size || p.unit || 'Nos',
           hsn_code:    p.hsn_code || '',
@@ -174,6 +175,19 @@ export default function ClientPortal() {
   };
 
   const getQty = (p, variant = '', pack_size = '') => cart[cartKey(p, variant, pack_size)]?.qty || 0;
+
+  // Effective base (per-unit, pre-GST) quote price — edited value wins
+  const effBase = (p, variant = '', pack_size = '') => {
+    const k = cartKey(p, variant, pack_size);
+    const def = p.unit_price ?? p.display_price ?? p.negotiated_price ?? 0;
+    return priceOverrides[k] !== undefined ? priceOverrides[k] : def;
+  };
+  // Edit the quote price for a product (updates the cart line too if present)
+  const setPrice = (p, base, variant = '', pack_size = '') => {
+    const k = cartKey(p, variant, pack_size);
+    setPriceOverrides(prev => ({ ...prev, [k]: base }));
+    setCart(prev => (prev[k] ? { ...prev, [k]: { ...prev[k], unit_price: base } } : prev));
+  };
 
   const cartItems = Object.values(cart);
   // Total reflects the GST mode the client picked (With GST = +tax, Without = +5%)
@@ -399,6 +413,8 @@ export default function ClientPortal() {
                   product={item}
                   qty={qty}
                   onQtyChange={(q) => setQty(item, q, item.variant, item.pack_size)}
+                  basePrice={effBase(item, item.variant, item.pack_size)}
+                  onPriceChange={(v) => setPrice(item, v, item.variant, item.pack_size)}
                   gstView={gstView}
                   isNegotiated={true}
                 />
@@ -457,6 +473,8 @@ export default function ClientPortal() {
                         product={enriched}
                         qty={qty}
                         onQtyChange={(q) => setQty(enriched, q)}
+                        basePrice={effBase(enriched)}
+                        onPriceChange={(v) => setPrice(enriched, v)}
                         gstView={gstView}
                         isNegotiated={false}
                       />
@@ -529,8 +547,7 @@ export default function ClientPortal() {
 }
 
 /* ── Product Row Component ── */
-function ProductRow({ product, qty, onQtyChange, gstView, isNegotiated }) {
-  const basePrice    = product.unit_price ?? product.display_price ?? product.negotiated_price ?? 0;
+function ProductRow({ product, qty, onQtyChange, gstView, isNegotiated, basePrice = 0, onPriceChange }) {
   const displayPrice = priceFor(basePrice, product.gst_percent, gstView);
   const lineTotal    = qty > 0 ? qty * displayPrice : 0;
   const unitLabel    = product.pack_size || product.unit || 'Nos';
@@ -566,23 +583,28 @@ function ProductRow({ product, qty, onQtyChange, gstView, isNegotiated }) {
             {product.description}
           </div>
         )}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
-          <span style={{ fontWeight: 900, fontSize: 16, color: isNegotiated ? '#059669' : '#0f766e', letterSpacing: '-.02em' }}>
-            ₹{new Intl.NumberFormat('en-IN').format(displayPrice)}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 5, flexWrap: 'wrap' }}>
+          {/* Editable quote price (per unit, before GST) */}
+          <span style={{ fontSize: 9.5, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '.04em' }}>Quote ₹</span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', border: `1.5px solid ${isNegotiated ? '#86efac' : '#cbd5e1'}`, borderRadius: 9, background: '#fff', overflow: 'hidden' }}>
+            <span style={{ fontSize: 12, color: '#94a3b8', padding: '0 0 0 8px' }}>₹</span>
+            <input type="number" min={0} value={basePrice}
+              onChange={(e) => onPriceChange && onPriceChange(Math.max(0, Number(e.target.value) || 0))}
+              style={{ width: 62, border: 'none', outline: 'none', padding: '6px 8px', fontSize: 14, fontWeight: 800, color: '#0f766e', background: 'transparent' }} />
           </span>
-          <span style={{ fontSize: 10, color: '#94a3b8' }}>/ {unitLabel}</span>
           {isNegotiated && (
             <span style={{ fontSize: 9, fontWeight: 800, background: '#dcfce7', color: '#15803d', padding: '2px 7px', borderRadius: 99 }}>YOUR PRICE</span>
           )}
-          <span style={{ fontSize: 9, fontWeight: 700, color: gstView === 'without_gst' ? '#9a3412' : '#0e7490', background: gstView === 'without_gst' ? '#ffedd5' : '#cffafe', padding: '2px 7px', borderRadius: 99 }}>
-            {gstView === 'without_gst' ? 'No GST' : `incl. ${product.gst_percent}% GST`}
-          </span>
         </div>
-        {active && (
-          <div style={{ fontSize: 11.5, fontWeight: 800, color: '#0f766e', marginTop: 3 }}>
-            Subtotal: ₹{new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(lineTotal)}
-          </div>
-        )}
+        {/* Final payable price */}
+        <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
+          ={' '}
+          <strong style={{ fontSize: 13.5, color: gstView === 'without_gst' ? '#9a3412' : '#0e7490' }}>₹{new Intl.NumberFormat('en-IN').format(displayPrice)}</strong>
+          {' '}{gstView === 'without_gst' ? '(no GST)' : `incl. ${product.gst_percent}% GST`} / {unitLabel}
+          {active && (
+            <span style={{ fontWeight: 800, color: '#0f766e' }}> · Subtotal ₹{new Intl.NumberFormat('en-IN').format(lineTotal)}</span>
+          )}
+        </div>
       </div>
 
       {/* Quantity stepper */}
