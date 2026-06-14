@@ -663,55 +663,48 @@ export default function Clients() {
         />
       )}
 
-      {/* Header */}
-      <div className="bg-white rounded-xl border border-slate-200 p-5">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div>
-            <h2 className="text-xl font-bold text-slate-900">Client Directory</h2>
-            <p className="text-sm text-slate-500 mt-0.5">All clients with their complete order and payment history</p>
+      {/* Header — gradient hero */}
+      <div style={{ position: 'relative', overflow: 'hidden', borderRadius: radii.xl, padding: '20px 22px', background: 'linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%)', boxShadow: shadow.md }}>
+        <div style={{ position: 'absolute', right: -36, top: -46, width: 150, height: 150, borderRadius: '50%', background: 'rgba(255,255,255,.14)' }} />
+        <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <div>
+              <h2 style={{ display: 'flex', alignItems: 'center', gap: 9, fontSize: 20, fontWeight: 900, color: '#fff', letterSpacing: '-.02em', margin: 0 }}>
+                <span style={{ width: 34, height: 34, borderRadius: 11, background: 'rgba(255,255,255,.22)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9M15 21V9"/></svg>
+                </span>
+                Client Directory
+              </h2>
+              <p style={{ fontSize: 12.5, color: 'rgba(255,255,255,.9)', marginTop: 5 }}>All clients with their complete order &amp; payment history</p>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              {catalogLinkCopied && (
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', background: 'rgba(34,197,94,.85)', padding: '6px 14px', borderRadius: 20 }}>✓ Link copied!</span>
+              )}
+              <button onClick={() => setShowShareCatalog(true)}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 16px', borderRadius: 11, fontSize: 13, fontWeight: 800,
+                  background: 'rgba(255,255,255,.2)', color: '#fff', border: '1px solid rgba(255,255,255,.3)', cursor: 'pointer', backdropFilter: 'blur(6px)' }}>
+                📋 Share Catalogue
+              </button>
+              <button onClick={() => setShowOnboard(true)}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 16px', borderRadius: 11, fontSize: 13, fontWeight: 800,
+                  background: '#fff', color: '#7c3aed', border: 'none', cursor: 'pointer', boxShadow: '0 4px 12px rgba(0,0,0,.15)' }}>
+                ➕ Onboard Client
+              </button>
+            </div>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="text-center px-4 py-2 rounded-lg" style={{ background: '#eff6ff' }}>
-              <div className="text-lg font-bold text-blue-700">{totalClients}</div>
-              <div className="text-[10px] font-semibold uppercase text-blue-500">Total</div>
-            </div>
-            <div className="text-center px-4 py-2 rounded-lg" style={{ background: '#f0fdf4' }}>
-              <div className="text-lg font-bold text-emerald-700">{activeClients}</div>
-              <div className="text-[10px] font-semibold uppercase text-emerald-500">Active (90d)</div>
-            </div>
-            <div className="text-center px-4 py-2 rounded-lg" style={{ background: '#faf5ff' }}>
-              <div className="text-lg font-bold text-purple-700">{fmtINR(totalRevenue)}</div>
-              <div className="text-[10px] font-semibold uppercase text-purple-500">Total Billed</div>
-            </div>
-            {catalogLinkCopied && (
-              <span style={{ fontSize: 12, fontWeight: 700, color: '#2E7D32', background: '#E8F5E9', padding: '6px 14px', borderRadius: 20 }}>
-                ✓ Catalogue link copied!
-              </span>
-            )}
-            <button
-              onClick={() => setShowShareCatalog(true)}
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: 6,
-                padding: '9px 16px', borderRadius: 10, fontSize: 13, fontWeight: 700,
-                background: 'linear-gradient(135deg, #0D2B6B, #1565C0)',
-                color: '#fff', border: 'none', cursor: 'pointer',
-                boxShadow: '0 2px 8px rgba(13,43,107,0.3)',
-              }}
-            >
-              📋 Share Catalogue
-            </button>
-            <button
-              onClick={() => setShowOnboard(true)}
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: 6,
-                padding: '9px 16px', borderRadius: 10, fontSize: 13, fontWeight: 700,
-                background: 'linear-gradient(135deg, #0891b2, #0e7490)',
-                color: '#fff', border: 'none', cursor: 'pointer',
-                boxShadow: '0 2px 8px rgba(8,145,178,0.3)',
-              }}
-            >
-              ➕ Onboard New Client
-            </button>
+          {/* Stat chips */}
+          <div className="flex gap-2.5 flex-wrap">
+            {[
+              { label: 'Total Clients', value: totalClients },
+              { label: 'Active (90d)', value: activeClients },
+              { label: 'Total Billed', value: fmtINR(totalRevenue) },
+            ].map((s) => (
+              <div key={s.label} style={{ background: 'rgba(255,255,255,.16)', borderRadius: 12, padding: '9px 16px', backdropFilter: 'blur(6px)' }}>
+                <div style={{ fontSize: 18, fontWeight: 900, color: '#fff', lineHeight: 1 }}>{s.value}</div>
+                <div style={{ fontSize: 9.5, fontWeight: 700, color: 'rgba(255,255,255,.85)', textTransform: 'uppercase', letterSpacing: '.05em', marginTop: 3 }}>{s.label}</div>
+              </div>
+            ))}
           </div>
         </div>
       </div>

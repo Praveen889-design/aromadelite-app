@@ -9,7 +9,7 @@ import {
 /* ─── Brand emblem (inline SVG, 36×36 rendered) ───────────── */
 const BrandEmblem = ({ size = 36 }) => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width={size} height={size} aria-hidden="true">
-    <rect width="64" height="64" rx="12" fill="#1F6BC7"/>
+    <rect width="64" height="64" rx="12" fill="#2563EB"/>
     <g transform="translate(32 42.24)">
       <g transform="translate(0 0) scale(0.21714285714285714)">
         <ellipse cx="-6" cy="3" rx="120" ry="4" fill="#143A6E" opacity="0.35"/>
@@ -26,7 +26,7 @@ const BrandEmblem = ({ size = 36 }) => (
           <rect x="20" y="-90" width="10" height="18" fill="#B83A2F"/>
           <rect x="-9" y="-28" width="18" height="28" rx="1" fill="#2E2A24"/>
           <circle cx="6" cy="-13" r="1.6" fill="#F8F2E0"/>
-          <rect x="-32" y="-48" width="22" height="18" rx="1" fill="#1F6BC7"/>
+          <rect x="-32" y="-48" width="22" height="18" rx="1" fill="#2563EB"/>
           <line x1="-21" y1="-48" x2="-21" y2="-30" stroke="#F8F2E0" strokeWidth="1.8"/>
           <line x1="-32" y1="-39" x2="-10" y2="-39" stroke="#F8F2E0" strokeWidth="1.8"/>
         </g>
@@ -117,7 +117,7 @@ export default function Sidebar({ open, onClose }) {
         <div className="mx-4 mb-4 rounded-xl px-3 py-3 flex items-center gap-3"
              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}>
           <div className="w-10 h-10 rounded-full font-bold flex items-center justify-center text-sm flex-shrink-0"
-               style={{ background: '#1F6BC7', color: '#F8F2E0' }}>
+               style={{ background: '#2563EB', color: '#F8F2E0' }}>
             {initials(user?.name)}
           </div>
           <div className="min-w-0 flex-1">
@@ -126,7 +126,7 @@ export default function Sidebar({ open, onClose }) {
           </div>
           {user?.region && (
             <span className="text-[10px] px-2 py-0.5 rounded-full flex-shrink-0"
-                  style={{ background: 'rgba(31,107,199,0.25)', color: '#93C0F5', border: '1px solid rgba(31,107,199,0.4)' }}>
+                  style={{ background: 'rgba(37,99,235,0.25)', color: '#93C0F5', border: '1px solid rgba(37,99,235,0.4)' }}>
               {user.region}
             </span>
           )}
@@ -152,14 +152,14 @@ export default function Sidebar({ open, onClose }) {
               }
               style={({ isActive }) =>
                 isActive
-                  ? { background: '#1F6BC7', color: '#F8F2E0' }
+                  ? { background: 'linear-gradient(135deg, #2563EB, #1D4ED8)', color: '#fff', boxShadow: '0 6px 16px rgba(37,99,235,.35)' }
                   : primary
-                    ? { background: '#D34B3F', color: '#fff' }
-                    : { color: 'rgba(248,242,224,0.7)' }
+                    ? { background: 'linear-gradient(135deg, #2563EB, #06B6D4)', color: '#fff', boxShadow: '0 6px 16px rgba(37,99,235,.30)' }
+                    : { color: 'rgba(248,242,224,0.72)' }
               }
               onMouseEnter={(e) => {
                 const el = e.currentTarget;
-                if (!el.dataset.active) el.style.background = 'rgba(255,255,255,0.07)';
+                if (!el.dataset.active) el.style.background = 'rgba(255,255,255,0.08)';
               }}
               onMouseLeave={(e) => {
                 const el = e.currentTarget;
