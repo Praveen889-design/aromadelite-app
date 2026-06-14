@@ -6,6 +6,7 @@ import { useToast } from '../components/Toast';
 import { CLIENT_TYPES } from '../components/quote/ClientModal';
 import ShareCatalogModal from '../components/ShareCatalogModal';
 import { useQuoteBuilder } from '../context/QuoteBuilderContext';
+import { colors, radii, shadow } from '../theme/tokens';
 
 const CITIES = ['Hyderabad', 'Nizamabad', 'Warangal', 'Karimnagar',
                 'Vijayawada', 'Guntur', 'Medak', 'Siddipet'];
@@ -195,6 +196,33 @@ const TYPE_COLOR = {
 };
 
 const typeColor = (t) => TYPE_COLOR[(t || '').toLowerCase()] || TYPE_COLOR.other;
+
+const AVATAR_GRAD = {
+  hotel:      'linear-gradient(135deg,#2563EB,#06B6D4)',
+  hospital:   'linear-gradient(135deg,#8B5CF6,#EC4899)',
+  restaurant: 'linear-gradient(135deg,#F59E0B,#FACC15)',
+  office:     'linear-gradient(135deg,#16A34A,#06B6D4)',
+  school:     'linear-gradient(135deg,#EAB308,#F59E0B)',
+  retail:     'linear-gradient(135deg,#EC4899,#EF4444)',
+  other:      'linear-gradient(135deg,#64748B,#94A3B8)',
+};
+const avatarGrad = (t) => AVATAR_GRAD[(t || '').toLowerCase()] || AVATAR_GRAD.other;
+const clientInitials = (name = '') =>
+  name.split(/\s+/).map((s) => s.replace(/[^A-Za-z0-9]/g, ''))
+    .filter(Boolean).slice(0, 2).map((s) => s[0]).join('').toUpperCase() || '?';
+
+// Call / WhatsApp quick actions — open native dialer / WhatsApp (no logic change)
+const callClient = (e, phone) => {
+  e.preventDefault(); e.stopPropagation();
+  if (phone) window.location.href = `tel:${phone}`;
+};
+const waClient = (e, phone, name) => {
+  e.preventDefault(); e.stopPropagation();
+  const digits = (phone || '').replace(/\D/g, '');
+  const to = digits ? (digits.length === 10 ? '91' + digits : digits) : '';
+  const text = encodeURIComponent(`Hi ${name || ''}, this is Aromadelite. `);
+  window.open(to ? `https://wa.me/${to}?text=${text}` : `https://wa.me/?text=${text}`, '_blank', 'noopener,noreferrer');
+};
 
 const PayBehavior = ({ paid, partial, pending }) => {
   const total = paid + partial + pending;
@@ -786,66 +814,93 @@ export default function Clients() {
                       } catch { /* silent */ }
                     }
                   }}
-                  style={{ textDecoration: 'none', display: 'block' }}
+                  style={{ textDecoration: 'none', display: 'block', height: '100%' }}
                 >
-                  <div className="bg-white rounded-xl border border-slate-200 hover:border-cyan-300 hover:shadow-md transition-all p-4 h-full cursor-pointer">
+                  <div className="prod-card" style={{
+                    background: '#fff', border: `1px solid ${colors.border}`, borderRadius: radii.lg,
+                    padding: 14, height: '100%', boxShadow: shadow.sm, cursor: 'pointer',
+                    display: 'flex', flexDirection: 'column',
+                  }}>
 
-                    {/* Top row */}
-                    <div className="flex items-start justify-between gap-2 mb-2">
+                    {/* Top row — avatar + identity + balance */}
+                    <div className="flex items-start gap-3 mb-3">
+                      <div style={{
+                        width: 46, height: 46, borderRadius: 14, flexShrink: 0,
+                        background: avatarGrad(c.client_type), color: '#fff',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontWeight: 800, fontSize: 16, boxShadow: shadow.sm,
+                      }}>{clientInitials(c.business_name || c.contact_name)}</div>
+
                       <div className="flex-1 min-w-0">
-                        <div className="font-bold text-slate-900 text-sm truncate">
+                        <div style={{ fontWeight: 800, fontSize: 14, color: colors.ink }} className="truncate">
                           {c.business_name || c.contact_name}
                         </div>
                         {c.business_name && (
-                          <div className="text-xs text-slate-500 truncate">{c.contact_name}</div>
+                          <div className="text-xs truncate" style={{ color: colors.sub }}>{c.contact_name}</div>
                         )}
-                        <div className="flex items-center gap-2 mt-1 flex-wrap">
+                        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                           {c.client_type && (
                             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full capitalize"
-                                  style={{ background: tc.bg, color: tc.text }}>
-                              {c.client_type}
-                            </span>
+                                  style={{ background: tc.bg, color: tc.text }}>{c.client_type}</span>
                           )}
-                          {c.city && (
-                            <span className="text-[10px] text-slate-500">📍 {c.city}</span>
-                          )}
-                          {c.phone && (
-                            <span className="text-[10px] text-slate-500">📞 {c.phone}</span>
-                          )}
+                          {c.city && <span className="text-[10px]" style={{ color: colors.faint }}>📍 {c.city}</span>}
                         </div>
                       </div>
+
                       <div className="text-right flex-shrink-0">
-                        <div className="text-base font-bold text-slate-900">{fmtINR(c.total_billed)}</div>
-                        <div className="text-[10px] text-slate-400">billed</div>
+                        {balance > 0 ? (
+                          <>
+                            <div style={{ fontSize: 15, fontWeight: 900, color: '#dc2626' }}>
+                              ₹{new Intl.NumberFormat('en-IN').format(Math.round(balance))}
+                            </div>
+                            <div className="text-[10px]" style={{ color: '#f87171' }}>outstanding</div>
+                          </>
+                        ) : (
+                          <>
+                            <div style={{ fontSize: 15, fontWeight: 900, color: colors.ink }}>{fmtINR(c.total_billed)}</div>
+                            <div className="text-[10px]" style={{ color: colors.faint }}>billed</div>
+                          </>
+                        )}
                       </div>
                     </div>
 
                     {/* Stats row */}
-                    <div className="flex gap-4 text-xs text-slate-600 mb-2">
+                    <div className="flex items-center gap-4 text-xs mb-2.5" style={{ color: colors.body }}>
                       <span>🧾 <strong>{c.quote_count}</strong> quotes</span>
                       <span>🏷 <strong>{c.bill_count}</strong> bills</span>
-                      <span className={`font-medium ${lastDays <= 30 ? 'text-emerald-600' : lastDays <= 90 ? 'text-amber-600' : 'text-slate-400'}`}>
+                      <span style={{ fontWeight: 600, color: lastDays <= 30 ? '#16a34a' : lastDays <= 90 ? '#d97706' : colors.faint }}>
                         {lastDays === 0 ? 'Today' : lastDays === 1 ? 'Yesterday' : `${lastDays}d ago`}
                       </span>
+                      {hasNotes && <span style={{ color: colors.purple }}>📝</span>}
                     </div>
 
-                    {/* Payment behavior */}
-                    <div className="flex items-center justify-between gap-2 mb-1">
+                    {/* Payment behaviour */}
+                    <div className="mb-2.5">
                       <PayBehavior paid={paid} partial={partial} pending={pending} />
-                      {balance > 0 && (
-                        <span className="text-[10px] font-bold text-rose-600 flex-shrink-0">
-                          ₹{new Intl.NumberFormat('en-IN').format(Math.round(balance))} due
-                        </span>
-                      )}
                     </div>
 
-                    {/* Notes indicator */}
-                    {hasNotes && (
-                      <div className="text-[10px] text-indigo-600 font-medium mb-1">📝 Has notes</div>
-                    )}
-
-                    {/* 🛒 Portal link button — stops click from navigating */}
-                    <PortalLinkBtn client={c} />
+                    {/* Quick actions — pinned to bottom */}
+                    <div style={{ marginTop: 'auto', display: 'flex', gap: 7, alignItems: 'center' }}>
+                      {c.phone && (
+                        <>
+                          <button type="button" onClick={(e) => callClient(e, c.phone)} title={`Call ${c.phone}`}
+                            style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                              padding: '7px 11px', borderRadius: 9, fontSize: 11.5, fontWeight: 700,
+                              background: '#EFF6FF', color: '#1d4ed8', border: '1px solid #bfdbfe', cursor: 'pointer' }}>
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3 19.5 19.5 0 0 1-6-6 19.8 19.8 0 0 1-3.1-8.7A2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.4-1.2a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z"/></svg>
+                            Call
+                          </button>
+                          <button type="button" onClick={(e) => waClient(e, c.phone, c.business_name || c.contact_name)} title="WhatsApp"
+                            style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                              padding: '7px 10px', borderRadius: 9, fontSize: 11.5, fontWeight: 700,
+                              background: '#F0FDF4', color: '#15803d', border: '1px solid #86efac', cursor: 'pointer' }}>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M20.52 3.48A11.93 11.93 0 0 0 12.04 0C5.47 0 .14 5.33.14 11.9c0 2.1.55 4.15 1.6 5.96L0 24l6.32-1.66a11.9 11.9 0 0 0 5.72 1.46h.01c6.57 0 11.9-5.33 11.9-11.9 0-3.18-1.24-6.17-3.43-8.42zM12.05 21.5h-.01a9.6 9.6 0 0 1-4.9-1.34l-.35-.21-3.75.98 1-3.66-.23-.38a9.55 9.55 0 0 1-1.48-5.1c0-5.28 4.3-9.58 9.6-9.58 2.56 0 4.97 1 6.78 2.81a9.5 9.5 0 0 1 2.8 6.78c0 5.28-4.3 9.58-9.46 9.58z"/></svg>
+                          </button>
+                        </>
+                      )}
+                      <div style={{ flex: 1 }} />
+                      <PortalLinkBtn client={c} />
+                    </div>
 
                   </div>
                 </Link>
