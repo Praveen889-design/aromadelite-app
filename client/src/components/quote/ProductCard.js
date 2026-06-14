@@ -3,6 +3,18 @@ import React, { useMemo, useState } from 'react';
 const formatINR = (n) =>
   new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n || 0);
 
+// Per-category colour identity (stable) — keeps the quote browser vibrant
+const CAT_PALETTE = ['#2563EB', '#06B6D4', '#22C55E', '#F59E0B', '#8B5CF6', '#EC4899', '#EF4444', '#0EA5E9', '#14B8A6'];
+const catColor = (name = '') => {
+  let h = 0;
+  for (const ch of String(name)) h = (h * 31 + ch.charCodeAt(0)) % 9973;
+  return CAT_PALETTE[h % CAT_PALETTE.length];
+};
+const tintHex = (hex, a = 0.12) => {
+  const h = hex.replace('#', '');
+  return `rgba(${parseInt(h.slice(0, 2), 16)},${parseInt(h.slice(2, 4), 16)},${parseInt(h.slice(4, 6), 16)},${a})`;
+};
+
 /**
  * Calculate the pack price from the size label and the per-unit base_price.
  * The pack LABEL carries the quantity + unit, so "5L" = 5 × base regardless
@@ -79,6 +91,7 @@ export default function ProductCard({ product, inCart, onAdd, stockQty = null, c
                     : stockQty <= 10     ? { bg: '#fffbeb', text: '#b45309', border: '#fcd34d' }
                     : { bg: '#f0fdf4', text: '#15803d', border: '#86efac' };
 
+  const accent   = catColor(product.category_name);
   const variants = product.variants || [];
   const rawSizes = product.pack_sizes || [];
 
@@ -145,110 +158,115 @@ export default function ProductCard({ product, inCart, onAdd, stockQty = null, c
   };
 
   return (
-    <div className="border rounded-xl p-4 transition-shadow flex flex-col bg-white border-slate-200 hover:shadow-md">
-      <div className="flex items-start gap-2">
-        <span className="text-xl leading-none">{product.category_icon}</span>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between gap-2">
-            <h3 className="font-semibold text-slate-900 text-sm leading-tight" title={product.name}>
-              {product.name}
-            </h3>
-            {stockLabel && (
-              <span style={{
-                flexShrink: 0,
-                fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 99,
-                background: stockColor.bg, color: stockColor.text,
-                border: `1px solid ${stockColor.border}`,
-                whiteSpace: 'nowrap',
-              }}>
-                {stockLabel}
-              </span>
-            )}
-          </div>
-          {product.description && (
-            <p className="text-[11px] text-slate-500 mt-1 leading-snug line-clamp-2" title={product.description}>
-              {product.description}
-            </p>
-          )}
-          <div className="text-[11px] text-slate-400 mt-1">
-            GST {product.gst_percent}% · HSN {product.hsn_code || '—'}
-          </div>
-          {hasClientPrice && (
-            <div className="mt-1 inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full"
-                 style={{ background: '#eef2ff', color: '#4338ca', border: '1px solid #c7d2fe' }}>
-              🔒 Client Price {formatINR(effectivePrice)}
-              {effectivePrice < systemPrice && (
-                <span style={{ color: '#94a3b8', fontWeight: 500, textDecoration: 'line-through' }}>
-                  {formatINR(systemPrice)}
+    <div className="qcard" style={{
+      position: 'relative', overflow: 'hidden', background: '#fff',
+      border: `1px solid ${alreadyAdded ? '#86efac' : '#E8EEF6'}`,
+      borderRadius: 16, boxShadow: '0 2px 8px rgba(8,42,56,.06)',
+      display: 'flex', flexDirection: 'column',
+    }}>
+      {/* Category accent stripe */}
+      <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, background: `linear-gradient(180deg, ${accent}, ${accent}aa)` }} />
+
+      <div style={{ padding: '13px 14px 14px 17px', display: 'flex', flexDirection: 'column', flex: 1 }}>
+        {/* Header */}
+        <div className="flex items-start gap-2.5">
+          <span style={{ width: 36, height: 36, borderRadius: 11, background: tintHex(accent, .14), color: accent,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 19, flexShrink: 0 }}>
+            {product.category_icon || '📦'}
+          </span>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-2">
+              <h3 style={{ fontWeight: 800, fontSize: 14, color: '#0F2B3A', lineHeight: 1.25 }} title={product.name}>
+                {product.name}
+              </h3>
+              {stockLabel && (
+                <span style={{ flexShrink: 0, fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 99,
+                  background: stockColor.bg, color: stockColor.text, border: `1px solid ${stockColor.border}`, whiteSpace: 'nowrap' }}>
+                  {stockLabel}
                 </span>
               )}
             </div>
-          )}
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 3,
+              fontSize: 9, fontWeight: 800, color: accent, letterSpacing: '.07em', textTransform: 'uppercase' }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: accent }} />
+              {product.category_name || 'Product'}
+            </span>
+          </div>
         </div>
-      </div>
 
-      {variants.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {variants.map((v) => {
-            const active = v === variant;
-            return (
-              <button key={v} type="button" onClick={() => setVariant(v)}
-                className={[
-                  'text-[11px] px-2 py-0.5 rounded-full border transition-colors',
-                  active ? 'bg-cyan-600 text-white border-cyan-600'
-                         : 'bg-white text-slate-600 border-slate-300 hover:border-cyan-400',
-                ].join(' ')}
-              >{v}</button>
-            );
-          })}
+        {product.description && (
+          <p className="line-clamp-2" style={{ fontSize: 11.5, color: '#64748B', lineHeight: 1.45, marginTop: 7 }} title={product.description}>
+            {product.description}
+          </p>
+        )}
+        <div style={{ fontSize: 10.5, color: '#94A3B8', marginTop: 6 }}>
+          GST {product.gst_percent}% · HSN {product.hsn_code || '—'}
         </div>
-      )}
-
-      <div className="mt-3 grid grid-cols-5 gap-2">
-        {allSizes.length > 0 ? (
-          <label className="col-span-3 text-xs text-slate-600">
-            <div className="mb-1">Pack size</div>
-            <select
-              value={sizeIdx}
-              onChange={(e) => setSizeIdx(Number(e.target.value))}
-              className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
-            >
-              {allSizes.map((s, i) => (
-                <option key={`${s.size}-${i}`} value={i}>
-                  {s.size} — {formatINR(calcPackPrice(s.size, product.base_price, product.unit))}
-                </option>
-              ))}
-            </select>
-          </label>
-        ) : (
-          <div className="col-span-3 text-xs text-slate-600">
-            <div className="mb-1">Unit price</div>
-            <div className="border border-slate-200 rounded-md px-2 py-1.5 bg-slate-50 text-sm font-medium text-slate-700">
-              {formatINR(effectivePrice)}
-            </div>
+        {hasClientPrice && (
+          <div className="inline-flex items-center gap-1" style={{ marginTop: 7, alignSelf: 'flex-start',
+            fontSize: 10, fontWeight: 800, padding: '3px 9px', borderRadius: 999, background: '#eef2ff', color: '#4338ca', border: '1px solid #c7d2fe' }}>
+            🔒 Client {formatINR(effectivePrice)}
+            {effectivePrice < systemPrice && (
+              <span style={{ color: '#94a3b8', fontWeight: 500, textDecoration: 'line-through' }}>{formatINR(systemPrice)}</span>
+            )}
           </div>
         )}
-        <label className="col-span-2 text-xs text-slate-600">
-          <div className="mb-1">Qty</div>
-          <input
-            type="number" min={1} value={qty}
-            onChange={(e) => setQty(e.target.value)}
-            className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
-          />
-        </label>
-      </div>
 
-      <button type="button"
-        onClick={onClickAdd}
-        className={[
-          'mt-3 w-full text-sm font-semibold rounded-lg py-2 transition-colors cursor-pointer',
-          alreadyAdded
-            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-            : 'bg-cyan-600 hover:bg-cyan-700 text-white',
-        ].join(' ')}
-      >
-        {alreadyAdded ? '✓ Added' : 'Add to Quote'}
-      </button>
+        {/* Variants */}
+        {variants.length > 0 && (
+          <div className="flex flex-wrap gap-1.5" style={{ marginTop: 10 }}>
+            {variants.map((v) => {
+              const active = v === variant;
+              return (
+                <button key={v} type="button" onClick={() => setVariant(v)} style={{
+                  fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 999, cursor: 'pointer',
+                  border: `1.5px solid ${active ? accent : '#E2E8F0'}`,
+                  background: active ? tintHex(accent, .12) : '#fff', color: active ? accent : '#64748B',
+                }}>{v}</button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Pack + Qty */}
+        <div className="grid grid-cols-5 gap-2" style={{ marginTop: 11 }}>
+          {allSizes.length > 0 ? (
+            <label className="col-span-3" style={{ fontSize: 10, fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '.04em' }}>
+              <div style={{ marginBottom: 4 }}>Pack size</div>
+              <select value={sizeIdx} onChange={(e) => setSizeIdx(Number(e.target.value))}
+                style={{ width: '100%', border: '1.5px solid #E2E8F0', borderRadius: 9, padding: '8px', fontSize: 13, fontWeight: 600, color: '#0F2B3A', background: '#F8FAFF', outline: 'none' }}>
+                {allSizes.map((s, i) => (
+                  <option key={`${s.size}-${i}`} value={i}>{s.size} — {formatINR(calcPackPrice(s.size, product.base_price, product.unit))}</option>
+                ))}
+              </select>
+            </label>
+          ) : (
+            <div className="col-span-3" style={{ fontSize: 10, fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '.04em' }}>
+              <div style={{ marginBottom: 4 }}>Unit price</div>
+              <div style={{ border: '1.5px solid #E2E8F0', borderRadius: 9, padding: '8px', background: '#F8FAFF', fontSize: 13.5, fontWeight: 800, color: accent }}>
+                {formatINR(effectivePrice)}
+              </div>
+            </div>
+          )}
+          <label className="col-span-2" style={{ fontSize: 10, fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '.04em' }}>
+            <div style={{ marginBottom: 4 }}>Qty</div>
+            <input type="number" min={1} value={qty} onChange={(e) => setQty(e.target.value)}
+              style={{ width: '100%', boxSizing: 'border-box', border: '1.5px solid #E2E8F0', borderRadius: 9, padding: '8px', fontSize: 13.5, fontWeight: 700, color: '#0F2B3A', outline: 'none' }} />
+          </label>
+        </div>
+
+        <button type="button" onClick={onClickAdd} style={{
+          marginTop: 12, width: '100%', height: 42, borderRadius: 11, cursor: 'pointer',
+          border: alreadyAdded ? '1.5px solid #059669' : 'none',
+          background: alreadyAdded ? '#F0FDF4' : `linear-gradient(135deg, ${accent}, ${accent}cc)`,
+          color: alreadyAdded ? '#059669' : '#fff',
+          fontFamily: "'Nunito', sans-serif", fontWeight: 800, fontSize: 14,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+          boxShadow: alreadyAdded ? 'none' : `0 5px 14px ${tintHex(accent, .35)}`,
+        }}>
+          {alreadyAdded ? '✓ Added' : '+ Add to Quote'}
+        </button>
+      </div>
     </div>
   );
 }
