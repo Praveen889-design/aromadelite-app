@@ -34,6 +34,13 @@ const calcPackPrice = (sizeLabel, basePrice, unit) => {
 const fmtINR = (n) =>
   new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n || 0);
 
+const WITHOUT_GST_MARKUP = 0.05; // +5%, mirrors quotes/bills
+// Final price the client pays per the chosen GST mode
+const priceFor = (base, gst, mode) =>
+  mode === 'without_gst'
+    ? Math.round(Number(base || 0) * (1 + WITHOUT_GST_MARKUP))
+    : Math.round(Number(base || 0) * (1 + Number(gst || 0) / 100));
+
 const fmtDate = (iso) => {
   if (!iso) return '—';
   return new Date(String(iso).length === 10 ? iso + 'T00:00:00' : iso)
@@ -64,12 +71,14 @@ export default function ClientPortal() {
   const [orderResult,  setOrderResult]  = useState(null); // success state
   const [activeTab,    setActiveTab]    = useState('my_items'); // 'my_items' | 'catalog'
   const [searchQ,      setSearchQ]      = useState('');
+  const [gstView,      setGstView]      = useState('with_gst'); // client-chosen GST mode
 
   useEffect(() => {
     (async () => {
       try {
         const { data } = await api.get(`/api/portal/${token}`);
         setPortalData(data);
+        setGstView(data.gst_mode === 'without_gst' ? 'without_gst' : 'with_gst');
 
         // Pre-fill cart with items from last order
         const cartInit = {};
@@ -98,7 +107,7 @@ export default function ClientPortal() {
     })();
   }, [token]);
 
-  const { client, catalog = [], past_orders = [], gst_mode } = portalData || {};
+  const { client, catalog = [], past_orders = [] } = portalData || {};
 
   // Group catalog by category
   const grouped = useMemo(() => {
@@ -126,6 +135,8 @@ export default function ClientPortal() {
         product_id:   it.product_id,
         name:         it.product_name || it.name,
         description:  prod?.description || it.description || null,
+        image_url:    prod?.image_url || null,
+        category_icon: prod?.category_icon || null,
         unit_price:   (prod?.negotiated_price ?? prod?.display_price ?? Number(it.unit_price)) || 0,
         gst_percent:  (prod?.gst_percent ?? Number(it.gst_percent)) || 0,
         unit:         it.unit || 'Nos',
@@ -165,11 +176,8 @@ export default function ClientPortal() {
   const getQty = (p, variant = '', pack_size = '') => cart[cartKey(p, variant, pack_size)]?.qty || 0;
 
   const cartItems = Object.values(cart);
-  // Cart total always includes GST — portal always shows what client will pay
-  const cartTotal = cartItems.reduce((s, it) => {
-    const gstFactor = 1 + (it.gst_percent || 0) / 100;
-    return s + Math.round(it.qty * it.unit_price * gstFactor);
-  }, 0);
+  // Total reflects the GST mode the client picked (With GST = +tax, Without = +5%)
+  const cartTotal = cartItems.reduce((s, it) => s + it.qty * priceFor(it.unit_price, it.gst_percent, gstView), 0);
   const cartCount = cartItems.reduce((s, it) => s + it.qty, 0);
 
   const placeOrder = async () => {
@@ -187,10 +195,11 @@ export default function ClientPortal() {
         category_name: it.category_name,
         variant:      it.variant,
         pack_size:    it.pack_size,
-        line_total:   +(it.qty * it.unit_price * (gst_mode === 'without_gst' ? 1 : (1 + it.gst_percent / 100))).toFixed(2),
+        line_total:   +(it.qty * priceFor(it.unit_price, it.gst_percent, gstView)).toFixed(2),
       }));
       const { data } = await api.post(`/api/portal/${token}/order`, {
         items,
+        gst_mode: gstView,
         notes: notes || null,
         orderer_name: client?.name,
       });
@@ -251,13 +260,15 @@ export default function ClientPortal() {
     <div style={{ minHeight: '100vh', background: '#f8fafc', fontFamily: "'Inter', ui-sans-serif, system-ui, sans-serif" }}>
 
       {/* ── Header ── */}
-      <div style={{ background: 'linear-gradient(135deg, #0f766e, #0d9488)', padding: '16px 20px', position: 'sticky', top: 0, zIndex: 40 }}>
+      <div style={{ background: 'linear-gradient(120deg, #0f766e 0%, #0d9488 45%, #06b6d4 100%)', padding: '15px 20px', position: 'sticky', top: 0, zIndex: 40, boxShadow: '0 4px 18px rgba(13,148,136,.3)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', maxWidth: 680, margin: '0 auto' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ fontSize: 28 }}>🌿</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
+            <span style={{ background: '#fff', borderRadius: 11, padding: '5px 9px', display: 'inline-flex', alignItems: 'center', boxShadow: '0 2px 8px rgba(0,0,0,.15)' }}>
+              <img src="/aromadelite-logo.png" alt="Aromadelite" style={{ height: 26, objectFit: 'contain', display: 'block' }} />
+            </span>
             <div>
               <div style={{ fontWeight: 900, fontSize: 16, color: '#fff', letterSpacing: '-0.02em' }}>Aromadelite</div>
-              <div style={{ fontSize: 11, color: '#99f6e4', marginTop: 1 }}>Order Portal</div>
+              <div style={{ fontSize: 11, color: '#a7f3d0', marginTop: 1 }}>Order Portal</div>
             </div>
           </div>
           <div style={{ textAlign: 'right' }}>
@@ -280,6 +291,25 @@ export default function ClientPortal() {
           </div>
           <div style={{ color: '#ccfbf1', fontSize: 12, marginTop: 4 }}>
             Browse your products below and place an order directly.
+          </div>
+        </div>
+
+        {/* ── GST mode toggle (client choice) ── */}
+        <div style={{ padding: '12px 16px 0' }}>
+          <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', boxShadow: '0 1px 3px rgba(8,42,56,.05)' }}>
+            <span style={{ fontSize: 12.5, fontWeight: 800, color: '#334155' }}>💰 Pricing</span>
+            <div style={{ display: 'flex', background: '#f1f5f9', borderRadius: 11, padding: 3 }}>
+              {[{ v: 'with_gst', l: 'With GST' }, { v: 'without_gst', l: 'Without GST' }].map(o => {
+                const on = gstView === o.v;
+                return (
+                  <button key={o.v} onClick={() => setGstView(o.v)} style={{
+                    padding: '7px 15px', borderRadius: 9, border: 'none', cursor: 'pointer', fontSize: 12.5, fontWeight: 800,
+                    background: on ? 'linear-gradient(135deg,#0d9488,#0f766e)' : 'transparent', color: on ? '#fff' : '#94a3b8',
+                    boxShadow: on ? '0 3px 8px rgba(15,118,110,.3)' : 'none', transition: 'all .15s',
+                  }}>{o.l}</button>
+                );
+              })}
+            </div>
           </div>
         </div>
 
@@ -369,7 +399,7 @@ export default function ClientPortal() {
                   product={item}
                   qty={qty}
                   onQtyChange={(q) => setQty(item, q, item.variant, item.pack_size)}
-                  gst_mode={gst_mode}
+                  gstView={gstView}
                   isNegotiated={true}
                 />
               );
@@ -427,7 +457,7 @@ export default function ClientPortal() {
                         product={enriched}
                         qty={qty}
                         onQtyChange={(q) => setQty(enriched, q)}
-                        gst_mode={gst_mode}
+                        gstView={gstView}
                         isNegotiated={false}
                       />
                     );
@@ -499,49 +529,57 @@ export default function ClientPortal() {
 }
 
 /* ── Product Row Component ── */
-function ProductRow({ product, qty, onQtyChange, gst_mode, isNegotiated }) {
-  const basePrice  = product.unit_price ?? product.display_price ?? product.negotiated_price ?? 0;
-  // Always show GST-inclusive price — gst_mode only affects quote PDF format, not what client pays
-  const gstFactor    = 1 + (product.gst_percent || 0) / 100;
-  const displayPrice = Math.round(basePrice * gstFactor);
+function ProductRow({ product, qty, onQtyChange, gstView, isNegotiated }) {
+  const basePrice    = product.unit_price ?? product.display_price ?? product.negotiated_price ?? 0;
+  const displayPrice = priceFor(basePrice, product.gst_percent, gstView);
   const lineTotal    = qty > 0 ? qty * displayPrice : 0;
   const unitLabel    = product.pack_size || product.unit || 'Nos';
+  const emoji        = product.category_icon || '📦';
+  const active       = qty > 0;
 
   return (
     <div style={{
-      background: qty > 0 ? '#f0fdfa' : '#fff',
-      border: `1.5px solid ${qty > 0 ? '#6ee7b7' : '#e2e8f0'}`,
-      borderRadius: 12, padding: '12px 14px',
-      display: 'flex', alignItems: 'center', gap: 10,
+      background: active ? 'linear-gradient(135deg,#f0fdfa,#ecfeff)' : '#fff',
+      border: `1.5px solid ${active ? '#5eead4' : '#e2e8f0'}`,
+      borderRadius: 14, padding: 11,
+      display: 'flex', alignItems: 'center', gap: 12,
+      boxShadow: active ? '0 4px 14px rgba(13,148,136,.14)' : '0 1px 3px rgba(8,42,56,.05)',
       transition: 'all .15s',
     }}>
+      {/* Product image */}
+      <div style={{ width: 60, height: 60, borderRadius: 12, flexShrink: 0, overflow: 'hidden',
+        background: product.image_url ? '#fff' : 'linear-gradient(135deg,#ccfbf1,#e0f2fe)',
+        border: '1px solid #d1fae5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        {product.image_url
+          ? <img src={product.image_url} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 4, boxSizing: 'border-box' }} />
+          : <span style={{ fontSize: 26, opacity: .6 }}>{emoji}</span>}
+      </div>
+
       {/* Product info */}
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontWeight: 700, fontSize: 13, color: '#1e293b', lineHeight: 1.3 }}>
+        <div style={{ fontWeight: 800, fontSize: 13.5, color: '#0f2b3a', lineHeight: 1.25 }}>
           {product.name}
           {product.variant && <span style={{ fontWeight: 400, color: '#64748b' }}> · {product.variant}</span>}
         </div>
         {product.description && (
-          <div style={{ fontSize: 11, color: '#64748b', marginTop: 2, lineHeight: 1.4 }}>
+          <div style={{ fontSize: 11, color: '#64748b', marginTop: 2, lineHeight: 1.35, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
             {product.description}
           </div>
         )}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3, flexWrap: 'wrap' }}>
-          <span style={{ fontWeight: 800, fontSize: 14, color: isNegotiated ? '#059669' : '#0f766e' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
+          <span style={{ fontWeight: 900, fontSize: 16, color: isNegotiated ? '#059669' : '#0f766e', letterSpacing: '-.02em' }}>
             ₹{new Intl.NumberFormat('en-IN').format(displayPrice)}
           </span>
           <span style={{ fontSize: 10, color: '#94a3b8' }}>/ {unitLabel}</span>
           {isNegotiated && (
-            <span style={{ fontSize: 9, fontWeight: 700, background: '#dcfce7', color: '#15803d', padding: '1px 6px', borderRadius: 99 }}>
-              YOUR PRICE
-            </span>
+            <span style={{ fontSize: 9, fontWeight: 800, background: '#dcfce7', color: '#15803d', padding: '2px 7px', borderRadius: 99 }}>YOUR PRICE</span>
           )}
-          {gst_mode !== 'without_gst' && product.gst_percent > 0 && (
-            <span style={{ fontSize: 9, color: '#94a3b8' }}>incl. {product.gst_percent}% GST</span>
-          )}
+          <span style={{ fontSize: 9, fontWeight: 700, color: gstView === 'without_gst' ? '#9a3412' : '#0e7490', background: gstView === 'without_gst' ? '#ffedd5' : '#cffafe', padding: '2px 7px', borderRadius: 99 }}>
+            {gstView === 'without_gst' ? 'No GST' : `incl. ${product.gst_percent}% GST`}
+          </span>
         </div>
-        {qty > 0 && (
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#0f766e', marginTop: 2 }}>
+        {active && (
+          <div style={{ fontSize: 11.5, fontWeight: 800, color: '#0f766e', marginTop: 3 }}>
             Subtotal: ₹{new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(lineTotal)}
           </div>
         )}

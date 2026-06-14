@@ -14,12 +14,17 @@ const parseJSON = (s, fallback = null) => {
   try { return JSON.parse(s); } catch { return fallback; }
 };
 
-const computeTotals = (items) => {
+const WITHOUT_GST_MARKUP = 0.05; // +5% on base, mirrors quotes/bills
+
+const computeTotals = (items, gst_mode = 'with_gst') => {
   let subtotal = 0, gst_amount = 0;
   for (const it of items) {
     const line = (Number(it.quantity) || 0) * (Number(it.unit_price) || 0);
     subtotal  += line;
     gst_amount += (line * (Number(it.gst_percent) || 0)) / 100;
+  }
+  if (gst_mode === 'without_gst') {
+    return { subtotal: +subtotal.toFixed(2), gst_amount: 0, total_amount: +(subtotal * (1 + WITHOUT_GST_MARKUP)).toFixed(2) };
   }
   return {
     subtotal:     +subtotal.toFixed(2),
@@ -86,7 +91,7 @@ router.get('/:token', async (req, res) => {
     // 3. Full product catalog
     const { rows: products } = await pool.query(`
       SELECT p.id, p.name, p.description, p.base_price, p.unit, p.hsn_code,
-             p.gst_percent, p.variants, p.pack_sizes,
+             p.gst_percent, p.variants, p.pack_sizes, p.image_url,
              c.name AS category_name, c.icon_emoji AS category_icon
       FROM products p
       JOIN product_categories c ON c.id = p.category_id
@@ -109,6 +114,7 @@ router.get('/:token', async (req, res) => {
         gst_percent:      Number(p.gst_percent) || 0,
         category_name:    p.category_name,
         category_icon:    p.category_icon || null,
+        image_url:        p.image_url || null,
         variants:         parseJSON(p.variants,   []),
         pack_sizes:       parseJSON(p.pack_sizes, []),
       };
@@ -194,8 +200,11 @@ router.post('/:token/order', async (req, res) => {
     }
     if (!employee_id) return res.status(500).json({ error: 'No associate found to handle this order' });
 
-    const gst_mode     = lq[0]?.gst_mode || 'with_gst';
-    const totals       = computeTotals(items);
+    // Client may choose GST mode in the portal; otherwise use the last quote's
+    const gst_mode     = ['with_gst', 'without_gst'].includes(req.body?.gst_mode)
+      ? req.body.gst_mode
+      : (lq[0]?.gst_mode || 'with_gst');
+    const totals       = computeTotals(items, gst_mode);
     const quote_number = await nextQuoteNumber();
     const estMonthly   = +(totals.total_amount / 3).toFixed(2);
     const clientName   = orderer_name || client.contact_name;
