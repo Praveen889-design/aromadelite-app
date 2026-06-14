@@ -5,6 +5,15 @@ import { useQuoteBuilder } from '../context/QuoteBuilderContext';
 import { useToast } from '../components/Toast';
 import { SkeletonCards } from '../components/Skeleton';
 import { calcPackPrice, baseUnitLabel } from '../components/quote/ProductCard';
+import { gradients, radii, shadow, tint } from '../theme/tokens';
+
+// Each category gets a stable colour identity for a vibrant, scannable grid
+const CAT_PALETTE = ['#2563EB', '#06B6D4', '#22C55E', '#F59E0B', '#8B5CF6', '#EC4899', '#EF4444', '#0EA5E9', '#14B8A6'];
+const catColor = (name = '') => {
+  let h = 0;
+  for (const ch of String(name)) h = (h * 31 + ch.charCodeAt(0)) % 9973;
+  return CAT_PALETTE[h % CAT_PALETTE.length];
+};
 
 const CATEGORY_EMOJI = {
   'Chemical Cleaners': '🧪',
@@ -27,21 +36,28 @@ const VariantPill = ({ children, active, onClick }) => (
   }}>{children}</button>
 );
 
-const CategoryChip = ({ children, active, emoji, onClick }) => (
+const CategoryChip = ({ children, active, emoji, count, onClick }) => (
   <button onClick={onClick} style={{
     flex: '0 0 auto',
-    display: 'inline-flex', alignItems: 'center', gap: 5,
-    height: 34, padding: '0 14px',
+    display: 'inline-flex', alignItems: 'center', gap: 6,
+    height: 36, padding: '0 14px',
     borderRadius: 999,
-    background: active ? '#2563EB' : '#FFFFFF',
-    color: active ? '#FFFFFF' : '#2563EB',
-    border: active ? '1.5px solid #2563EB' : '1.5px solid #BFDBFE',
-    fontFamily: "'Source Sans 3', sans-serif", fontWeight: 600, fontSize: 13,
-    boxShadow: active ? '0 4px 12px rgba(14,116,144,.25)' : 'none',
-    whiteSpace: 'nowrap', cursor: 'pointer',
+    background: active ? gradients.green : '#FFFFFF',
+    color: active ? '#FFFFFF' : '#0F2B3A',
+    border: active ? 'none' : '1.5px solid #E2E8F0',
+    fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: 13,
+    boxShadow: active ? '0 6px 16px rgba(34,197,94,.30)' : '0 1px 2px rgba(8,42,56,.05)',
+    whiteSpace: 'nowrap', cursor: 'pointer', transition: 'all .15s ease',
   }}>
-    {emoji && <span style={{ fontSize: 14 }}>{emoji}</span>}
+    {emoji && <span style={{ fontSize: 15 }}>{emoji}</span>}
     {children}
+    {count != null && (
+      <span style={{
+        fontSize: 11, fontWeight: 800, minWidth: 18, height: 18, borderRadius: 999,
+        padding: '0 5px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        background: active ? 'rgba(255,255,255,.25)' : '#EFF6FF', color: active ? '#fff' : '#2563EB',
+      }}>{count}</span>
+    )}
   </button>
 );
 
@@ -74,19 +90,23 @@ function ProductCard({ product, inCart, onAddToQuote }) {
   const activePack = packs[selPack] || packs[0];
   const price      = calcPackPrice(activePack.size, product.base_price, product.unit);
   const gst        = Number(product.gst_percent) || 0;
+  const accent     = catColor(product.category_name);
 
   return (
     <div className="prod-card" style={{
       position: 'relative', background: '#FFFFFF',
-      border: `1px solid ${inCart ? '#34D399' : '#E5EEF2'}`,
-      borderRadius: 16, overflow: 'hidden',
+      border: `1px solid ${inCart ? '#34D399' : '#E8EEF6'}`,
+      borderRadius: 18, overflow: 'hidden',
       display: 'flex', flexDirection: 'column', minWidth: 0,
-      boxShadow: inCart ? '0 6px 18px rgba(5,150,105,.14)' : '0 1px 3px rgba(8,42,56,.06)',
+      boxShadow: inCart ? '0 6px 18px rgba(5,150,105,.14)' : '0 2px 8px rgba(8,42,56,.06)',
     }}>
+      {/* Category accent stripe */}
+      <div style={{ height: 4, background: `linear-gradient(90deg, ${accent}, ${accent}99)` }} />
+
       {/* ── Image ── */}
       <div style={{
         position: 'relative', width: '100%', aspectRatio: '1 / 1',
-        background: product.image_url ? '#FFFFFF' : 'linear-gradient(135deg, #EFF6FF 0%, #F0FDFA 100%)',
+        background: product.image_url ? '#FFFFFF' : `linear-gradient(135deg, ${tint(accent, .1)} 0%, ${tint(accent, .04)} 100%)`,
         display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
         borderBottom: '1px solid #EEF3F6',
       }}>
@@ -118,10 +138,13 @@ function ProductCard({ product, inCart, onAddToQuote }) {
 
       {/* ── Body ── */}
       <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 7, flex: 1 }}>
-        <span style={{
-          fontFamily: "'Source Sans 3', sans-serif", fontWeight: 700, fontSize: 9.5,
-          color: '#2563EB', letterSpacing: '.1em', textTransform: 'uppercase',
-        }}>{product.category_name || 'Product'}</span>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5,
+          fontFamily: "'Inter', sans-serif", fontWeight: 800, fontSize: 9.5,
+          color: accent, letterSpacing: '.1em', textTransform: 'uppercase',
+        }}>
+          <span style={{ width: 7, height: 7, borderRadius: '50%', background: accent }} />
+          {product.category_name || 'Product'}
+        </span>
 
         <div style={{
           fontFamily: "'Nunito', sans-serif", fontWeight: 800, fontSize: 16,
@@ -163,7 +186,7 @@ function ProductCard({ product, inCart, onAddToQuote }) {
         {/* Price + Add */}
         <div style={{ marginTop: 'auto', paddingTop: 6 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 8 }}>
-            <span style={{ fontFamily: "'Nunito', sans-serif", fontWeight: 900, fontSize: 21, color: '#2563EB', letterSpacing: '-.02em' }}>
+            <span style={{ fontFamily: "'Nunito', sans-serif", fontWeight: 900, fontSize: 21, color: accent, letterSpacing: '-.02em' }}>
               {formatINR(price)}
             </span>
             <span style={{ fontFamily: "'Source Sans 3', sans-serif", fontSize: 11.5, color: '#94A3B8' }}>
@@ -257,31 +280,35 @@ export default function Products() {
   if (loading) return <div className="space-y-4"><SkeletonCards count={6} /></div>;
 
   return (
-    <div style={{ fontFamily: "'Source Sans 3', sans-serif" }}>
-      {/* Search */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 10,
-        background: '#FFFFFF', border: '1.5px solid #E5E7EB',
-        borderRadius: 12, padding: '0 14px', height: 44, marginBottom: 12,
-      }}>
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>
-        </svg>
-        <input
-          type="text"
-          placeholder="Search products…"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          style={{
-            flex: 1, border: 0, outline: 0, background: 'transparent',
-            fontFamily: "'Source Sans 3', sans-serif", fontSize: 14, color: '#374151',
-          }}
-        />
-        {search && (
-          <button onClick={() => setSearch('')} style={{ border: 0, background: 'transparent', color: '#94A3B8', cursor: 'pointer', padding: 2, display: 'flex', alignItems: 'center' }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
-          </button>
-        )}
+    <div style={{ fontFamily: "'Inter', sans-serif" }}>
+      {/* ── Gradient hero + search ── */}
+      <div style={{ position: 'relative', overflow: 'hidden', borderRadius: radii.xl, padding: '18px 20px 16px', background: gradients.green, boxShadow: shadow.md, marginBottom: 14 }}>
+        <div style={{ position: 'absolute', right: -34, top: -44, width: 150, height: 150, borderRadius: '50%', background: 'rgba(255,255,255,.14)' }} />
+        <div style={{ position: 'absolute', right: 70, bottom: -60, width: 120, height: 120, borderRadius: '50%', background: 'rgba(255,255,255,.10)' }} />
+        <div style={{ position: 'relative' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
+            <h2 style={{ display: 'flex', alignItems: 'center', gap: 9, fontSize: 19, fontWeight: 900, color: '#fff', letterSpacing: '-.02em', margin: 0 }}>
+              <span style={{ width: 32, height: 32, borderRadius: 10, background: 'rgba(255,255,255,.22)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.7l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.7l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="m3.3 7 8.7 5 8.7-5M12 22V12"/></svg>
+              </span>
+              Product Catalog
+            </h2>
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', background: 'rgba(255,255,255,.2)', padding: '5px 12px', borderRadius: 999, backdropFilter: 'blur(6px)' }}>
+              {products.length} products · {categories.length} categories
+            </span>
+          </div>
+          {/* Glassy search */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(255,255,255,.95)', borderRadius: 12, padding: '0 14px', height: 46, boxShadow: '0 4px 14px rgba(0,0,0,.10)' }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16A34A" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            <input type="text" placeholder="Search products…" value={search} onChange={e => setSearch(e.target.value)}
+              style={{ flex: 1, border: 0, outline: 0, background: 'transparent', fontFamily: "'Inter', sans-serif", fontSize: 14, fontWeight: 500, color: '#0F2B3A' }} />
+            {search && (
+              <button onClick={() => setSearch('')} style={{ border: 0, background: 'transparent', color: '#94A3B8', cursor: 'pointer', padding: 2, display: 'flex', alignItems: 'center' }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+              </button>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Category chips */}
@@ -293,15 +320,17 @@ export default function Products() {
         }}
           className="hide-scrollbar"
         >
-          <CategoryChip active={activeCat === 'all'} onClick={() => setActiveCat('all')}>All</CategoryChip>
+          <CategoryChip active={activeCat === 'all'} count={products.length} onClick={() => setActiveCat('all')}>All</CategoryChip>
           {categories.map(c => {
             const name = typeof c === 'string' ? c : c.name;
             const emoji = typeof c === 'string' ? CATEGORY_EMOJI[c] : (c.icon_emoji || CATEGORY_EMOJI[c.name]);
+            const count = typeof c === 'string' ? undefined : Number(c.product_count) || undefined;
             return (
               <CategoryChip
                 key={name}
                 active={activeCat === name}
                 emoji={emoji}
+                count={count}
                 onClick={() => setActiveCat(name)}
               >{name}</CategoryChip>
             );
