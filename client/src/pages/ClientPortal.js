@@ -548,7 +548,10 @@ export default function ClientPortal() {
 
 /* ── Product Row Component ── */
 function ProductRow({ product, qty, onQtyChange, gstView, isNegotiated, basePrice = 0, onPriceChange }) {
+  const actualBase   = product.unit_price ?? product.display_price ?? product.negotiated_price ?? 0;
+  const actualFinal  = priceFor(actualBase, product.gst_percent, gstView);
   const displayPrice = priceFor(basePrice, product.gst_percent, gstView);
+  const edited       = Math.round(basePrice) !== Math.round(actualBase);
   const lineTotal    = qty > 0 ? qty * displayPrice : 0;
   const unitLabel    = product.pack_size || product.unit || 'Nos';
   const emoji        = product.category_icon || '📦';
@@ -583,15 +586,30 @@ function ProductRow({ product, qty, onQtyChange, gstView, isNegotiated, basePric
             {product.description}
           </div>
         )}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 5, flexWrap: 'wrap' }}>
-          {/* Editable quote price (per unit, before GST) */}
-          <span style={{ fontSize: 9.5, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '.04em' }}>Quote ₹</span>
-          <span style={{ display: 'inline-flex', alignItems: 'center', border: `1.5px solid ${isNegotiated ? '#86efac' : '#cbd5e1'}`, borderRadius: 9, background: '#fff', overflow: 'hidden' }}>
-            <span style={{ fontSize: 12, color: '#94a3b8', padding: '0 0 0 8px' }}>₹</span>
-            <input type="number" min={0} value={basePrice}
-              onChange={(e) => onPriceChange && onPriceChange(Math.max(0, Number(e.target.value) || 0))}
-              style={{ width: 62, border: 'none', outline: 'none', padding: '6px 8px', fontSize: 14, fontWeight: 800, color: '#0f766e', background: 'transparent' }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 5, flexWrap: 'wrap' }}>
+          {/* Actual (list) price */}
+          <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 4 }}>
+            <span style={{ fontSize: 9.5, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.04em' }}>Actual</span>
+            <span style={{ fontSize: 13, fontWeight: 700, color: '#94a3b8', textDecoration: edited ? 'line-through' : 'none' }}>
+              ₹{new Intl.NumberFormat('en-IN').format(actualFinal)}
+            </span>
           </span>
+
+          {/* Editable quote price (per unit, before GST) */}
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+            <span style={{ fontSize: 9.5, fontWeight: 800, color: '#0f766e', textTransform: 'uppercase', letterSpacing: '.04em' }}>Quote</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', border: `1.5px solid ${edited ? '#0d9488' : '#cbd5e1'}`, borderRadius: 9, background: '#fff', overflow: 'hidden' }}>
+              <span style={{ fontSize: 12, color: '#94a3b8', padding: '0 0 0 8px' }}>₹</span>
+              <input type="number" min={0} value={basePrice}
+                onChange={(e) => onPriceChange && onPriceChange(Math.max(0, Number(e.target.value) || 0))}
+                style={{ width: 60, border: 'none', outline: 'none', padding: '6px 8px', fontSize: 14, fontWeight: 800, color: '#0f766e', background: 'transparent' }} />
+            </span>
+            {edited && (
+              <button onClick={() => onPriceChange && onPriceChange(actualBase)} title="Reset to actual price"
+                style={{ border: 'none', background: 'transparent', color: '#94a3b8', cursor: 'pointer', fontSize: 13, padding: 2 }}>↺</button>
+            )}
+          </span>
+
           {isNegotiated && (
             <span style={{ fontSize: 9, fontWeight: 800, background: '#dcfce7', color: '#15803d', padding: '2px 7px', borderRadius: 99 }}>YOUR PRICE</span>
           )}
