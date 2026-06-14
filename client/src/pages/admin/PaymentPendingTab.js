@@ -2,6 +2,20 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../utils/api';
 import { useToast } from '../../components/Toast';
+import { gradients, radii, shadow } from '../../theme/tokens';
+
+const FinCard = ({ label, value, sub, gradient, icon }) => (
+  <div style={{ position: 'relative', overflow: 'hidden', borderRadius: radii.lg, padding: 15, color: '#fff', background: gradient, boxShadow: shadow.md }}>
+    <div style={{ position: 'absolute', right: -20, top: -22, width: 80, height: 80, borderRadius: '50%', background: 'rgba(255,255,255,.16)' }} />
+    <div style={{ position: 'relative' }}>
+      <div style={{ width: 34, height: 34, borderRadius: 11, background: 'rgba(255,255,255,.22)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>{icon}</div>
+      <div style={{ fontSize: 23, fontWeight: 900, letterSpacing: '-.02em', lineHeight: 1 }}>{value}</div>
+      <div style={{ fontSize: 11, fontWeight: 700, opacity: .95, marginTop: 5, textTransform: 'uppercase', letterSpacing: '.05em' }}>{label}</div>
+      {sub && <div style={{ fontSize: 11.5, opacity: .88, marginTop: 2 }}>{sub}</div>}
+    </div>
+  </div>
+);
+const fIcon = (d) => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{d}</svg>;
 
 const fmtINR = (n) =>
   new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n || 0);
@@ -55,6 +69,8 @@ export default function PaymentPendingTab() {
   const totalReceived = bills.reduce((s, b) => s + Number(b.amount_paid  || 0), 0);
   const totalBalance  = totalPending - totalReceived;
   const partialCount  = bills.filter((b) => b.payment_status === 'partial').length;
+  const overdueBills  = bills.filter((b) => b.payment_status !== 'partial' && ageDays(b.created_at) >= 14);
+  const overdueAmount = overdueBills.reduce((s, b) => s + (Number(b.total_amount || 0) - Number(b.amount_paid || 0)), 0);
 
   return (
     <div style={{ padding: '20px 0' }}>
@@ -78,45 +94,28 @@ export default function PaymentPendingTab() {
         </p>
       </div>
 
-      {/* Summary banner */}
+      {/* Finance summary cards */}
       {bills.length > 0 && (
-        <div style={{
-          background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
-          border: '1.5px solid #fcd34d', borderRadius: 12, padding: '14px 18px',
-          marginBottom: 20,
-        }}>
-          <div style={{ display: 'flex', gap: 32, flexWrap: 'wrap', marginBottom: totalReceived > 0 ? 12 : 0 }}>
-            <div>
-              <div style={{ fontSize: 11, color: '#92400e', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>Balance Due</div>
-              <div style={{ fontSize: 22, fontWeight: 800, color: '#78350f' }}>{fmtINR(totalBalance)}</div>
-            </div>
-            {totalReceived > 0 && (
-              <div>
-                <div style={{ fontSize: 11, color: '#065f46', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>Already Received</div>
-                <div style={{ fontSize: 22, fontWeight: 800, color: '#065f46' }}>{fmtINR(totalReceived)}</div>
-              </div>
-            )}
-            <div>
-              <div style={{ fontSize: 11, color: '#92400e', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>Bills</div>
-              <div style={{ fontSize: 22, fontWeight: 800, color: '#78350f' }}>
-                {bills.length}
-                {partialCount > 0 && <span style={{ fontSize: 13, fontWeight: 600, color: '#7c3aed', marginLeft: 8 }}>({partialCount} partial)</span>}
-              </div>
-            </div>
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
+            <FinCard label="Balance Due" value={fmtINR(totalBalance)} sub={`${bills.length} bill${bills.length !== 1 ? 's' : ''}`}
+              gradient={gradients.red} icon={fIcon(<><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></>)} />
+            <FinCard label="Overdue 14d+" value={fmtINR(overdueAmount)} sub={`${overdueBills.length} bill${overdueBills.length !== 1 ? 's' : ''}`}
+              gradient={gradients.orange} icon={fIcon(<><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></>)} />
+            <FinCard label="Received" value={fmtINR(totalReceived)} sub={totalPending > 0 ? `${Math.round((totalReceived / totalPending) * 100)}% collected` : '—'}
+              gradient={gradients.green} icon={fIcon(<path d="M20 6 9 17l-5-5"/>)} />
+            <FinCard label="Open Bills" value={bills.length} sub={partialCount > 0 ? `${partialCount} partial` : 'awaiting collection'}
+              gradient={gradients.purple} icon={fIcon(<><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></>)} />
           </div>
           {/* Overall collection progress */}
           {totalPending > 0 && totalReceived > 0 && (
-            <div>
-              <div style={{ fontSize: 11, color: '#92400e', fontWeight: 600, marginBottom: 4 }}>
-                Collection Progress — {Math.round((totalReceived / totalPending) * 100)}%
+            <div style={{ background: '#fff', border: '1px solid #E8EEF6', borderRadius: radii.md, padding: '12px 16px', marginTop: 12, boxShadow: shadow.sm }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 700, color: '#475569', marginBottom: 6 }}>
+                <span>Collection Progress</span>
+                <span style={{ color: '#059669' }}>{Math.round((totalReceived / totalPending) * 100)}%</span>
               </div>
-              <div style={{ height: 8, background: '#fde68a', borderRadius: 8, overflow: 'hidden' }}>
-                <div style={{
-                  height: '100%',
-                  width: `${Math.min(100, (totalReceived / totalPending) * 100)}%`,
-                  background: 'linear-gradient(90deg, #059669, #10b981)',
-                  borderRadius: 8, transition: 'width .4s',
-                }} />
+              <div style={{ height: 9, background: '#eef2f7', borderRadius: 8, overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${Math.min(100, (totalReceived / totalPending) * 100)}%`, background: 'linear-gradient(90deg, #059669, #06B6D4)', borderRadius: 8, transition: 'width .4s' }} />
               </div>
             </div>
           )}
