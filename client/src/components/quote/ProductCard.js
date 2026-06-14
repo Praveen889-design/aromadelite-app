@@ -113,10 +113,13 @@ export default function ProductCard({ product, inCart, onAdd, stockQty = null, c
   const [qty,     setQty]     = useState(1);
 
   const selectedSize = allSizes[sizeIdx];
+  // pack_size stored in the cart is '' for the base unit — the "Added" check
+  // must use this same value, not the display label, or base packs never match.
+  const selPackSize  = selectedSize?.isBase ? '' : (selectedSize?.size || '');
 
   const lineKey = useMemo(
-    () => `${product.id}|${variant || ''}|${selectedSize?.size || ''}`,
-    [product.id, variant, selectedSize]
+    () => `${product.id}|${variant || ''}|${selPackSize}`,
+    [product.id, variant, selPackSize]
   );
   const alreadyAdded = inCart.has(lineKey);
 
@@ -127,7 +130,6 @@ export default function ProductCard({ product, inCart, onAdd, stockQty = null, c
 
   // Onboarded client: lock to their last billed price for this product+pack —
   // but never charge more than the current system price (lower of the two wins).
-  const selPackSize  = selectedSize?.isBase ? '' : (selectedSize?.size || '');
   const clientPrice  = lookupClientPrice(clientPrices, product.id, selPackSize, product.unit);
   const hasClientPrice = clientPrice !== null && clientPrice > 0;
   const effectivePrice = hasClientPrice ? Math.min(clientPrice, systemPrice) : systemPrice;
