@@ -170,10 +170,16 @@ export default function ProductCard({ product, inCart, onAdd, stockQty = null, c
       <div style={{ padding: '13px 14px 14px 17px', display: 'flex', flexDirection: 'column', flex: 1 }}>
         {/* Header */}
         <div className="flex items-start gap-2.5">
-          <span style={{ width: 36, height: 36, borderRadius: 11, background: tintHex(accent, .14), color: accent,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 19, flexShrink: 0 }}>
-            {product.category_icon || '📦'}
-          </span>
+          {product.image_url ? (
+            <img src={product.image_url} alt={product.name}
+              style={{ width: 52, height: 52, borderRadius: 12, objectFit: 'contain', padding: 3, boxSizing: 'border-box',
+                background: '#fff', border: `1px solid ${tintHex(accent, .3)}`, flexShrink: 0 }} />
+          ) : (
+            <span style={{ width: 52, height: 52, borderRadius: 12, background: tintHex(accent, .14), color: accent,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, flexShrink: 0 }}>
+              {product.category_icon || '📦'}
+            </span>
+          )}
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2">
               <h3 style={{ fontWeight: 800, fontSize: 14, color: '#0F2B3A', lineHeight: 1.25 }} title={product.name}>
