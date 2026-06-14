@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import { useQuoteBuilder } from '../context/QuoteBuilderContext';
@@ -40,15 +40,12 @@ export default function NewQuote() {
   const [modalOpen, setModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false); // mobile cart bottom sheet
-  const prevCount = useRef(0);
-
-  // Auto-pop the cart sheet on the first mobile add
-  useEffect(() => {
-    if (items.length > prevCount.current && window.matchMedia('(max-width: 1023px)').matches) {
-      setSheetOpen(true);
-    }
-    prevCount.current = items.length;
-  }, [items.length]);
+  // Add to cart WITHOUT blocking the page — a toast confirms and the floating
+  // cart bar tracks the count; the user opens the cart sheet only when ready.
+  const handleAddToCart = useCallback((item) => {
+    addItem(item);
+    toast(`${item.product_name} added to quote`, { kind: 'success' });
+  }, [addItem, toast]);
 
   useEffect(() => {
     let cancelled = false;
@@ -319,7 +316,7 @@ export default function NewQuote() {
                 key={p.id}
                 product={p}
                 inCart={cartKeys}
-                onAdd={addItem}
+                onAdd={handleAddToCart}
                 clientPrices={clientPrices}
                 stockQty={
                   stockMap === null
